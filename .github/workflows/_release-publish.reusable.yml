@@ -172,7 +172,16 @@ jobs:
                  echo "::error::NODE_AUTH_TOKEN is not set. Cannot publish to NPM."
                  exit 1
              fi
+
+             # Explicitly configure .npmrc
+             echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
+             # echo "registry=https://registry.npmjs.org/" >> .npmrc # Optional: Ensure registry URL
+
+             # Now publish
              pnpm publish --tag $NPM_TAG --no-git-checks
+
+             # Optional: Remove .npmrc after publish for cleanup
+             # rm -f .npmrc
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

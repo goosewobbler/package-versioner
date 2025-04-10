@@ -80,11 +80,19 @@ This is the default if the `synced` flag is present and true.
 
 *(Note: This mode relies heavily on monorepo tooling and structure, like `pnpm workspaces` and correctly configured package dependencies.)*
 
--   **Behavior:** The tool analyzes commits to determine which specific packages within the monorepo have changed since the last tag.
-    -   It calculates an appropriate version bump **independently for each changed package** based on the commits affecting that package (or potentially using branch patterns, though this is less common in async mode).
+-   **Behavior (Default - No `-t` flag):** The tool analyzes commits to determine which specific packages within the monorepo have changed since the last relevant commit/tag.
+    -   It calculates an appropriate version bump **independently for each changed package** based on the commits affecting that package.
     -   Only the `package.json` files of the changed packages are updated.
-    -   Individual Git tags might be created per package (e.g., `my-package@1.1.0`), or a single commit might group the changes without specific tags, depending on configuration (`tagPrefix`, commit message templates).
--   **Use Case:** Suitable for monorepos where packages are loosely coupled and can be versioned and released independently.
+    -   A **single commit** is created grouping all the version bumps, using the commit message template. **No Git tags are created** in this mode.
+-   **Use Case:** Suitable for monorepos where packages are versioned independently, but a single commit represents the batch of updates for traceability.
+
+-   **Behavior (Targeted - With `-t` flag):** When using the `-t, --target <targets>` flag:
+    -   Only the specified packages (respecting the `skip` list) are considered for versioning.
+    -   It calculates an appropriate version bump **independently for each targeted package** based on its commit history.
+    -   The `package.json` file of each successfully updated targeted package is modified.
+    -   An **individual Git tag** (e.g., `packageName@1.2.3`) is created **for each successfully updated package** immediately after its version is bumped.
+    -   Finally, a **single commit** is created including all the updated `package.json` files, using a summary commit message (e.g., `chore(release): pkg-a, pkg-b 1.2.3 [skip-ci]`).
+-   **Use Case:** Releasing specific packages independently while still tagging each released package individually.
 
 You can also target specific packages for versioning in monorepos using the `--target <package-name>` CLI flag, which typically forces a single-package update regardless of the `synced` setting.
 

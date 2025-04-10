@@ -171,18 +171,22 @@ export async function gitProcess({ files, nextTag, commitMessage, skipHooks, dry
         skipHooks,
       });
 
-      const tagMessage = `New Version ${nextTag} generated at ${new Date().toISOString()}`;
-      await createGitTag({
-        tag: nextTag,
-        message: tagMessage,
-      });
+      if (nextTag) {
+        const tagMessage = `New Version ${nextTag} generated at ${new Date().toISOString()}`;
+        await createGitTag({
+          tag: nextTag,
+          message: tagMessage,
+        });
+      }
     } else {
       log('info', '[DRY RUN] Would add files:');
       for (const file of files) {
         log('info', `  - ${file}`);
       }
       log('info', `[DRY RUN] Would commit with message: "${commitMessage}"`);
-      log('info', `[DRY RUN] Would create tag: ${nextTag}`);
+      if (nextTag) {
+        log('info', `[DRY RUN] Would create tag: ${nextTag}`);
+      }
     }
   } catch (err: unknown) {
     console.log(err);

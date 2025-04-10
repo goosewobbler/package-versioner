@@ -403,8 +403,7 @@ export class VersionEngine {
   public async asyncStrategy(cliTargets: string[] = []): Promise<void> {
     const {
       // packages: configPackages, // REMOVED - No longer needed here
-      commitMessage = 'chore(release): publish packages', // Generic message for async
-      skipHooks,
+      commitMessage = 'chore(release): ${version}', // Align with test expectations
     } = this.config;
 
     let pkgsResult: PackagesWithRoot;

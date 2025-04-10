@@ -708,9 +708,17 @@ describe('VersionEngine', () => {
       // Verify error was logged
       expect(utils.log).toHaveBeenCalledWith(
         'error',
-        'Failed to create tag vpackage-1@1.1.0 for package-1',
+        // Match the actual log format including the error message
+        expect.stringContaining(
+          'Failed to create tag vpackage-1@1.1.0 for package-1: Tagging failed',
+        ),
       );
-      expect(consoleErrorSpy).toHaveBeenCalledWith(tagError);
+
+      // Verify the second error log (stack trace) was called (optional but good)
+      expect(utils.log).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Error: Tagging failed'), // Check for stack trace start
+      );
 
       // Verify commit still happened
       expect(utils.gitCommit).toHaveBeenCalledTimes(1);

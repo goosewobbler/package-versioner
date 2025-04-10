@@ -376,7 +376,6 @@ export class VersionEngine {
       // Log error details using the log utility
       const errorMessage = error instanceof Error ? error.message : String(error);
       log('error', `Failed to calculate version for ${packageName}: ${errorMessage}`);
-      // console.error(error); // Remove direct console.error
       // nextVersion remains undefined
     }
 
@@ -490,7 +489,6 @@ export class VersionEngine {
       // Use log utility for consistency
       const errorMessage = error instanceof Error ? error.message : String(error);
       log('error', `Failed to get packages information: ${errorMessage}`);
-      // console.error(error); // Remove direct console.error
       exit(1); // exit terminates, no return needed
     }
 
@@ -557,8 +555,11 @@ export class VersionEngine {
           await createGitTag({ tag: packageTag, message: tagMessage });
           log('success', `Created tag: ${packageTag}`);
         } catch (tagError) {
-          log('error', `Failed to create tag ${packageTag} for ${name}`);
-          log('error', tagError);
+          log(
+            'error',
+            `Failed to create tag ${packageTag} for ${name}: ${(tagError as Error).message}`,
+          );
+          log('error', (tagError as Error).stack || 'No stack trace available');
           // Continue processing other packages even if tagging fails?
         }
       } else {

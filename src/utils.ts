@@ -3,9 +3,9 @@
  */
 
 import fs from 'node:fs';
-import { promisify } from 'node:util';
 
 import chalk from 'chalk';
+import gitSemverTags from 'git-semver-tags';
 
 import type { PackageVersion, TagFormat, TagProps } from './types.js';
 
@@ -36,16 +36,17 @@ export function log(status: 'info' | 'success' | 'error' | 'warning', message: s
  */
 export async function getLatestTag(): Promise<string> {
   try {
-    // Dynamically import the ESM module
-    const gstModule = await import('git-semver-tags');
-    // Promisify the synthesized default export
-    const getSemverTags = promisify(gstModule.default);
-    const tags = await getSemverTags();
-    return tags[0] || '';
+    // Use the default import directly
+    const tags: string[] = await gitSemverTags({}); // Pass empty options
+    return tags[0] || ''; // Return the latest tag or empty string
   } catch (error) {
     log('error', 'Failed to get latest tag');
-    console.error(error);
-    return '';
+    console.error(error); // Log the actual error for better debugging
+    // Check if the error specifically means no tags were found
+    if (error instanceof Error && error.message.includes('No names found')) {
+      log('info', 'No tags found in the repository.');
+    }
+    return ''; // Return empty string on error or no tags
   }
 }
 

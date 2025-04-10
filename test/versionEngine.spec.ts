@@ -270,7 +270,7 @@ describe('VersionEngine', () => {
       expect(utils.gitProcess).toHaveBeenCalledTimes(1);
       const gitProcessArgs = vi.mocked(utils.gitProcess).mock.calls[0][0];
       expect(gitProcessArgs).toHaveProperty('files', [
-        '/test/path/packages/package-1/package.json',
+        path.join('/test/path', 'packages', 'package-1', 'package.json'),
       ]);
       expect(gitProcessArgs).toHaveProperty('nextTag', 'prefix@v1.1.0');
       expect(gitProcessArgs).toHaveProperty('commitMessage', expectedCommitMessage);

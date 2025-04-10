@@ -46,8 +46,8 @@ Customize behavior by creating a `version.config.json` file in your project root
 {
   "preset": "conventional-commits", // Preset for conventional-commits analysis
   "tagPrefix": "v",                 // Prefix for Git tags (e.g., v1.0.0)
-  "commitMessage": "chore(release): v${version}", // Template for the release commit
-  "versionStrategy": "conventional", // or "branchPattern"
+  "commitMessage": "chore(release): v${version}", // Template for the release commit (defaults to this if omitted)
+  "versionStrategy": "commitMessage", // Use conventional commit messages (default) or "branchPattern"
   "baseBranch": "main",               // Base branch for calculations
   "branchPattern": [                // Used if versionStrategy is branchPattern
     "feature:minor", 

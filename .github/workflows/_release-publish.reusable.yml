@@ -73,6 +73,9 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Build and verify package
+        uses: ./.github/workflows/actions/build-verify
+
       - name: 🔖 Run package-versioner
         id: version
         shell: bash

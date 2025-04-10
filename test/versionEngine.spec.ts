@@ -1,4 +1,6 @@
 import fs from 'node:fs';
+import path from 'node:path';
+
 import { getPackagesSync } from '@manypkg/get-packages';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config } from '../src/types.js';
@@ -168,9 +170,9 @@ describe('VersionEngine', () => {
       expect(utils.gitProcess).toHaveBeenCalledWith(
         expect.objectContaining({
           files: [
-            '/test/path/package.json',
-            '/test/path/packages/package-1/package.json',
-            '/test/path/packages/package-2/package.json',
+            path.join('/test/path', 'package.json'),
+            path.join('/test/path', 'packages', 'package-1', 'package.json'),
+            path.join('/test/path', 'packages', 'package-2', 'package.json'),
           ],
           nextTag: 'prefix@v1.1.0',
           commitMessage: 'chore(release): 1.1.0',

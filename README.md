@@ -32,11 +32,11 @@ npx package-versioner --bump minor
 # Create a prerelease (e.g., alpha)
 npx package-versioner --bump patch --prerelease alpha
 
-# Perform a dry run without making changes
+# Perform a dry run: calculates version, logs actions, but makes no file changes or Git commits/tags
 npx package-versioner --dry-run
 ```
 
-Works with npm, pnpm, and yarn projects.
+
 
 ## Configuration
 

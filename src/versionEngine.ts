@@ -161,7 +161,7 @@ export class VersionEngine {
         name,
       });
 
-      files.push(`${pkgPath}/package.json`);
+      files.push(path.join(pkgPath, 'package.json'));
     }
 
     return files;
@@ -263,7 +263,7 @@ export class VersionEngine {
         name: pkg.packageJson.name,
       });
 
-      files.push(`${pkg.dir}/package.json`);
+      files.push(path.join(pkg.dir, 'package.json'));
     }
 
     // Create commit and tag

@@ -9,12 +9,15 @@ import semver from 'semver';
 import type { ReleaseType } from 'semver';
 import type { Config, VersionOptions } from './types.js';
 import {
+  createGitTag,
   formatCommitMessage,
   formatTag,
   formatTagPrefix,
   getCommitsLength,
   getCurrentBranch,
   getLatestTag,
+  gitAdd,
+  gitCommit,
   gitProcess,
   lastMergeBranchName,
   log,
@@ -144,9 +147,9 @@ export class VersionEngine {
    */
   private async processPackages(
     discoveredPackages: Package[] = [],
-    targets: string[] = [], // Renamed from configPackages to generic targets
+    targets: string[] = [],
   ): Promise<string[]> {
-    const { tagPrefix, skip } = this.config;
+    const { tagPrefix, skip, dryRun } = this.config;
     const files: string[] = [];
 
     // Determine which packages to consider based on targets and skip list
@@ -156,17 +159,14 @@ export class VersionEngine {
         log('info', `Skipping package ${pkg.packageJson.name} based on config skip list.`);
         return false;
       }
-
       // If targets are provided, only include packages matching a target
       if (targets.length > 0) {
         const isTargeted = targets.includes(pkg.packageJson.name);
         if (!isTargeted) {
-          // Optional: Log which packages are skipped due to not being targeted
           // log('info', `Skipping package ${pkg.packageJson.name} as it is not in the target list.`);
         }
         return isTargeted;
       }
-
       // If no targets are provided, include all non-skipped packages
       return true;
     });
@@ -177,21 +177,20 @@ export class VersionEngine {
       const name = pkg.packageJson.name;
       const pkgPath = pkg.dir;
       const prefix = formatTagPrefix(tagPrefix);
-      const latestTag = await getLatestTag(); // Consider if tag should be package-specific for async?
+      const latestTag = await getLatestTag();
 
       const nextVersion = await this.calculateVersion({
-        latestTag, // This might need refinement for async based on package-specific tags
+        latestTag,
         tagPrefix: prefix,
         path: pkgPath,
-        name, // Pass name for potential package-specific tag lookups
+        name,
         branchPattern: this.config.branchPattern,
         baseBranch: this.config.baseBranch,
         prereleaseIdentifier: this.config.prereleaseIdentifier,
-        type: this.config.forceType, // Pass forced type if provided
+        type: this.config.forceType,
       });
 
       if (!nextVersion) {
-        // Log already happens in calculateVersion if no bump is needed
         continue;
       }
 
@@ -199,7 +198,7 @@ export class VersionEngine {
         path: pkgPath,
         version: nextVersion,
         name,
-        dryRun: this.config.dryRun,
+        dryRun: dryRun,
       });
 
       files.push(path.join(pkgPath, 'package.json'));
@@ -364,12 +363,22 @@ export class VersionEngine {
     const prefix = formatTagPrefix(tagPrefix);
     const latestTag = await getLatestTag();
 
-    const nextVersion = await this.calculateVersion({
-      latestTag,
-      tagPrefix: prefix,
-      path: pkgPath,
-      name: packageName,
-    });
+    // biome-ignore lint/style/noVar: Need let for try/catch assignment
+    let nextVersion = ''; // Initialize, type inferred
+    try {
+      // Wrap calculateVersion in try/catch
+      nextVersion = await this.calculateVersion({
+        latestTag,
+        tagPrefix: prefix,
+        path: pkgPath,
+        name: packageName,
+      });
+    } catch (error) {
+      // Log error similar to how calculateVersion does, but ensure flow continues
+      log('error', `Failed to calculate version for ${packageName}`);
+      console.error(error);
+      // nextVersion remains ''
+    }
 
     if (!nextVersion) {
       log('info', `No version change needed for ${packageName}`);
@@ -401,9 +410,16 @@ export class VersionEngine {
    * Async versioning strategy (each package gets its own version)
    */
   public async asyncStrategy(cliTargets: string[] = []): Promise<void> {
+    // --- Route to new targeted strategy if targets are provided ---
+    if (cliTargets.length > 0) {
+      await this.asyncTargetedStrategy(cliTargets);
+      return; // Exit after targeted strategy is done
+    }
+
+    // --- Original async logic (when no targets are provided) ---
     const {
       commitMessage = 'chore(release): ${version}', // Align with test expectations
-      skipHooks, // Add skipHooks here
+      skipHooks,
     } = this.config;
 
     let pkgsResult: PackagesWithRoot;
@@ -416,25 +432,24 @@ export class VersionEngine {
       log('error', 'Failed to get packages information');
       console.error(error);
       exit(1);
-      return; // This is unreachable but helps TypeScript understand pkgsResult is defined below
+      return;
     }
 
-    // Get packages to process, passing cliTargets for filtering
-    const pkgsToProcess = await this.processPackages(pkgsResult.packages, cliTargets);
+    // Get packages to process (returns file paths)
+    const pkgsToProcess = await this.processPackages(pkgsResult.packages, cliTargets); // cliTargets will be empty here
 
-    // No packages to process
     if (pkgsToProcess.length === 0) {
       log('info', 'No packages to process based on changes and targets');
       return;
     }
 
-    // Use a generic commit message for async, as versions vary
     const formattedCommitMessage = commitMessage;
 
     try {
+      // Use original gitProcess which handles commit only (no tags for default async)
       await gitProcess({
         files: pkgsToProcess,
-        nextTag: '',
+        nextTag: '', // No tag for default async
         commitMessage: formattedCommitMessage,
         skipHooks,
         dryRun: this.config.dryRun,
@@ -447,6 +462,149 @@ export class VersionEngine {
       log('error', 'Failed to create version commit');
       console.error(error);
       exit(1);
+    }
+  }
+
+  // --- NEW METHOD for Async + Targeted ---
+  private async asyncTargetedStrategy(cliTargets: string[]): Promise<void> {
+    const {
+      tagPrefix,
+      skip,
+      dryRun,
+      skipHooks,
+      commitMessage: commitMessageTemplate,
+    } = this.config;
+    const updatedPackagesInfo: Array<{ name: string; version: string; path: string }> = [];
+
+    log('info', `Processing targeted packages: ${cliTargets.join(', ')}`);
+
+    // 1. Get all packages
+    let pkgsResult: PackagesWithRoot;
+    try {
+      pkgsResult = getPackagesSync(cwd()) as PackagesWithRoot;
+      if (!pkgsResult || !pkgsResult.packages) {
+        throw new Error('Failed to get packages information');
+      }
+    } catch (error) {
+      log('error', 'Failed to get packages information');
+      console.error(error);
+      exit(1);
+      return;
+    }
+
+    // 2. Filter packages based on targets and skip list
+    const pkgsToConsider = pkgsResult.packages.filter((pkg: Package) => {
+      if (skip?.includes(pkg.packageJson.name)) {
+        log('info', `Skipping package ${pkg.packageJson.name} based on config skip list.`);
+        return false;
+      }
+      // Only include if it's in the cliTargets list
+      const isTargeted = cliTargets.includes(pkg.packageJson.name);
+      if (!isTargeted) {
+        // log('info', `Skipping package ${pkg.packageJson.name} as it is not targeted.`);
+      }
+      return isTargeted;
+    });
+
+    log('info', `Found ${pkgsToConsider.length} targeted package(s) to process after filtering.`);
+
+    if (pkgsToConsider.length === 0) {
+      log('info', 'No matching targeted packages found to process.');
+      return;
+    }
+
+    // 3. Process each targeted package
+    for (const pkg of pkgsToConsider) {
+      const name = pkg.packageJson.name;
+      const pkgPath = pkg.dir;
+      const prefix = formatTagPrefix(tagPrefix);
+      const latestTag = await getLatestTag(); // Still potentially repo-global
+
+      const nextVersion = await this.calculateVersion({
+        latestTag,
+        tagPrefix: prefix,
+        path: pkgPath,
+        name,
+        branchPattern: this.config.branchPattern,
+        baseBranch: this.config.baseBranch,
+        prereleaseIdentifier: this.config.prereleaseIdentifier,
+        type: this.config.forceType,
+      });
+
+      if (!nextVersion) {
+        continue; // No version change calculated for this package
+      }
+
+      // Update package.json
+      updatePackageVersion({
+        path: pkgPath,
+        version: nextVersion,
+        name,
+        dryRun: dryRun,
+      });
+
+      // Create package-specific tag
+      const packageTag = formatTag(
+        { synced: false, name, tagPrefix },
+        { version: nextVersion, tagPrefix },
+      );
+      const tagMessage = `chore(release): ${name} ${nextVersion}`;
+
+      if (!dryRun) {
+        try {
+          await createGitTag({ tag: packageTag, message: tagMessage });
+          log('success', `Created tag: ${packageTag}`);
+        } catch (tagError) {
+          log('error', `Failed to create tag ${packageTag} for ${name}`);
+          console.error(tagError);
+          // Continue processing other packages even if tagging fails?
+        }
+      } else {
+        log('info', `[DRY RUN] Would create tag: ${packageTag}`);
+      }
+
+      // Collect info for the final commit
+      updatedPackagesInfo.push({ name, version: nextVersion, path: pkgPath });
+    }
+
+    // 4. Create single commit if any packages were updated
+    if (updatedPackagesInfo.length === 0) {
+      log('info', 'No targeted packages required a version update.');
+      return;
+    }
+
+    const filesToCommit = updatedPackagesInfo.map((info) => path.join(info.path, 'package.json'));
+    const packageNames = updatedPackagesInfo.map((p) => p.name).join(', ');
+    // Use the version from the first updated package as representative
+    const representativeVersion = updatedPackagesInfo[0]?.version || 'multiple';
+    let commitMessage = commitMessageTemplate || 'chore(release): publish packages';
+
+    // Construct commit message: Use template if only one package, otherwise list names.
+    if (updatedPackagesInfo.length === 1 && commitMessage.includes('${version}')) {
+      // If template has ${version} and only one package, format it
+      commitMessage = formatCommitMessage(commitMessage, representativeVersion);
+    } else {
+      // Otherwise, use a generic message listing packages and representative version
+      commitMessage = `chore(release): ${packageNames} ${representativeVersion}`;
+    }
+    commitMessage += ' [skip-ci]'; // Add skip-ci trailer
+
+    if (!dryRun) {
+      try {
+        await gitAdd(filesToCommit);
+        await gitCommit({ message: commitMessage, skipHooks });
+        log('success', `Created commit for targeted release: ${packageNames}`);
+      } catch (commitError) {
+        log('error', 'Failed to create commit for targeted release.');
+        console.error(commitError);
+        exit(1); // Exit if commit fails
+      }
+    } else {
+      log('info', '[DRY RUN] Would add files:');
+      for (const file of filesToCommit) {
+        log('info', `  - ${file}`);
+      }
+      log('info', `[DRY RUN] Would commit with message: "${commitMessage}"`);
     }
   }
 }

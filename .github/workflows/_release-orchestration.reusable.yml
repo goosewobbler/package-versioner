@@ -76,6 +76,8 @@ jobs:
   # Publish the release (tag, npm publish, GitHub release)
   publish_release:
     needs: ['calculate_branches', 'prepare']
+    permissions:
+      contents: write
     uses: ./.github/workflows/_release-publish.reusable.yml
     with:
       target_branch: ${{ needs.calculate_branches.outputs.target_branch }}

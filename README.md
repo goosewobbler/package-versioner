@@ -88,7 +88,7 @@ npx package-versioner --help
 
 ## Acknowledgements
 
-This project was originally forked from and inspired by [`jucian0/turbo-version`](https://github.com/jucian0/turbo-version)). We appreciate the foundational work done by the original authors.
+This project was originally forked from and inspired by [`jucian0/turbo-version`](https://github.com/jucian0/turbo-version). We appreciate the foundational work done by the original authors.
 
 ## License
 

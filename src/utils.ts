@@ -5,18 +5,47 @@
 import fs from 'node:fs';
 
 import chalk from 'chalk';
+import figlet from 'figlet';
+// Use default import for JSON with NodeNext module resolution
+import pkg from '../package.json' with { type: 'json' };
+
 // Use the correct named import for the ESM package
 import { getSemverTags } from 'git-semver-tags';
 
 import type { PackageVersion, TagFormat, TagProps } from './types.js';
 
-// Re-export git functions
+// Correctly re-export only necessary functions from git.ts
 export {
-  gitProcess,
   getCommitsLength,
   getCurrentBranch,
+  gitProcess,
   lastMergeBranchName,
 } from './git.js';
+
+// Figlet doesn't promisify cleanly with options. Call original with callback.
+// const figletAsync = promisify(figlet.text);
+
+/**
+ * Print the figlet banner
+ */
+export function printFiglet(): void {
+  // Made synchronous as figlet callback handles async
+  const font = 'Standard'; // Specify font directly
+  figlet.text(pkg.name, { font }, (err, data) => {
+    // Use pkg.name
+    if (err) {
+      log('warning', 'Could not print figlet banner: Figlet error');
+      console.error(err);
+      return;
+    }
+    if (data) {
+      const figletText = data;
+      const versionText = `v${pkg.version}`; // Use pkg.version
+      process.stdout.write(`${chalk.hex('#FF1F57')(figletText)}\n`);
+      process.stdout.write(`${chalk.hex('#0096FF')(versionText)}\n\n`);
+    }
+  });
+}
 
 /**
  * Log a message with color based on status

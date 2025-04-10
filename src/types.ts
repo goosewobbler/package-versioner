@@ -21,6 +21,7 @@ export interface Config {
   prereleaseIdentifier?: string;
   skipHooks?: boolean;
   dryRun?: boolean;
+  forceType?: ReleaseType;
 }
 
 /**

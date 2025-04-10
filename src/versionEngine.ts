@@ -139,43 +139,59 @@ export class VersionEngine {
   }
 
   /**
-   * Process all packages and update their versions
+   * Process packages based on discovery, skip list, and optional target list.
+   * Returns a list of package.json file paths that were updated (or would be in dry run).
    */
   private async processPackages(
-    packages: Package[] = [],
-    configPackages: string[] = [],
+    discoveredPackages: Package[] = [],
+    targets: string[] = [], // Renamed from configPackages to generic targets
   ): Promise<string[]> {
-    const { tagPrefix } = this.config;
-
-    const pkgsResult = packages.length
-      ? { packages }
-      : (getPackagesSync(cwd()) as PackagesWithRoot);
+    const { tagPrefix, skip } = this.config;
     const files: string[] = [];
-    const selectedPackages = pkgsResult.packages.filter((pkg: Package) => {
-      if (this.config.skip?.includes(pkg.packageJson.name)) {
+
+    // Determine which packages to consider based on targets and skip list
+    const pkgsToConsider = discoveredPackages.filter((pkg: Package) => {
+      // Always skip packages in the skip list
+      if (skip?.includes(pkg.packageJson.name)) {
+        log('info', `Skipping package ${pkg.packageJson.name} based on config skip list.`);
         return false;
       }
 
-      return configPackages.length === 0 || configPackages.includes(pkg.packageJson.name);
+      // If targets are provided, only include packages matching a target
+      if (targets.length > 0) {
+        const isTargeted = targets.includes(pkg.packageJson.name);
+        if (!isTargeted) {
+          // Optional: Log which packages are skipped due to not being targeted
+          // log('info', `Skipping package ${pkg.packageJson.name} as it is not in the target list.`);
+        }
+        return isTargeted;
+      }
+
+      // If no targets are provided, include all non-skipped packages
+      return true;
     });
 
-    for (const pkg of selectedPackages) {
+    log('info', `Found ${pkgsToConsider.length} package(s) to process after filtering.`);
+
+    for (const pkg of pkgsToConsider) {
       const name = pkg.packageJson.name;
       const pkgPath = pkg.dir;
       const prefix = formatTagPrefix(tagPrefix);
-      const latestTag = await getLatestTag();
+      const latestTag = await getLatestTag(); // Consider if tag should be package-specific for async?
 
       const nextVersion = await this.calculateVersion({
-        latestTag,
+        latestTag, // This might need refinement for async based on package-specific tags
         tagPrefix: prefix,
         path: pkgPath,
-        name,
+        name, // Pass name for potential package-specific tag lookups
         branchPattern: this.config.branchPattern,
         baseBranch: this.config.baseBranch,
         prereleaseIdentifier: this.config.prereleaseIdentifier,
+        type: this.config.forceType, // Pass forced type if provided
       });
 
       if (!nextVersion) {
+        // Log already happens in calculateVersion if no bump is needed
         continue;
       }
 
@@ -384,11 +400,10 @@ export class VersionEngine {
   /**
    * Async versioning strategy (each package gets its own version)
    */
-  public async asyncStrategy(): Promise<void> {
+  public async asyncStrategy(cliTargets: string[] = []): Promise<void> {
     const {
-      packages: configPackages,
-      commitMessage = 'chore(release): ${version}',
-      skipHooks,
+      commitMessage = 'chore(release): ${version}', // Align with test expectations
+      skipHooks, // Add skipHooks here
     } = this.config;
 
     let pkgsResult: PackagesWithRoot;
@@ -404,28 +419,29 @@ export class VersionEngine {
       return; // This is unreachable but helps TypeScript understand pkgsResult is defined below
     }
 
-    // Get packages to process
-    const pkgsToProcess = await this.processPackages(pkgsResult.packages, configPackages);
+    // Get packages to process, passing cliTargets for filtering
+    const pkgsToProcess = await this.processPackages(pkgsResult.packages, cliTargets);
 
     // No packages to process
     if (pkgsToProcess.length === 0) {
-      log('info', 'No packages to process');
+      log('info', 'No packages to process based on changes and targets');
       return;
     }
 
+    // Use a generic commit message for async, as versions vary
     const formattedCommitMessage = commitMessage;
 
     try {
       await gitProcess({
         files: pkgsToProcess,
-        nextTag: '', // No tag for async strategy
+        nextTag: '',
         commitMessage: formattedCommitMessage,
         skipHooks,
         dryRun: this.config.dryRun,
       });
 
       if (!this.config.dryRun) {
-        log('success', 'Created version commit');
+        log('success', `Created version commit for ${pkgsToProcess.length} package(s)`);
       }
     } catch (error) {
       log('error', 'Failed to create version commit');

@@ -1,93 +1,84 @@
 #!/usr/bin/env node
 
 import { exit } from 'node:process';
+import { cwd } from 'node:process';
 import chalk from 'chalk';
 import { Command } from 'commander';
-import figlet from 'figlet';
-//@ts-ignore
-import pkg from '../package.json' assert { type: 'json' };
 import { loadConfig } from './config.js';
-import { log } from './utils.js';
+import type { Config } from './types.js';
+import { log, printFiglet } from './utils.js';
 import { VersionEngine } from './versionEngine.js';
 
-const name = 'package-versioner';
+async function run() {
+  printFiglet();
 
-const program = new Command();
+  const program = new Command();
 
-program
-  .name('package-versioner')
-  .description('Manages package versions using Git context.')
-  .version(pkg.version);
+  program
+    .name('package-versioner')
+    .description(
+      'Automated semantic versioning based on Git history and conventional commits. Supports monorepos with synchronized or independent package versioning strategies.',
+    )
+    .version('0.0.2') // TODO: Read from package.json
+    .option('--config <path>', 'Path to the configuration file')
+    .option('--dry-run', 'Simulate the versioning process without making changes')
+    .option('--synced', 'Force synced versioning strategy (overrides config)') // Keep for explicit override
+    .option('--bump <type>', 'Force a specific release type (patch, minor, major)')
+    .option(
+      '--prerelease <identifier>',
+      'Create a prerelease version with the specified identifier',
+    )
+    .option(
+      '-t, --target <targets>',
+      'Comma-separated list of package names to target (only for async strategy)',
+    )
+    .parse(process.argv);
 
-// Core options
-program
-  .option('-t, --target <project>', 'specific package to update')
-  .option('-b, --bump <version>', 'type of version bump to perform', (value) => {
-    const validBumps = [
-      'patch',
-      'minor',
-      'major',
-      'premajor',
-      'preminor',
-      'prepatch',
-      'prerelease',
-    ];
-    if (!validBumps.includes(value)) {
-      log('error', `Invalid bump type '${value}'. Valid options are: ${validBumps.join(', ')}`);
-      process.exit(1);
-    }
-    return value;
-  })
-  .option('--base-branch <branch>', 'override the base branch for this operation')
-  .option('--synced', 'force synced versioning mode')
-  .option('--no-synced', 'force async versioning mode')
-  .option('--skip <packages>', 'comma-separated list of packages to skip', (value) =>
-    value.split(','),
-  )
-  .option('--prerelease <identifier>', 'set prerelease identifier (e.g., alpha, beta)')
-  .option('--skip-hooks', 'skip Git hooks for this operation')
-  .option('--config <path>', 'specify a custom config file path')
-  .option('--dry-run', 'Calculate version and log actions without changing files or Git state');
+  const options = program.opts();
 
-program
-  .description('Version packages based on Git context and conventional commits')
-  .action(async (options): Promise<void> => {
-    // Display the figlet header directly
-    const figletText = figlet.textSync(name);
-    const versionText = `v${pkg.version}`;
-    process.stdout.write(`${chalk.hex('#FF1F57')(figletText)}\n`);
-    process.stdout.write(`${chalk.hex('#0096FF')(versionText)}\n\n`);
+  try {
+    // Load config
+    const config: Config = await loadConfig(options.config);
+    log('info', `Loaded configuration from ${options.config || 'version.config.json'}`);
 
-    try {
-      // Load config (with potential override for config path)
-      const configPath = options.config || undefined;
-      const config = await loadConfig(configPath);
+    // Override config with CLI options
+    if (options.dryRun) config.dryRun = true;
+    if (options.synced) config.synced = true; // Allow forcing sync mode
+    if (options.bump) config.forceType = options.bump;
+    if (options.prerelease)
+      config.prereleaseIdentifier = options.prerelease === true ? 'rc' : options.prerelease;
 
-      // Override config with CLI options
-      if (options.baseBranch) config.baseBranch = options.baseBranch;
-      if (options.synced !== undefined) config.synced = options.synced;
-      if (options.skip) config.skip = options.skip;
-      if (options.prerelease) config.prereleaseIdentifier = options.prerelease;
-      if (options.skipHooks !== undefined) config.skipHooks = options.skipHooks;
-      if (options.dryRun !== undefined) config.dryRun = options.dryRun;
+    // Parse targets
+    const cliTargets: string[] = options.target
+      ? options.target.split(',').map((t: string) => t.trim())
+      : [];
 
-      const engine = new VersionEngine(config);
+    // Initialize engine
+    const engine = new VersionEngine(config);
 
-      // Simple routing logic
-      if (config.synced) {
-        // Synced mode - all packages get the same version
-        await engine.syncedStrategy();
-      } else if (options.bump && options.target) {
-        // Single package mode - version specific packages
-        await engine.singleStrategy();
-      } else {
-        // Async mode - version packages with changes
-        await engine.asyncStrategy();
+    // Determine strategy
+    if (config.synced) {
+      log('info', 'Using synced versioning strategy.');
+      await engine.syncedStrategy(); // Synced doesn't use targets
+    } else if (config.packages && config.packages.length === 1) {
+      log('info', 'Using single package versioning strategy.');
+      if (cliTargets.length > 0) {
+        log('warning', '--target flag is ignored for single package strategy.');
       }
-    } catch (err: unknown) {
-      log('error', `${err instanceof Error ? err.message : String(err)}`);
-      exit(1);
+      await engine.singleStrategy();
+    } else {
+      log('info', 'Using async versioning strategy.');
+      if (cliTargets.length > 0) {
+        log('info', `Targeting specific packages: ${cliTargets.join(', ')}`);
+      }
+      await engine.asyncStrategy(cliTargets); // Pass targets to async strategy
     }
-  });
 
-program.parse();
+    log('success', 'Versioning process completed.');
+  } catch (error) {
+    log('error', error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
+run();

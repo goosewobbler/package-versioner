@@ -20,7 +20,7 @@ runs:
 
     - name: ⚙️ Install Dependencies
       shell: bash
-      run: pnpm install --frozen-lockfile
+      run: pnpm install --frozen-lockfile --prod=false
 
     - name: 🔧 Configure Git identity
       shell: bash

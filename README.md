@@ -45,7 +45,7 @@ npx package-versioner -t @scope/package-a,@scope/package-b
 npx package-versioner --dry-run
 ```
 
-
+**Note on Targeting:** Using the `-t` flag creates package-specific tags (e.g., `@scope/package-a@1.2.0`) but *not* a global tag (like `v1.2.0`). If needed, create the global tag manually in your CI/CD script after this command.
 
 ## Configuration
 

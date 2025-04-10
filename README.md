@@ -4,92 +4,85 @@ A powerful CLI tool for automated semantic versioning based on Git history and c
 
 ## Features
 
-- Automatically determines version bumps based on commit history
-- Supports both monorepo and single package projects
-- Flexible versioning strategies (synchronized or independent)
-- Integrates with conventional commits
-- Customizable through configuration or CLI options
-- Generates appropriate Git tags for releases
-
-## Installation
-
-```bash
-# Global installation
-npm install -g package-versioner
-
-# Or as a dev dependency
-npm install --save-dev package-versioner
-```
+- Automatically determines version bumps based on commit history (using conventional commits)
+- Primarily designed for single package projects, but configurable
+- Flexible versioning strategies (e.g., based on commit types, branch patterns)
+- Integrates with conventional commits presets
+- Customizable through a `version.config.json` file or CLI options
+- Automatically updates `package.json` version
+- Creates and pushes appropriate Git tags for releases
 
 ## Usage
 
-### Basic Usage
+`package-versioner` is designed to be run directly using your preferred package manager's execution command, without needing global installation.
 
 ```bash
-# Let package-versioner determine what to bump based on commit messages
-package-versioner
+# Determine bump based on conventional commits since last tag
+npx package-versioner
 
-# Specify a bump type
-package-versioner --bump minor
+# Using pnpm
+pnpm dlx package-versioner
 
-# Target a specific package in a monorepo
-package-versioner --target my-package --bump patch
+# Using yarn
+yarn dlx package-versioner
 
-# Use prerelease identifier
-package-versioner --prerelease beta
+# Specify a bump type explicitly
+npx package-versioner --bump minor
+
+# Create a prerelease (e.g., alpha)
+npx package-versioner --bump patch --prerelease alpha
+
+# Perform a dry run without making changes
+npx package-versioner --dry-run
 ```
 
-### Configuration
+Works with npm, pnpm, and yarn projects.
 
-Create a `version.config.json` file in your project root:
+## Configuration
+
+Customize behavior by creating a `version.config.json` file in your project root:
 
 ```json
 {
-  "preset": "conventional-commits",
-  "packages": [],
-  "tagPrefix": "v",
-  "versionStrategy": "branchPattern",
-  "baseBranch": "main",
-  "synced": true,
-  "branchPattern": ["feature:minor", "fix:patch"],
-  "skip": [],
-  "updateInternalDependencies": "no-internal-update"
+  "preset": "conventional-commits", // Preset for conventional-commits analysis
+  "tagPrefix": "v",                 // Prefix for Git tags (e.g., v1.0.0)
+  "commitMessage": "chore(release): v${version}", // Template for the release commit
+  "versionStrategy": "conventional", // or "branchPattern"
+  "baseBranch": "main",               // Base branch for calculations
+  "branchPattern": [                // Used if versionStrategy is branchPattern
+    "feature:minor", 
+    "fix:patch"
+  ],
+  "prereleaseIdentifier": null,     // Default prerelease identifier (e.g., "beta")
+  "skipHooks": false,               // Skip git commit hooks (--no-verify)
+  "synced": true,                   // (Monorepo-specific) Treat as a single synchronized unit
+  "packages": [],                   // (Monorepo-specific) Specify packages (not typical for single repo)
+  "updateInternalDependencies": "no-internal-update" // (Monorepo-specific) How to handle workspace deps
 }
 ```
 
-## Versioning Strategies
+**Note:** Options like `synced`, `packages`, and `updateInternalDependencies` enable monorepo-specific behaviours.
 
-### Synced Mode
+## How Versioning Works
 
-All packages get the same version number. Use this for tightly coupled packages.
+`package-versioner` determines the next version based on your configuration (`version.config.json`). The two main approaches are:
 
-```bash
-package-versioner --synced
-```
+1.  **Conventional Commits:** Analyzes commit messages (like `feat:`, `fix:`, `BREAKING CHANGE:`) since the last tag.
+2.  **Branch Pattern:** Determines the bump based on the current or recently merged branch name matching predefined patterns.
 
-### Async Mode
-
-Each package gets its own independent version. Use this for loosely coupled packages.
-
-```bash
-package-versioner --no-synced
-```
-
-### Single Package Mode
-
-Version a specific package in a monorepo.
-
-```bash
-package-versioner --target my-package
-```
+For a detailed explanation of these concepts and monorepo modes (Synced vs. Async), see [Versioning Strategies and Concepts](./docs/VERSIONING_STRATEGIES.md).
 
 ## Documentation
 
-For more details on available options and configuration, run:
+For more details on available CLI options, run:
 
 ```bash
-package-versioner --help
+npx package-versioner --help
 ```
+
+## Acknowledgements
+
+This project was originally forked from and inspired by `jucian0/turbo-version` ([https://github.com/jucian0/turbo-version](https://github.com/jucian0/turbo-version)). We appreciate the foundational work done by the original authors.
 
 ## License
 

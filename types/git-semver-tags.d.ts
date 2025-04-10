@@ -5,6 +5,6 @@ declare module 'git-semver-tags' {
     skipUnstable?: boolean;
     tagPrefix?: string;
   }
-  function gitSemverTags(options?: Options): Promise<string[]>;
-  export = gitSemverTags;
+  // Declare the named export function
+  export function getSemverTags(options?: Options): Promise<string[]>;
 }

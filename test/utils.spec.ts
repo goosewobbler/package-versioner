@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import gitSemverTags from 'git-semver-tags';
+import { getSemverTags } from 'git-semver-tags';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 
@@ -16,12 +16,9 @@ vi.mock('node:util', () => ({
   promisify: vi.fn((fn) => fn),
 }));
 
-// Refined git-semver-tags mock
-// Define mock directly in the factory
+// Mock the named export getSemverTags
 vi.mock('git-semver-tags', () => ({
-  __esModule: true, // Handle ES module interop
-  // Remove type hint again
-  default: vi.fn().mockResolvedValue([]),
+  getSemverTags: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock fs module - Provide mocks for both named and default imports
@@ -174,30 +171,29 @@ describe('Utils Module', () => {
   });
 
   describe('getLatestTag', () => {
-    it('should return the first tag from gitSemverTags', async () => {
+    it('should return the first tag from getSemverTags', async () => {
       const mockTags = ['v1.1.0', 'v1.0.0'];
-      // Remove explicit cast, use vi.mocked directly
-      // @ts-expect-error - Linter struggles with mockResolvedValue type here
-      vi.mocked(gitSemverTags).mockResolvedValue(mockTags);
+      // Mock the named export
+      vi.mocked(getSemverTags).mockResolvedValue(mockTags);
 
       const latestTag = await utils.getLatestTag();
       expect(latestTag).toBe('v1.1.0');
-      // Check the default export mock was called
-      expect(gitSemverTags).toHaveBeenCalled();
+      // Check the named export mock was called
+      expect(getSemverTags).toHaveBeenCalledWith({}); // Expect call with empty options
     });
 
     it('should return an empty string if no tags are found', async () => {
-      // Remove explicit cast
-      // @ts-expect-error - Linter struggles with mockResolvedValue type here
-      vi.mocked(gitSemverTags).mockResolvedValue([]); // Empty array
+      // Mock the named export
+      vi.mocked(getSemverTags).mockResolvedValue([]); // Empty array
       const latestTag = await utils.getLatestTag();
       expect(latestTag).toBe('');
+      expect(getSemverTags).toHaveBeenCalledWith({}); // Expect call with empty options
     });
 
     it('should return an empty string and log error if gitSemverTags rejects', async () => {
       const error = new Error('Git command failed');
-      // Remove explicit cast
-      vi.mocked(gitSemverTags).mockRejectedValue(error);
+      // Mock the named export
+      vi.mocked(getSemverTags).mockRejectedValue(error);
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
@@ -208,6 +204,7 @@ describe('Utils Module', () => {
       expect(stdoutWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to get latest tag'),
       );
+      expect(getSemverTags).toHaveBeenCalledWith({}); // Expect call with empty options
       consoleErrorSpy.mockRestore();
       stdoutWriteSpy.mockRestore();
     });

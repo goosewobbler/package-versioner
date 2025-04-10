@@ -5,7 +5,8 @@
 import fs from 'node:fs';
 
 import chalk from 'chalk';
-import gitSemverTags from 'git-semver-tags';
+// Use the correct named import for the ESM package
+import { getSemverTags } from 'git-semver-tags';
 
 import type { PackageVersion, TagFormat, TagProps } from './types.js';
 
@@ -36,8 +37,8 @@ export function log(status: 'info' | 'success' | 'error' | 'warning', message: s
  */
 export async function getLatestTag(): Promise<string> {
   try {
-    // Use the default import directly
-    const tags: string[] = await gitSemverTags({}); // Pass empty options
+    // Call the named import directly
+    const tags: string[] = await getSemverTags({}); // Pass empty options
     return tags[0] || ''; // Return the latest tag or empty string
   } catch (error) {
     log('error', 'Failed to get latest tag');

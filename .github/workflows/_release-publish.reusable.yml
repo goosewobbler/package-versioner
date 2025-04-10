@@ -99,7 +99,8 @@ jobs:
           fi
 
           # Execute package-versioner (ESM output is index.js due to type: module)
-          COMMAND="node ./dist/index.js $BUMP_ARG $PRE_ARG $DRY_RUN_ARG" # Execute ESM built file directly
+          # Add --synced flag to ensure a single tag is generated for the release workflow
+          COMMAND="node ./dist/index.js --synced $BUMP_ARG $PRE_ARG $DRY_RUN_ARG" 
           echo "Running: $COMMAND"
           OUTPUT=$( $COMMAND 2>&1 || echo "Command failed with exit code $?" ) # Capture stdout/stderr even on failure
           echo "Command Output:"

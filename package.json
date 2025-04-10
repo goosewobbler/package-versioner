@@ -15,17 +15,9 @@
     "url": "https://github.com/goosewobbler/package-versioner",
     "homepage": "https://github.com/goosewobbler/package-versioner"
   },
-  "keywords": [
-    "version",
-    "semver",
-    "git",
-    "package"
-  ],
+  "keywords": ["version", "semver", "git", "package"],
   "license": "MIT",
-  "files": [
-    "dist/**",
-    "package-versioner.schema.json"
-  ],
+  "files": ["dist/**", "package-versioner.schema.json"],
   "bin": {
     "package-versioner": "./dist/index.js"
   },
@@ -43,10 +35,7 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{js,ts,jsx,tsx}": [
-      "biome check --apply",
-      "biome format --write"
-    ]
+    "*.{js,ts,jsx,tsx}": ["biome check --apply", "biome format --write"]
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -64,6 +53,7 @@
     "@manypkg/get-packages": "^2.2.2",
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
+    "conventional-changelog-angular": "^8.0.0",
     "conventional-recommended-bump": "^11.0.0",
     "figlet": "^1.8.0",
     "git-semver-tags": "^8.0.0",

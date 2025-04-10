@@ -363,8 +363,7 @@ export class VersionEngine {
     const prefix = formatTagPrefix(tagPrefix);
     const latestTag = await getLatestTag();
 
-    // biome-ignore lint/style/noVar: Need let for try/catch assignment
-    let nextVersion = ''; // Initialize, type inferred
+    let nextVersion: string | undefined = undefined;
     try {
       // Wrap calculateVersion in try/catch
       nextVersion = await this.calculateVersion({
@@ -374,13 +373,15 @@ export class VersionEngine {
         name: packageName,
       });
     } catch (error) {
-      // Log error similar to how calculateVersion does, but ensure flow continues
-      log('error', `Failed to calculate version for ${packageName}`);
-      console.error(error);
-      // nextVersion remains ''
+      // Log error details using the log utility
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log('error', `Failed to calculate version for ${packageName}: ${errorMessage}`);
+      // console.error(error); // Remove direct console.error
+      // nextVersion remains undefined
     }
 
-    if (!nextVersion) {
+    // Explicitly check for undefined (error) or empty string (no bump)
+    if (nextVersion === undefined || nextVersion === '') {
       log('info', `No version change needed for ${packageName}`);
       return;
     }
@@ -486,10 +487,11 @@ export class VersionEngine {
         throw new Error('Failed to get packages information');
       }
     } catch (error) {
-      log('error', 'Failed to get packages information');
-      console.error(error);
-      exit(1);
-      return;
+      // Use log utility for consistency
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log('error', `Failed to get packages information: ${errorMessage}`);
+      // console.error(error); // Remove direct console.error
+      exit(1); // exit terminates, no return needed
     }
 
     // 2. Filter packages based on targets and skip list

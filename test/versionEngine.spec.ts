@@ -484,9 +484,8 @@ describe('VersionEngine', () => {
       // Check error log from calculateVersion's catch block (which logs and returns '')
       expect(utils.log).toHaveBeenCalledWith(
         'error',
-        expect.stringContaining('Failed to calculate version for package-1'),
+        expect.stringContaining(`Failed to calculate version for package-1: ${calcError.message}`),
       );
-      expect(consoleErrorSpy).toHaveBeenCalledWith(calcError);
       // Check that singleStrategy then logs "no version change" because calculateVersion returned ''
       expect(utils.log).toHaveBeenCalledWith('info', 'No version change needed for package-1');
       // Verify no actual updates or git commands ran

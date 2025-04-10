@@ -62,7 +62,7 @@ export function formatTag(options: TagFormat, props: TagProps): string {
     return `${tagPrefix ? tagPrefix : ''}${name}@${version}`;
   }
 
-  return `${tagPrefix ? tagPrefix : ''}v${version}`;
+  return `${tagPrefix ? tagPrefix : 'v'}${version}`;
 }
 
 /**

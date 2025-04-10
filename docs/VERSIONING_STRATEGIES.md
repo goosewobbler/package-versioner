@@ -93,7 +93,3 @@ This is the default if the `synced` flag is present and true.
     -   An **individual Git tag** (e.g., `packageName@1.2.3`) is created **for each successfully updated package** immediately after its version is bumped.
     -   Finally, a **single commit** is created including all the updated `package.json` files, using a summary commit message (e.g., `chore(release): pkg-a, pkg-b 1.2.3 [skip-ci]`).
 -   **Use Case:** Releasing specific packages independently while still tagging each released package individually.
-
-You can also target specific packages for versioning in monorepos using the `--target <package-name>` CLI flag, which typically forces a single-package update regardless of the `synced` setting.
-
-When using Async Mode (`synced: false`), you can further filter which packages are processed using the `-t, --target <targets>` CLI flag. Provide a comma-separated list of package names (e.g., `-t @scope/pkg-a,@scope/pkg-b`). Only packages matching this list (and not excluded by the `skip` config) will be considered for versioning. 

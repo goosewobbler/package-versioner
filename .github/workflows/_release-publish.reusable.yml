@@ -99,7 +99,7 @@ jobs:
           fi
 
           # Execute package-versioner
-          COMMAND="pnpm exec package-versioner $BUMP_ARG $PRE_ARG $DRY_RUN_ARG"
+          COMMAND="node ./dist/index.js $BUMP_ARG $PRE_ARG $DRY_RUN_ARG" # Execute built file directly
           echo "Running: $COMMAND"
           OUTPUT=$( $COMMAND 2>&1 || echo "Command failed with exit code $?" ) # Capture stdout/stderr even on failure
           echo "Command Output:"

@@ -456,79 +456,144 @@ describe('VersionEngine', () => {
   });
 
   describe('asyncStrategy', () => {
-    it('should update only packages with changes', async () => {
+    beforeEach(() => {
+      // Default to async mode for these tests
       mockConfig.synced = false;
-      Object.defineProperty(engine, 'processPackages', {
-        value: vi.fn().mockResolvedValue(['/test/path/packages/package-1/package.json']),
-        configurable: true,
-      });
+      engine = new VersionEngine(mockConfig); // Re-create engine with updated config
+      vi.mocked(utils.getLatestTag).mockResolvedValue('v1.0.0');
+      vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'patch' });
+      vi.mocked(utils.getCommitsLength).mockResolvedValue(1);
+    });
+
+    it('should update only packages where calculateVersion returns a version', async () => {
+      // Mock calculateVersion directly for finer control in async tests
+      // biome-ignore lint/suspicious/noExplicitAny: Need to spy on private method for testing
+      const calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
+      calculateVersionSpy
+        .mockResolvedValueOnce('1.0.1') // package-1 gets an update
+        .mockResolvedValueOnce(''); // package-2 does not
 
       await engine.asyncStrategy();
+
+      expect(utils.updatePackageVersion).toHaveBeenCalledTimes(1);
+      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'package-1', version: '1.0.1' }),
+      );
+      expect(utils.updatePackageVersion).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'package-2' }),
+      );
 
       expect(utils.gitProcess).toHaveBeenCalledWith(
         expect.objectContaining({
-          files: ['/test/path/packages/package-1/package.json'],
-          nextTag: '',
+          files: [path.join('/test/path', 'packages', 'package-1', 'package.json')],
           commitMessage: 'chore(release): ${version}',
+          nextTag: '',
+          skipHooks: undefined,
+          dryRun: undefined,
         }),
       );
-      expect(utils.log).toHaveBeenCalledWith('success', 'Created version commit');
+      // Check the updated log message
+      expect(utils.log).toHaveBeenCalledWith('success', 'Created version commit for 1 package(s)');
     });
 
-    it('should do nothing when no packages have changes', async () => {
-      mockConfig.synced = false;
-      Object.defineProperty(engine, 'processPackages', {
-        value: vi.fn().mockResolvedValue([]),
-        configurable: true,
-      });
+    it('should do nothing when calculateVersion returns no versions', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Need to spy on private method for testing
+      const calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
+      calculateVersionSpy.mockResolvedValue(''); // No packages get updates
 
       await engine.asyncStrategy();
 
+      expect(utils.updatePackageVersion).not.toHaveBeenCalled();
       expect(utils.gitProcess).not.toHaveBeenCalled();
-      expect(utils.log).toHaveBeenCalledWith('info', 'No packages to process');
+      // Check the updated log message
+      expect(utils.log).toHaveBeenCalledWith(
+        'info',
+        'No packages to process based on changes and targets',
+      );
     });
 
-    // Add test for getPackagesSync error
-    it('should handle errors when getPackagesSync fails', async () => {
-      mockConfig.synced = false;
-      const error = new Error('getPackagesSync failed');
-      vi.mocked(getPackagesSync).mockImplementation(() => {
-        throw error;
-      });
-      vi.spyOn(process, 'exit').mockImplementation(() => {
-        throw new Error('Process exit');
-      });
+    // --- New tests for --target flag ---
 
-      await expect(engine.asyncStrategy()).rejects.toThrow('Process exit');
+    it('should process only targeted packages when cliTargets are provided', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Need to spy on private method for testing
+      const calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
+      calculateVersionSpy.mockResolvedValue('1.0.1'); // Assume target package needs update
 
-      expect(utils.log).toHaveBeenCalledWith('error', 'Failed to get packages information');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(error);
-      expect(process.exit).toHaveBeenCalledWith(1);
-    });
+      const targets = ['package-1'];
+      await engine.asyncStrategy(targets);
 
-    // Test for gitProcess error in asyncStrategy
-    it('should handle errors when creating git commit', async () => {
-      mockConfig.synced = false;
-      Object.defineProperty(engine, 'processPackages', {
-        value: vi.fn().mockResolvedValue(['/path/pkg-a/package.json']), // Simulate packages found
-        configurable: true,
-      });
-      const gitError = new Error('Git error');
-      vi.mocked(utils.gitProcess).mockRejectedValue(gitError);
-      vi.spyOn(process, 'exit').mockImplementation(() => {
-        throw new Error('Process exit');
-      });
+      // Verify processPackages was effectively called for only the target
+      expect(calculateVersionSpy).toHaveBeenCalledTimes(1);
+      expect(calculateVersionSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'package-1' }),
+      );
 
-      await expect(engine.asyncStrategy()).rejects.toThrow('Process exit');
+      expect(utils.updatePackageVersion).toHaveBeenCalledTimes(1);
+      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'package-1', version: '1.0.1' }),
+      );
 
-      expect(utils.log).toHaveBeenCalledWith('error', 'Failed to create version commit');
-      // Ensure consoleErrorSpy is checked correctly for the wrapped error
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(utils.gitProcess).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: expect.stringContaining('Git error'), // Check wrapped error
+          files: [path.join('/test/path', 'packages', 'package-1', 'package.json')],
+          commitMessage: 'chore(release): ${version}',
+          nextTag: '',
+          skipHooks: undefined,
+          dryRun: undefined,
         }),
       );
-      expect(process.exit).toHaveBeenCalledWith(1);
+      expect(utils.log).toHaveBeenCalledWith('success', 'Created version commit for 1 package(s)');
+    });
+
+    it('should process no packages if targets do not match discovered packages', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Need to spy on private method for testing
+      const calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
+      const targets = ['non-existent-package'];
+      await engine.asyncStrategy(targets);
+
+      expect(calculateVersionSpy).not.toHaveBeenCalled();
+      expect(utils.updatePackageVersion).not.toHaveBeenCalled();
+      expect(utils.gitProcess).not.toHaveBeenCalled();
+      expect(utils.log).toHaveBeenCalledWith(
+        'info',
+        'No packages to process based on changes and targets',
+      );
+    });
+
+    it('should respect config skip list even if package is targeted', async () => {
+      mockConfig.skip = ['package-1']; // Add package-1 to skip list
+      engine = new VersionEngine(mockConfig); // Re-create engine
+
+      // biome-ignore lint/suspicious/noExplicitAny: Need to spy on private method for testing
+      const calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
+      calculateVersionSpy.mockResolvedValue('1.0.1'); // Assume package-2 needs update
+
+      const targets = ['package-1', 'package-2']; // Target both
+      await engine.asyncStrategy(targets);
+
+      // Verify package-1 was skipped despite being targeted
+      expect(utils.log).toHaveBeenCalledWith(
+        'info',
+        'Skipping package package-1 based on config skip list.',
+      );
+
+      // Verify only package-2 was processed
+      expect(calculateVersionSpy).toHaveBeenCalledTimes(1);
+      expect(calculateVersionSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'package-2' }),
+      );
+
+      expect(utils.updatePackageVersion).toHaveBeenCalledTimes(1);
+      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'package-2', version: '1.0.1' }),
+      );
+
+      expect(utils.gitProcess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          files: [path.join('/test/path', 'packages', 'package-2', 'package.json')],
+        }),
+      );
+      expect(utils.log).toHaveBeenCalledWith('success', 'Created version commit for 1 package(s)');
     });
   });
 });

@@ -41,6 +41,8 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       release_tag: ${{ steps.version.outputs.release_tag }}
       new_version: ${{ steps.version.outputs.new_version }}

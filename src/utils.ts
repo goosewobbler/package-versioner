@@ -36,9 +36,9 @@ export function log(status: 'info' | 'success' | 'error' | 'warning', message: s
  */
 export async function getLatestTag(): Promise<string> {
   try {
-    // Dynamically import the CJS module
+    // Dynamically import the ESM module
     const gstModule = await import('git-semver-tags');
-    // Promisify the default export (synthesized by Node)
+    // Promisify the synthesized default export
     const getSemverTags = promisify(gstModule.default);
     const tags = await getSemverTags();
     return tags[0] || '';

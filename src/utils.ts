@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { promisify } from 'node:util';
 
 import chalk from 'chalk';
-import gitSemverTags from 'git-semver-tags';
+import * as gitSemverTags from 'git-semver-tags';
 
 import type { PackageVersion, TagFormat, TagProps } from './types.js';
 
@@ -18,7 +18,7 @@ export {
   lastMergeBranchName,
 } from './git.js';
 
-const getSemverTags = promisify(gitSemverTags);
+const getSemverTags = promisify(gitSemverTags.default);
 
 /**
  * Log a message with color based on status

@@ -1,5 +1,11 @@
 # package-versioner
 
+
+<a href="https://www.npmjs.com/package/package-versioner" alt="NPM Version">
+  <img src="https://img.shields.io/npm/v/package-versioner" /></a>
+<a href="https://www.npmjs.com/package/package-versioner" alt="NPM Downloads">
+  <img src="https://img.shields.io/npm/dw/package-versioner" /></a>
+
 A powerful CLI tool for automated semantic versioning based on Git history and conventional commits. Simplifies version management in JavaScript/TypeScript projects.
 
 ## Features

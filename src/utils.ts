@@ -20,6 +20,9 @@ export {
   getCurrentBranch,
   gitProcess,
   lastMergeBranchName,
+  createGitTag,
+  gitAdd,
+  gitCommit,
 } from './git.js';
 
 // Figlet doesn't promisify cleanly with options. Call original with callback.

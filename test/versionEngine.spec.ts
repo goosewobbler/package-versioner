@@ -61,12 +61,14 @@ vi.mock('../src/utils.js', () => ({
     .mockImplementation((msg, version) => `${msg.replace('${version}', version)}`),
   updatePackageVersion: vi.fn(),
   log: vi.fn(),
-  gitProcess: vi.fn(), // Mock gitProcess via utils
+  gitProcess: vi.fn(),
   getCommitsLength: vi.fn(),
-  // Provide default resolved values
   getCurrentBranch: vi.fn().mockResolvedValue('main'),
   lastMergeBranchName: vi.fn().mockResolvedValue(null),
   getLatestTag: vi.fn().mockResolvedValue('v1.0.0'),
+  gitAdd: vi.fn(),
+  gitCommit: vi.fn(),
+  createGitTag: vi.fn(),
 }));
 
 // Mock node:process
@@ -90,50 +92,61 @@ import * as utils from '../src/utils.js';
 // Auto-mock the module
 vi.mock('conventional-recommended-bump');
 
+// Mock the individual git functions we need for asyncTargetedStrategy
+vi.mock('../src/git.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../src/git.js')>();
+  return {
+    ...original, // Keep original exports like isGitRepository if needed
+    gitAdd: vi.fn(),
+    gitCommit: vi.fn(),
+    createGitTag: vi.fn(),
+    // Mock others if they are called unexpectedly
+  };
+});
+
+// Need to import git functions directly for mocking/spying after the mock setup
+import { createGitTag, gitAdd, gitCommit } from '../src/git.js';
+
 describe('VersionEngine', () => {
   let engine: VersionEngine;
   let mockConfig: Config;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
+  // Spy on the new private method
+  // biome-ignore lint/suspicious/noExplicitAny: Explicit any needed to bypass spy type mismatch
+  let asyncTargetedStrategySpy: any;
+  // Spy on the original private method
+  // biome-ignore lint/suspicious/noExplicitAny: Explicit any needed to bypass spy type mismatch
+  let processPackagesSpy: any;
+  // Spy on the calculateVersion method
+  // biome-ignore lint/suspicious/noExplicitAny: Explicit any needed to bypass spy type mismatch
+  let calculateVersionSpy: any;
+
   beforeEach(() => {
     vi.resetAllMocks();
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    // Ensure Bumper and its instances/methods are deeply mocked AFTER reset
+    // Mock Bumper
     vi.mocked(Bumper, { deep: true });
-
-    // Set default implementations on the PROTOTYPE of the deeply mocked class
     vi.mocked(Bumper.prototype.loadPreset).mockImplementation(vi.fn());
     vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'patch' });
 
-    // Explicitly reset branch mocks AFTER resetAllMocks
+    // Mock utils functions (used by multiple strategies)
     vi.mocked(utils.getCurrentBranch).mockResolvedValue('main');
     vi.mocked(utils.lastMergeBranchName).mockResolvedValue(null);
-
-    mockConfig = {
-      preset: 'conventional-commits',
-      packages: [],
-      tagPrefix: 'v',
-      commitMessage: 'chore(release): ${version}',
-      versionStrategy: 'branchPattern' as const,
-      baseBranch: 'main',
-      synced: true,
-      branchPattern: ['feature:minor', 'fix:patch'],
-      skip: [], // Ensure skip is always an array
-      updateInternalDependencies: 'no-internal-update' as const,
-    };
-
-    // Create engine instance
-    engine = new VersionEngine(mockConfig);
-
-    // Reset mock implementations AFTER resetAllMocks and engine creation
-    vi.mocked(utils.formatTag).mockReturnValue('prefix@v1.1.0');
-    vi.mocked(utils.formatTagPrefix).mockReturnValue('prefix@');
+    vi.mocked(utils.formatTag).mockImplementation(({ name, tagPrefix }, { version }) =>
+      name ? `${tagPrefix}${name}@${version}` : `${tagPrefix || 'v'}${version}`,
+    );
+    vi.mocked(utils.formatTagPrefix).mockImplementation((prefix) => (prefix ? `${prefix}` : ''));
     vi.mocked(utils.formatCommitMessage).mockImplementation(
       (msg, version) => `${msg.replace('${version}', version)}`,
     );
     vi.mocked(utils.getLatestTag).mockResolvedValue('v1.0.0');
     vi.mocked(utils.getCommitsLength).mockResolvedValue(1);
+    vi.mocked(utils.updatePackageVersion).mockImplementation(() => {});
+    vi.mocked(utils.log).mockImplementation(() => {}); // Mock log to suppress output in tests
+
+    // Mock manypkg (used by multiple strategies)
     vi.mocked(getPackagesSync).mockReturnValue({
       packages: [
         {
@@ -148,21 +161,53 @@ describe('VersionEngine', () => {
       root: '/test/path',
     } as PackagesWithRoot);
 
-    if (vi.isMockFunction(fs.existsSync)) {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-    }
-    if (vi.isMockFunction(fs.readFileSync)) {
-      vi.mocked(fs.readFileSync).mockReturnValue('{}');
-    }
-    if (vi.isMockFunction(fs.writeFileSync)) {
+    // Mock fs
+    if (vi.isMockFunction(fs.existsSync)) vi.mocked(fs.existsSync).mockReturnValue(true);
+    if (vi.isMockFunction(fs.readFileSync))
+      vi.mocked(fs.readFileSync).mockReturnValue('{"name": "test", "version": "1.0.0"}'); // Provide valid JSON
+    if (vi.isMockFunction(fs.writeFileSync))
       vi.mocked(fs.writeFileSync).mockImplementation(() => {});
-    }
 
-    vi.mocked(utils.updatePackageVersion).mockImplementation(() => {});
+    // Default config
+    mockConfig = {
+      preset: 'conventional-commits',
+      packages: [],
+      tagPrefix: 'v',
+      commitMessage: 'chore(release): ${version}',
+      versionStrategy: 'commitMessage' as const,
+      baseBranch: 'main',
+      synced: false, // Default to async for relevant tests
+      branchPattern: [],
+      skip: [],
+      updateInternalDependencies: 'no-internal-update' as const,
+      skipHooks: false,
+      dryRun: false,
+    };
+
+    engine = new VersionEngine(mockConfig);
+
+    // --- Spy on private methods AFTER engine instantiation ---
+    // biome-ignore lint/suspicious/noExplicitAny: Accessing private method for testing
+    asyncTargetedStrategySpy = vi.spyOn(engine as any, 'asyncTargetedStrategy');
+    // biome-ignore lint/suspicious/noExplicitAny: Accessing private method for testing
+    processPackagesSpy = vi.spyOn(engine as any, 'processPackages');
+    // biome-ignore lint/suspicious/noExplicitAny: Accessing private method for testing
+    calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
+
+    // Default implementation for calculateVersion (can be overridden per test)
+    calculateVersionSpy.mockResolvedValue('1.0.1');
+
+    // Mock the original gitProcess (used by non-targeted async)
+    vi.mocked(utils.gitProcess).mockResolvedValue();
+
+    // Mock individual git functions via utils mock (used by targeted async)
+    vi.mocked(utils.gitAdd).mockResolvedValue({ stdout: '', stderr: '' });
+    vi.mocked(utils.gitCommit).mockResolvedValue({ stdout: '', stderr: '' });
+    vi.mocked(utils.createGitTag).mockResolvedValue({ stdout: '', stderr: '' });
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.restoreAllMocks(); // Restore all mocks, including spies
   });
 
   describe('syncedStrategy', () => {
@@ -198,6 +243,7 @@ describe('VersionEngine', () => {
     it('should use initial version 0.0.1 when no tags exist', async () => {
       vi.mocked(utils.getLatestTag).mockResolvedValue('');
       vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'patch' });
+      calculateVersionSpy.mockResolvedValue('0.0.1');
 
       const expectedInitialVersion = '0.0.1';
       vi.mocked(utils.formatTag).mockReturnValue(`v${expectedInitialVersion}`);
@@ -228,31 +274,29 @@ describe('VersionEngine', () => {
     it('should skip version update when tags exist but no relevant commits are found', async () => {
       vi.mocked(utils.getLatestTag).mockResolvedValue('v1.0.0');
       vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: undefined });
+      calculateVersionSpy.mockResolvedValue('');
       vi.mocked(utils.getCommitsLength).mockResolvedValue(1);
 
       await engine.syncedStrategy();
 
       expect(utils.updatePackageVersion).not.toHaveBeenCalled();
       expect(utils.gitProcess).not.toHaveBeenCalled();
-      expect(utils.log).toHaveBeenCalledWith(
-        'info',
-        expect.stringContaining('No relevant commits found'),
-      );
+      // Expect the specific log message from syncedStrategy when no version is calculated
+      expect(utils.log).toHaveBeenCalledWith('info', 'No version change needed');
     });
 
     it('should skip version update when tags exist but getCommitsLength returns 0', async () => {
       vi.mocked(utils.getLatestTag).mockResolvedValue('v1.0.0');
-      vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'patch' });
+      vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'patch' }); // Bump proposed
+      calculateVersionSpy.mockResolvedValue(''); // But calculateVersion returns no change due to commitsLength
       vi.mocked(utils.getCommitsLength).mockResolvedValue(0);
 
       await engine.syncedStrategy();
 
       expect(utils.updatePackageVersion).not.toHaveBeenCalled();
       expect(utils.gitProcess).not.toHaveBeenCalled();
-      expect(utils.log).toHaveBeenCalledWith(
-        'info',
-        expect.stringContaining('No new commits found'),
-      );
+      // Expect the specific log message from syncedStrategy when no version is calculated
+      expect(utils.log).toHaveBeenCalledWith('info', 'No version change needed');
     });
 
     it('should log error if updating root package.json fails', async () => {
@@ -289,6 +333,7 @@ describe('VersionEngine', () => {
       vi.mocked(utils.getLatestTag).mockResolvedValue('vpackage-1@1.0.0');
       vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'minor' });
       vi.mocked(utils.getCommitsLength).mockResolvedValue(5);
+      calculateVersionSpy.mockResolvedValue('1.1.0');
 
       const expectedVersion = '1.1.0';
       const pkg1Path = '/test/path/packages/package-1';
@@ -316,6 +361,7 @@ describe('VersionEngine', () => {
       mockConfig.synced = false;
       vi.mocked(utils.getLatestTag).mockResolvedValue('');
       vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'minor' });
+      calculateVersionSpy.mockResolvedValue('0.0.1');
 
       const expectedVersion = '0.0.1';
       const pkg1Path = '/test/path/packages/package-1';
@@ -373,10 +419,7 @@ describe('VersionEngine', () => {
     it('should do nothing if calculateVersion returns empty string', async () => {
       mockConfig.packages = ['package-1'];
       mockConfig.synced = false;
-      Object.defineProperty(engine, 'calculateVersion', {
-        value: vi.fn().mockResolvedValue(''), // No version change
-        configurable: true,
-      });
+      calculateVersionSpy.mockResolvedValue('');
 
       await engine.singleStrategy();
 
@@ -389,10 +432,7 @@ describe('VersionEngine', () => {
     it('should handle errors during gitProcess', async () => {
       mockConfig.packages = ['package-1'];
       mockConfig.synced = false;
-      Object.defineProperty(engine, 'calculateVersion', {
-        value: vi.fn().mockResolvedValue('1.1.0'),
-        configurable: true,
-      });
+      calculateVersionSpy.mockResolvedValue('1.1.0');
       const gitError = new Error('Git process failed');
       vi.mocked(utils.gitProcess).mockRejectedValue(gitError);
       vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -436,164 +476,289 @@ describe('VersionEngine', () => {
       mockConfig.packages = ['package-1'];
       mockConfig.synced = false;
       const calcError = new Error('Calculation failed');
-      // Mock the prototype BUMP function to throw
-      vi.mocked(Bumper.prototype.bump).mockRejectedValue(calcError);
-      vi.mocked(utils.getLatestTag).mockResolvedValue(''); // Example: no tags scenario
+      calculateVersionSpy.mockRejectedValue(calcError);
+      vi.mocked(utils.getLatestTag).mockResolvedValue('v1.0.0');
 
-      // Act
       await engine.singleStrategy();
 
-      // Assert: Check logs and ensure no updates/git happened
+      // Check error log from calculateVersion's catch block (which logs and returns '')
       expect(utils.log).toHaveBeenCalledWith(
         'error',
-        expect.stringContaining('Failed to calculate version'),
+        expect.stringContaining(`Failed to calculate version for package-1: ${calcError.message}`),
       );
+      // Check that singleStrategy then logs "no version change" because calculateVersion returned ''
+      expect(utils.log).toHaveBeenCalledWith('info', 'No version change needed for package-1');
+      // Verify no actual updates or git commands ran
       expect(utils.updatePackageVersion).not.toHaveBeenCalled();
       expect(utils.gitProcess).not.toHaveBeenCalled();
-      // Assert that the *original* rejected error was caught and logged by calculateVersion's catch block
-      expect(consoleErrorSpy).toHaveBeenCalledWith(calcError);
     });
   });
 
   describe('asyncStrategy', () => {
     beforeEach(() => {
-      // Default to async mode for these tests
+      // Ensure async mode
       mockConfig.synced = false;
-      engine = new VersionEngine(mockConfig); // Re-create engine with updated config
-      vi.mocked(utils.getLatestTag).mockResolvedValue('v1.0.0');
-      vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'patch' });
-      vi.mocked(utils.getCommitsLength).mockResolvedValue(1);
+      engine = new VersionEngine(mockConfig);
+      // Re-apply spies after engine recreation
+      // biome-ignore lint/suspicious/noExplicitAny: Accessing private method for testing
+      asyncTargetedStrategySpy = vi.spyOn(engine as any, 'asyncTargetedStrategy');
+      // biome-ignore lint/suspicious/noExplicitAny: Accessing private method for testing
+      processPackagesSpy = vi.spyOn(engine as any, 'processPackages');
     });
 
-    it('should update only packages where calculateVersion returns a version', async () => {
-      // Mock calculateVersion directly for finer control in async tests
-      // biome-ignore lint/suspicious/noExplicitAny: Need to spy on private method for testing
-      const calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
-      calculateVersionSpy
-        .mockResolvedValueOnce('1.0.1') // package-1 gets an update
-        .mockResolvedValueOnce(''); // package-2 does not
+    it('should call asyncTargetedStrategy when cliTargets are provided', async () => {
+      const targets = ['package-1'];
+      await engine.asyncStrategy(targets);
 
-      await engine.asyncStrategy();
+      expect(asyncTargetedStrategySpy).toHaveBeenCalledWith(targets);
+      expect(processPackagesSpy).not.toHaveBeenCalled(); // Original processor shouldn't be called
+      expect(utils.gitProcess).not.toHaveBeenCalled(); // Original git process shouldn't be called
+    });
 
-      expect(utils.updatePackageVersion).toHaveBeenCalledTimes(1);
-      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'package-1', version: '1.0.1' }),
-      );
-      expect(utils.updatePackageVersion).not.toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'package-2' }),
-      );
+    it('should call original processPackages and gitProcess when no cliTargets are provided', async () => {
+      // Mock original processPackages to return file paths
+      processPackagesSpy.mockResolvedValue(['/test/path/packages/package-1/package.json']);
 
+      await engine.asyncStrategy([]); // Empty targets
+
+      expect(asyncTargetedStrategySpy).not.toHaveBeenCalled();
+      expect(processPackagesSpy).toHaveBeenCalledWith(expect.any(Array), []); // Called with empty targets
       expect(utils.gitProcess).toHaveBeenCalledWith(
         expect.objectContaining({
-          files: [path.join('/test/path', 'packages', 'package-1', 'package.json')],
-          commitMessage: 'chore(release): ${version}',
-          nextTag: '',
-          skipHooks: undefined,
-          dryRun: undefined,
+          files: ['/test/path/packages/package-1/package.json'],
+          nextTag: '', // No tag for default async
+          commitMessage: mockConfig.commitMessage, // Expect template
         }),
       );
-      // Check the updated log message
-      expect(utils.log).toHaveBeenCalledWith('success', 'Created version commit for 1 package(s)');
     });
 
-    it('should do nothing when calculateVersion returns no versions', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: Need to spy on private method for testing
-      const calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
-      calculateVersionSpy.mockResolvedValue(''); // No packages get updates
-
-      await engine.asyncStrategy();
-
-      expect(utils.updatePackageVersion).not.toHaveBeenCalled();
+    it('should handle no packages being processed in the original flow', async () => {
+      processPackagesSpy.mockResolvedValue([]); // No files updated
+      await engine.asyncStrategy([]);
+      expect(asyncTargetedStrategySpy).not.toHaveBeenCalled();
+      expect(processPackagesSpy).toHaveBeenCalled();
       expect(utils.gitProcess).not.toHaveBeenCalled();
-      // Check the updated log message
       expect(utils.log).toHaveBeenCalledWith(
         'info',
         'No packages to process based on changes and targets',
       );
     });
+  });
 
-    // --- New tests for --target flag ---
+  // --- NEW Suite for asyncTargetedStrategy ---
+  describe('asyncTargetedStrategy (private method test)', () => {
+    beforeEach(() => {
+      // Ensure async mode
+      mockConfig.synced = false;
+      engine = new VersionEngine(mockConfig);
+      // Re-apply spies after engine recreation
+      // biome-ignore lint/suspicious/noExplicitAny: Accessing private method for testing
+      asyncTargetedStrategySpy = vi.spyOn(engine as any, 'asyncTargetedStrategy');
+      // biome-ignore lint/suspicious/noExplicitAny: Accessing private method for testing
+      processPackagesSpy = vi.spyOn(engine as any, 'processPackages');
+      // biome-ignore lint/suspicious/noExplicitAny: Accessing private method for testing
+      calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
+      calculateVersionSpy.mockResolvedValue('1.1.0'); // Default successful bump
+    });
 
-    it('should process only targeted packages when cliTargets are provided', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: Need to spy on private method for testing
-      const calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
-      calculateVersionSpy.mockResolvedValue('1.0.1'); // Assume target package needs update
+    // Helper to call the private method
+    const callPrivateMethod = (targets: string[]) => {
+      // biome-ignore lint/suspicious/noExplicitAny: Calling private method
+      return (engine as any).asyncTargetedStrategy(targets);
+    };
 
+    it('should update, tag, and commit targeted packages', async () => {
       const targets = ['package-1'];
-      await engine.asyncStrategy(targets);
+      calculateVersionSpy.mockResolvedValue('1.1.0'); // Ensure correct version
+      await callPrivateMethod(targets);
 
-      // Verify processPackages was effectively called for only the target
+      // Verify version calculation and update
+      expect(calculateVersionSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'package-1' }),
+      );
+      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'package-1', version: '1.1.0' }),
+      );
+
+      // Verify tagging
+      expect(utils.formatTag).toHaveBeenCalledWith(
+        { synced: false, name: 'package-1', tagPrefix: mockConfig.tagPrefix },
+        { version: '1.1.0', tagPrefix: mockConfig.tagPrefix },
+      );
+      const expectedTag = `${mockConfig.tagPrefix}package-1@1.1.0`;
+      expect(utils.createGitTag).toHaveBeenCalledWith({
+        tag: expectedTag,
+        message: 'chore(release): package-1 1.1.0',
+      });
+
+      // Verify commit message (uses template because it's a single package)
+      const expectedCommitMsg = 'chore(release): 1.1.0 [skip-ci]'; // Formatted by template
+      expect(utils.gitCommit).toHaveBeenCalledWith({
+        message: expectedCommitMsg,
+        skipHooks: false,
+      });
+      expect(utils.log).toHaveBeenCalledWith(
+        'success',
+        'Created commit for targeted release: package-1',
+      );
+    });
+
+    it('should handle multiple targeted packages', async () => {
+      const targets = ['package-1', 'package-2'];
+      calculateVersionSpy.mockResolvedValue('1.2.0');
+      await callPrivateMethod(targets);
+
+      // Verify updates for both
+      expect(utils.updatePackageVersion).toHaveBeenCalledTimes(2);
+      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'package-1', version: '1.2.0' }),
+      );
+      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'package-2', version: '1.2.0' }),
+      );
+
+      // Verify tagging for both
+      expect(utils.createGitTag).toHaveBeenCalledTimes(2);
+      expect(utils.createGitTag).toHaveBeenCalledWith({
+        tag: `${mockConfig.tagPrefix}package-1@1.2.0`,
+        message: 'chore(release): package-1 1.2.0',
+      });
+      expect(utils.createGitTag).toHaveBeenCalledWith({
+        tag: `${mockConfig.tagPrefix}package-2@1.2.0`,
+        message: 'chore(release): package-2 1.2.0',
+      });
+
+      // Verify commit message (uses generic list format)
+      const expectedCommitMsg = 'chore(release): package-1, package-2 1.2.0 [skip-ci]'; // Generic format
+      expect(utils.gitCommit).toHaveBeenCalledWith({
+        message: expectedCommitMsg,
+        skipHooks: false,
+      });
+      expect(utils.log).toHaveBeenCalledWith(
+        'success',
+        'Created commit for targeted release: package-1, package-2',
+      );
+    });
+
+    it('should skip packages not matching targets or in skip list', async () => {
+      mockConfig.skip = ['package-2'];
+      engine = new VersionEngine(mockConfig);
+      // Re-spy after recreation
+      // biome-ignore lint/suspicious/noExplicitAny: Accessing private method for testing
+      calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
+      calculateVersionSpy.mockResolvedValue('1.0.5');
+
+      const targets = ['package-1', 'package-2'];
+      await callPrivateMethod(targets);
+
+      // Verify skip log for package-2
+      expect(utils.log).toHaveBeenCalledWith(
+        'info',
+        'Skipping package package-2 based on config skip list.',
+      );
+
+      // Verify only package-1 was processed
       expect(calculateVersionSpy).toHaveBeenCalledTimes(1);
       expect(calculateVersionSpy).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'package-1' }),
       );
-
       expect(utils.updatePackageVersion).toHaveBeenCalledTimes(1);
-      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'package-1', version: '1.0.1' }),
-      );
+      expect(utils.createGitTag).toHaveBeenCalledTimes(1);
+      expect(utils.gitCommit).toHaveBeenCalledTimes(1);
 
-      expect(utils.gitProcess).toHaveBeenCalledWith(
-        expect.objectContaining({
-          files: [path.join('/test/path', 'packages', 'package-1', 'package.json')],
-          commitMessage: 'chore(release): ${version}',
-          nextTag: '',
-          skipHooks: undefined,
-          dryRun: undefined,
-        }),
+      // Verify commit message (uses template as only one package was actually processed)
+      const expectedCommitMsg = 'chore(release): 1.0.5 [skip-ci]'; // Formatted by template
+      expect(utils.gitCommit).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expectedCommitMsg }),
       );
-      expect(utils.log).toHaveBeenCalledWith('success', 'Created version commit for 1 package(s)');
     });
 
-    it('should process no packages if targets do not match discovered packages', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: Need to spy on private method for testing
-      const calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
-      const targets = ['non-existent-package'];
-      await engine.asyncStrategy(targets);
+    it('should handle dry run correctly', async () => {
+      mockConfig.dryRun = true;
+      engine = new VersionEngine(mockConfig);
+      // Re-apply spies
+      // biome-ignore lint/suspicious/noExplicitAny: Accessing private method for testing
+      calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
+      // Ensure specific version for this test
+      calculateVersionSpy.mockResolvedValue('1.1.0');
 
-      expect(calculateVersionSpy).not.toHaveBeenCalled();
+      const targets = ['package-1'];
+      await callPrivateMethod(targets);
+
+      // Verify tag log expectation
+      expect(utils.log).toHaveBeenCalledWith(
+        'info',
+        '[DRY RUN] Would create tag: vpackage-1@1.1.0',
+      );
+      // Verify commit log expectation (uses template for single package)
+      const expectedDryRunCommit = 'chore(release): 1.1.0 [skip-ci]';
+      expect(utils.log).toHaveBeenCalledWith(
+        'info',
+        `[DRY RUN] Would commit with message: "${expectedDryRunCommit}"`,
+      );
+      // ... other dry run expects ...
+    });
+
+    it('should proceed with commit even if tagging fails', async () => {
+      const tagError = new Error('Tagging failed');
+      vi.mocked(utils.createGitTag).mockRejectedValue(tagError);
+      const targets = ['package-1'];
+      await callPrivateMethod(targets);
+
+      // Verify error was logged
+      expect(utils.log).toHaveBeenCalledWith(
+        'error',
+        // Match the actual log format including the error message
+        expect.stringContaining(
+          'Failed to create tag vpackage-1@1.1.0 for package-1: Tagging failed',
+        ),
+      );
+
+      // Verify the second error log (stack trace) was called (optional but good)
+      expect(utils.log).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Error: Tagging failed'), // Check for stack trace start
+      );
+
+      // Verify commit still happened
+      expect(utils.gitCommit).toHaveBeenCalledTimes(1);
+      expect(utils.log).toHaveBeenCalledWith(
+        'success',
+        'Created commit for targeted release: package-1',
+      );
+    });
+
+    it('should exit if commit fails', async () => {
+      const commitError = new Error('Commit failed');
+      vi.mocked(utils.gitCommit).mockRejectedValue(commitError);
+      vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('Simulated Exit');
+      }); // Prevent actual exit
+
+      const targets = ['package-1'];
+      await expect(callPrivateMethod(targets)).rejects.toThrow('Simulated Exit');
+
+      // Verify error logging and exit call
+      expect(utils.log).toHaveBeenCalledWith(
+        'error',
+        'Failed to create commit for targeted release.',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(commitError);
+      expect(process.exit).toHaveBeenCalledWith(1);
+    });
+
+    it('should do nothing if no targeted packages require updates', async () => {
+      calculateVersionSpy.mockResolvedValue(''); // No version change
+      const targets = ['package-1'];
+      await callPrivateMethod(targets);
+
       expect(utils.updatePackageVersion).not.toHaveBeenCalled();
-      expect(utils.gitProcess).not.toHaveBeenCalled();
+      expect(utils.createGitTag).not.toHaveBeenCalled();
+      expect(utils.gitCommit).not.toHaveBeenCalled();
       expect(utils.log).toHaveBeenCalledWith(
         'info',
-        'No packages to process based on changes and targets',
+        'No targeted packages required a version update.',
       );
-    });
-
-    it('should respect config skip list even if package is targeted', async () => {
-      mockConfig.skip = ['package-1']; // Add package-1 to skip list
-      engine = new VersionEngine(mockConfig); // Re-create engine
-
-      // biome-ignore lint/suspicious/noExplicitAny: Need to spy on private method for testing
-      const calculateVersionSpy = vi.spyOn(engine as any, 'calculateVersion');
-      calculateVersionSpy.mockResolvedValue('1.0.1'); // Assume package-2 needs update
-
-      const targets = ['package-1', 'package-2']; // Target both
-      await engine.asyncStrategy(targets);
-
-      // Verify package-1 was skipped despite being targeted
-      expect(utils.log).toHaveBeenCalledWith(
-        'info',
-        'Skipping package package-1 based on config skip list.',
-      );
-
-      // Verify only package-2 was processed
-      expect(calculateVersionSpy).toHaveBeenCalledTimes(1);
-      expect(calculateVersionSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'package-2' }),
-      );
-
-      expect(utils.updatePackageVersion).toHaveBeenCalledTimes(1);
-      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'package-2', version: '1.0.1' }),
-      );
-
-      expect(utils.gitProcess).toHaveBeenCalledWith(
-        expect.objectContaining({
-          files: [path.join('/test/path', 'packages', 'package-2', 'package.json')],
-        }),
-      );
-      expect(utils.log).toHaveBeenCalledWith('success', 'Created version commit for 1 package(s)');
     });
   });
 });

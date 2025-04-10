@@ -61,13 +61,13 @@ export async function pushTags() {
   await execAsync('git push origin --tags');
 }
 
-async function gitAdd(files: string[]) {
+export async function gitAdd(files: string[]) {
   const command = `git add ${files.join(' ')}`;
 
   return execAsync(command);
 }
 
-async function gitCommit(options: GitCommit) {
+export async function gitCommit(options: GitCommit) {
   const command = ['commit'];
   if (options.amend) {
     command.push('--amend');

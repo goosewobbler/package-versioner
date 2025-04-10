@@ -111,8 +111,9 @@ jobs:
           RELEASE_TAG=""
 
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            # Try parsing dry-run output (might need adjustment based on actual output format)
-            NEW_VERSION=$(echo "$OUTPUT" | grep -oP 'New version: \K\S+' || echo "")
+            # Parse version from the dry run update log (take first match if multiple)
+            NEW_VERSION=$(echo "$OUTPUT" | grep -oP 'Would update.*? to version \K\S+' | head -n 1)
+            # Parse tag from the dry run tag log
             RELEASE_TAG=$(echo "$OUTPUT" | grep -oP 'Would create tag: \K\S+' || echo "")
             echo "Dry run - Parsed Version: $NEW_VERSION"
             echo "Dry run - Parsed Tag: $RELEASE_TAG"

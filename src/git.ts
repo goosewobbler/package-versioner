@@ -81,7 +81,7 @@ async function gitCommit(options: GitCommit) {
   if (options.skipHooks) {
     command.push('--no-verify');
   }
-  command.push(`-m "chore: ${options.message}"`);
+  command.push(`-m "${options.message}"`);
 
   return execAsync(`git ${command.join(' ')}`);
 }
@@ -181,7 +181,7 @@ export async function gitProcess({ files, nextTag, commitMessage, skipHooks, dry
       for (const file of files) {
         log('info', `  - ${file}`);
       }
-      log('info', `[DRY RUN] Would commit with message: "chore: ${commitMessage}"`);
+      log('info', `[DRY RUN] Would commit with message: "${commitMessage}"`);
       log('info', `[DRY RUN] Would create tag: ${nextTag}`);
     }
   } catch (err: unknown) {

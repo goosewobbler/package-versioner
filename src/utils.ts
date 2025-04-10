@@ -6,7 +6,6 @@ import fs from 'node:fs';
 import { promisify } from 'node:util';
 
 import chalk from 'chalk';
-import * as gitSemverTags from 'git-semver-tags';
 
 import type { PackageVersion, TagFormat, TagProps } from './types.js';
 
@@ -17,8 +16,6 @@ export {
   getCurrentBranch,
   lastMergeBranchName,
 } from './git.js';
-
-const getSemverTags = promisify(gitSemverTags.default);
 
 /**
  * Log a message with color based on status
@@ -39,6 +36,10 @@ export function log(status: 'info' | 'success' | 'error' | 'warning', message: s
  */
 export async function getLatestTag(): Promise<string> {
   try {
+    // Dynamically import the CJS module
+    const gstModule = await import('git-semver-tags');
+    // Promisify the default export (synthesized by Node)
+    const getSemverTags = promisify(gstModule.default);
     const tags = await getSemverTags();
     return tags[0] || '';
   } catch (error) {

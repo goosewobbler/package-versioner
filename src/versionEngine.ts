@@ -558,7 +558,7 @@ export class VersionEngine {
           log('success', `Created tag: ${packageTag}`);
         } catch (tagError) {
           log('error', `Failed to create tag ${packageTag} for ${name}`);
-          console.error(tagError);
+          log('error', tagError);
           // Continue processing other packages even if tagging fails?
         }
       } else {

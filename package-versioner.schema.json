@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON schema reference"
+    },
+    "tagPrefix": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The prefix used for Git tags",
+      "default": "v"
+    },
+    "preset": {
+      "type": "string",
+      "enum": ["angular", "conventional"],
+      "default": "angular",
+      "description": "The commit message convention preset"
+    },
+    "baseBranch": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The main branch for versioning",
+      "default": "main"
+    },
+    "synced": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether packages should be versioned together"
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": [],
+      "description": "List of packages to include in versioning"
+    },
+    "versionStrategy": {
+      "type": "string",
+      "enum": ["branchPattern", "commitMessage"],
+      "default": "commitMessage",
+      "description": "How to determine version changes"
+    },
+    "branchPattern": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": ["major:", "minor:", "patch:"],
+      "description": "Patterns to match against branch names"
+    },
+    "updateInternalDependencies": {
+      "type": "string",
+      "enum": ["major", "minor", "patch", "no-internal-update"],
+      "default": "patch",
+      "description": "How to update dependencies between packages"
+    },
+    "skip": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": [],
+      "description": "Packages to exclude from versioning"
+    },
+    "commitMessage": {
+      "type": "string",
+      "minLength": 1,
+      "default": "chore(release): v${version}",
+      "description": "Template for commit messages"
+    },
+    "prereleaseIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identifier for prerelease versions"
+    },
+    "skipHooks": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to skip Git hooks"
+    }
+  },
+  "required": ["tagPrefix", "preset", "updateInternalDependencies"],
+  "additionalProperties": false
+}

@@ -36,9 +36,6 @@ importers:
       '@types/figlet':
         specifier: ^1.5.5
         version: 1.7.0
-      '@types/git-semver-tags':
-        specifier: ^4.1.1
-        version: 4.1.3
       '@types/node':
         specifier: ^18.14.0
         version: 18.19.86
@@ -502,9 +499,6 @@ packages:
 
   '@types/figlet@1.7.0':
     resolution: {integrity: sha512-KwrT7p/8Eo3Op/HBSIwGXOsTZKYiM9NpWRBJ5sVjWP/SmlS+oxxRvJht/FNAtliJvja44N3ul1yATgohnVBV0Q==}
-
-  '@types/git-semver-tags@4.1.3':
-    resolution: {integrity: sha512-zRj1wZpcnXrNAkTgMDxb5VVO7qVfmhk6IOT+k5eADPXOHog7X5jT/niGbBP9TBwXx8ZPKyDla3J4KmC3m5DOPQ==}
 
   '@types/node@18.19.86':
     resolution: {integrity: sha512-fifKayi175wLyKyc5qUfyENhQ1dCNI1UNjp653d8kuYcPQN5JhX3dGuP/XmvPTg/xRBn1VTLpbmi+H/Mr7tLfQ==}
@@ -1828,8 +1822,6 @@ snapshots:
   '@types/estree@1.0.7': {}
 
   '@types/figlet@1.7.0': {}
-
-  '@types/git-semver-tags@4.1.3': {}
 
   '@types/node@18.19.86':
     dependencies:

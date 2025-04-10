@@ -101,7 +101,8 @@ jobs:
           # Execute package-versioner
           COMMAND="pnpm exec package-versioner $BUMP_ARG $PRE_ARG $DRY_RUN_ARG"
           echo "Running: $COMMAND"
-          OUTPUT=$($COMMAND)
+          OUTPUT=$( $COMMAND 2>&1 || echo "Command failed with exit code $?" ) # Capture stdout/stderr even on failure
+          echo "Command Output:"
           echo "$OUTPUT"
 
           # Determine new version and tag

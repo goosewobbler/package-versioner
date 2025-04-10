@@ -1,55 +1,37 @@
-name: Release
+name: Manual Release Publish
 
 on:
-  push:
-    branches:
-      - main
-
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to release from'
+        required: true
+        default: 'main' # Default to main for most common case
+        type: choice
+        options:
+          - main # Current stable
+          - feature # Next major development
+      release_version:
+        description: 'Release type - patch, minor, or major'
+        required: true
+        default: 'patch'
+        type: choice
+        options: ['patch', 'minor', 'major']
+      dry_run:
+        description: 'Do not touch or write anything. Show the commands.'
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   release:
     name: Release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Setup pnpm 7
-        uses: pnpm/action-setup@v2
-        with:
-          version: 7
-
-      - name: Setup Node.js 20.x
-        uses: actions/setup-node@v2
-        with:
-          node-version: 20.x
-
-      - name: Install Dependencies
-        shell: bash
-        run: pnpm i
-
-      - name: Build
-        shell: bash
-        run: pnpm build
-
-      - name: Temporally git user
-        shell: bash
-        run: git config --global user.name 'github-actions[bot]' && git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-
-      - name: Turbo Version
-        shell: bash
-        run: npx @turbo-version/version
-
-      - name: Authenticate with npm
-        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-
-      - name: Turbo Release
-        shell: bash
-        run: pnpm -r publish --no-git-checks --filter=!docs
-
-      - name: Push tags, and commits
-        shell: bash
-        run: git push --tags && git push
+    uses: ./.github/workflows/_release-orchestration.reusable.yml
+    with:
+      branch: ${{ inputs.branch }}
+      release_version: ${{ inputs.release_version }}
+      dry_run: ${{ inputs.dry_run }}
+    secrets:
+      github_bot_token: ${{ secrets.GITHUB_TOKEN }}
+      npm_token: ${{ secrets.NPM_TOKEN }}
+      deploy_key: ${{ secrets.DEPLOY_KEY }}

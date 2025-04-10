@@ -175,7 +175,7 @@ jobs:
              pnpm publish --tag $NPM_TAG --no-git-checks
           fi
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: 🚀 Push Tags and Commits
         id: push_tags # Renamed from push_tags to avoid conflict?

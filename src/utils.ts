@@ -87,16 +87,19 @@ export function formatCommitMessage(template: string, version: string): string {
 /**
  * Update package.json version
  */
-export function updatePackageVersion({ path, version, name }: PackageVersion): void {
+export function updatePackageVersion({ path, version, name, dryRun }: PackageVersion): void {
   try {
     const pkgPath = `${path}/package.json`;
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 
     pkg.version = version;
 
-    fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
-
-    log('success', `${name}: ${version}`);
+    if (!dryRun) {
+      fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+      log('success', `${name}: ${version}`);
+    } else {
+      log('info', `[DRY RUN] Would update ${name} package.json to version ${version}`);
+    }
   } catch (error) {
     log('error', `Failed to update ${name} to version ${version}`);
     console.error(error);

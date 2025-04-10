@@ -159,6 +159,7 @@ export class VersionEngine {
         path: pkgPath,
         version: nextVersion,
         name,
+        dryRun: this.config.dryRun,
       });
 
       files.push(path.join(pkgPath, 'package.json'));
@@ -174,6 +175,7 @@ export class VersionEngine {
     files: string[],
     nextTag: string,
     commitMessage: string,
+    dryRun?: boolean,
   ): Promise<void> {
     try {
       await gitProcess({
@@ -181,9 +183,12 @@ export class VersionEngine {
         nextTag,
         commitMessage,
         skipHooks: this.config.skipHooks,
+        dryRun,
       });
 
-      log('success', `Created tag: ${nextTag}`);
+      if (!dryRun) {
+        log('success', `Created tag: ${nextTag}`);
+      }
     } catch (error) {
       log('error', 'Failed to create git commit and tag');
       console.error(error);
@@ -243,6 +248,7 @@ export class VersionEngine {
           path: pkgsResult.root,
           version: nextVersion,
           name: 'root',
+          dryRun: this.config.dryRun,
         });
 
         files.push(rootPkgPath);
@@ -261,6 +267,7 @@ export class VersionEngine {
         path: pkg.dir,
         version: nextVersion,
         name: pkg.packageJson.name,
+        dryRun: this.config.dryRun,
       });
 
       files.push(path.join(pkg.dir, 'package.json'));
@@ -273,7 +280,7 @@ export class VersionEngine {
     );
     const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion);
 
-    await this.createGitCommitAndTag(files, nextTag, formattedCommitMessage);
+    await this.createGitCommitAndTag(files, nextTag, formattedCommitMessage, this.config.dryRun);
   }
 
   /**
@@ -333,6 +340,7 @@ export class VersionEngine {
       path: pkgPath,
       version: nextVersion,
       name: packageName,
+      dryRun: this.config.dryRun,
     });
 
     const nextTag = formatTag(
@@ -341,7 +349,12 @@ export class VersionEngine {
     );
     const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion);
 
-    await this.createGitCommitAndTag([`${pkgPath}/package.json`], nextTag, formattedCommitMessage);
+    await this.createGitCommitAndTag(
+      [path.join(pkgPath, 'package.json')],
+      nextTag,
+      formattedCommitMessage,
+      this.config.dryRun,
+    );
   }
 
   /**
@@ -384,9 +397,12 @@ export class VersionEngine {
         nextTag: '', // No tag for async strategy
         commitMessage: formattedCommitMessage,
         skipHooks,
+        dryRun: this.config.dryRun,
       });
 
-      log('success', 'Created version commit');
+      if (!this.config.dryRun) {
+        log('success', 'Created version commit');
+      }
     } catch (error) {
       log('error', 'Failed to create version commit');
       console.error(error);

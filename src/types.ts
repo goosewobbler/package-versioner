@@ -20,6 +20,7 @@ export interface Config {
   branchPattern: string[];
   prereleaseIdentifier?: string;
   skipHooks?: boolean;
+  dryRun?: boolean;
 }
 
 /**
@@ -72,6 +73,7 @@ export interface GitProcess {
   nextTag: string;
   commitMessage: string;
   skipHooks?: boolean;
+  dryRun?: boolean;
 }
 
 /**
@@ -81,4 +83,5 @@ export interface PackageVersion {
   path: string;
   version: string;
   name: string;
+  dryRun?: boolean;
 }

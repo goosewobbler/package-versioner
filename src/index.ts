@@ -46,7 +46,8 @@ program
   )
   .option('--prerelease <identifier>', 'set prerelease identifier (e.g., alpha, beta)')
   .option('--skip-hooks', 'skip Git hooks for this operation')
-  .option('--config <path>', 'specify a custom config file path');
+  .option('--config <path>', 'specify a custom config file path')
+  .option('--dry-run', 'Calculate version and log actions without changing files or Git state');
 
 program
   .description('Version packages based on Git context and conventional commits')
@@ -68,6 +69,7 @@ program
       if (options.skip) config.skip = options.skip;
       if (options.prerelease) config.prereleaseIdentifier = options.prerelease;
       if (options.skipHooks !== undefined) config.skipHooks = options.skipHooks;
+      if (options.dryRun !== undefined) config.dryRun = options.dryRun;
 
       const engine = new VersionEngine(config);
 

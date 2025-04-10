@@ -3,6 +3,7 @@ import type { ExecException, ExecOptions } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { cwd } from 'node:process';
+import { log } from './utils.js';
 
 // Use manual Promise wrapper for execAsync
 const execAsync = (command: string): Promise<{ stdout: string; stderr: string }> => {
@@ -45,6 +46,7 @@ type GitProcess = {
   nextTag: string;
   commitMessage: string;
   skipHooks?: boolean;
+  dryRun?: boolean;
 };
 
 export async function pullBranch(branch: string) {
@@ -155,24 +157,33 @@ async function getLastTag(): Promise<string | null> {
   }
 }
 
-export async function gitProcess({ files, nextTag, commitMessage, skipHooks }: GitProcess) {
+export async function gitProcess({ files, nextTag, commitMessage, skipHooks, dryRun }: GitProcess) {
   try {
     if (!isGitRepository(cwd())) {
       throw new Error('Not a git repository (or any parent up to mount point /)');
     }
 
-    await gitAdd(files);
+    if (!dryRun) {
+      await gitAdd(files);
 
-    await gitCommit({
-      message: commitMessage,
-      skipHooks,
-    });
+      await gitCommit({
+        message: commitMessage,
+        skipHooks,
+      });
 
-    const tagMessage = `New Version ${nextTag} generated at ${new Date().toISOString()}`;
-    await createGitTag({
-      tag: nextTag,
-      message: tagMessage,
-    });
+      const tagMessage = `New Version ${nextTag} generated at ${new Date().toISOString()}`;
+      await createGitTag({
+        tag: nextTag,
+        message: tagMessage,
+      });
+    } else {
+      log('info', '[DRY RUN] Would add files:');
+      for (const file of files) {
+        log('info', `  - ${file}`);
+      }
+      log('info', `[DRY RUN] Would commit with message: "chore: ${commitMessage}"`);
+      log('info', `[DRY RUN] Would create tag: ${nextTag}`);
+    }
   } catch (err: unknown) {
     console.log(err);
     const errorMessage = err instanceof Error ? err.message : String(err);

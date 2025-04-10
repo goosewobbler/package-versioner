@@ -55,14 +55,14 @@ export async function getLatestTag(): Promise<string> {
  * Format a tag based on synced mode and package name
  */
 export function formatTag(options: TagFormat, props: TagProps): string {
-  const { name, synced } = options;
-  const { tagPrefix: tp, version } = props;
+  const { name, synced, tagPrefix } = options;
+  const { version } = props;
 
   if (!synced && name) {
-    return `${tp}${name}@${version}`;
+    return `${tagPrefix ? tagPrefix : ''}${name}@${version}`;
   }
 
-  return `${tp}v${version}`;
+  return `${tagPrefix ? tagPrefix : ''}v${version}`;
 }
 
 /**

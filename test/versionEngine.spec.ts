@@ -292,7 +292,7 @@ describe('VersionEngine', () => {
 
       const expectedVersion = '1.1.0';
       const pkg1Path = '/test/path/packages/package-1';
-      const expectedTag = `package-1@${expectedVersion}`;
+      const expectedTag = `vpackage-1@${expectedVersion}`;
       vi.mocked(utils.formatTag).mockReturnValue(expectedTag);
       vi.mocked(utils.formatCommitMessage).mockReturnValue(`chore(release): ${expectedVersion}`);
 
@@ -319,7 +319,7 @@ describe('VersionEngine', () => {
 
       const expectedVersion = '0.0.1';
       const pkg1Path = '/test/path/packages/package-1';
-      const expectedTag = `package-1@${expectedVersion}`;
+      const expectedTag = `vpackage-1@${expectedVersion}`;
       vi.mocked(utils.formatTag).mockReturnValue(expectedTag);
       vi.mocked(utils.formatCommitMessage).mockReturnValue(`chore(release): ${expectedVersion}`);
 

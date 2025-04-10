@@ -70,8 +70,7 @@ describe('Utils Module', () => {
         { synced: true, tagPrefix: 'prefix' },
         { tagPrefix: 'prefix@', version: '1.0.0' },
       );
-
-      expect(result).toBe('prefix@v1.0.0');
+      expect(result).toBe('prefixv1.0.0');
     });
 
     it('should format tag for a package with non-synced versioning', () => {
@@ -79,14 +78,13 @@ describe('Utils Module', () => {
         { synced: false, name: 'my-package', tagPrefix: 'prefix' },
         { tagPrefix: 'prefix@', version: '1.0.0' },
       );
-
-      expect(result).toBe('prefix@my-package@1.0.0');
+      expect(result).toBe('prefixmy-package@1.0.0');
     });
 
     it('should format tag for async mode without name (fallback to synced format)', () => {
       const props = { tagPrefix: 'prefix@', version: '1.2.3' };
       const options = { synced: false, name: undefined, tagPrefix: 'prefix' };
-      expect(utils.formatTag(options, props)).toBe('prefix@v1.2.3');
+      expect(utils.formatTag(options, props)).toBe('prefixv1.2.3');
     });
 
     it('should handle empty tagPrefix', () => {

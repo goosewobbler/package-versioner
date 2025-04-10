@@ -436,7 +436,7 @@ export class VersionEngine {
     }
 
     // Get packages to process (returns file paths)
-    const pkgsToProcess = await this.processPackages(pkgsResult.packages, cliTargets); // cliTargets will be empty here
+    const pkgsToProcess = await this.processPackages(pkgsResult.packages, cliTargets); // cliTargets is empty here because the method exits early if cliTargets has elements
 
     if (pkgsToProcess.length === 0) {
       log('info', 'No packages to process based on changes and targets');

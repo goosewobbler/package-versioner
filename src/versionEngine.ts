@@ -40,77 +40,101 @@ export class VersionEngine {
    * Calculate the next version based on options
    */
   private async calculateVersion(options: VersionOptions): Promise<string> {
-    const { latestTag, tagPrefix, type, path, name, branchPattern, prereleaseIdentifier } = options;
+    const { latestTag, type, path, name, branchPattern, prereleaseIdentifier } = options;
+    // Get the ORIGINAL prefix from the config for pattern matching
+    const originalPrefix = this.config.tagPrefix || ''; // Default to empty string
 
-    // If we already have a specific type (from conventional-commits)
-    if (type) {
+    const initialVersion = prereleaseIdentifier ? `0.0.1-${prereleaseIdentifier}` : '0.0.1';
+
+    // Correctly determine tag search pattern using the ORIGINAL prefix
+    const tagSearchPattern = name
+      ? originalPrefix
+        ? `${originalPrefix}${name}@`
+        : `${name}@`
+      : originalPrefix
+        ? `${originalPrefix}v`
+        : 'v';
+
+    let determinedReleaseType: ReleaseType | null = type || null;
+
+    // 1. Handle specific type if provided
+    if (determinedReleaseType) {
       if (!latestTag) {
-        return prereleaseIdentifier ? `0.0.1-${prereleaseIdentifier}` : '0.0.1';
+        return initialVersion;
       }
-
-      const version =
-        semver.clean(latestTag.replace(`${tagPrefix}${name ? `${name}@` : 'v'}`, '')) || '0.0.0';
-      return semver.inc(version, type, prereleaseIdentifier) || '';
+      const currentVersion = semver.clean(latestTag.replace(tagSearchPattern, '')) || '0.0.0';
+      return semver.inc(currentVersion, determinedReleaseType, prereleaseIdentifier) || '';
     }
 
-    // Use branch pattern versioning
-    if (
-      this.config.versionStrategy === 'branchPattern' &&
-      branchPattern &&
-      branchPattern.length > 0
-    ) {
+    // 2. Handle branch pattern versioning (if configured)
+    if (this.config.versionStrategy === 'branchPattern' && branchPattern?.length) {
       const currentBranch = await getCurrentBranch();
       const mergeBranch = await lastMergeBranchName(branchPattern, this.config.baseBranch);
       const branch = mergeBranch || currentBranch;
 
-      console.log('calculateVersion', mergeBranch, currentBranch);
-
       for (const pattern of branchPattern) {
-        console.log('calculateVersion', pattern);
         const [match, releaseType] = pattern.split(':');
-        console.log('calculateVersion', branch, match, releaseType);
         if (branch.includes(match) && releaseType) {
-          if (!latestTag) {
-            return prereleaseIdentifier ? `0.0.1-${prereleaseIdentifier}` : '0.0.1';
-          }
-
-          const version =
-            semver.clean(latestTag.replace(`${tagPrefix}${name ? `${name}@` : 'v'}`, '')) ||
-            '0.0.0';
-          return semver.inc(version, releaseType as ReleaseType, prereleaseIdentifier) || '';
+          determinedReleaseType = releaseType as ReleaseType;
+          break; // Found matching branch pattern
         }
+      }
+
+      if (determinedReleaseType) {
+        if (!latestTag) {
+          return initialVersion;
+        }
+        const currentVersion = semver.clean(latestTag.replace(tagSearchPattern, '')) || '0.0.0';
+        return semver.inc(currentVersion, determinedReleaseType, prereleaseIdentifier) || '';
       }
     }
 
-    // Fall back to conventional-commits
+    // 3. Fallback to conventional-commits
     try {
-      if (path) {
-        const commitsLength = await getCommitsLength(path);
-
-        if (commitsLength === 0) {
-          log('info', `No commits found for ${name || 'project'}, skipping version bump`);
-          return '';
-        }
-      }
-
-      // Call conventionalRecommendedBump with correct options
       const bumper = new Bumper();
       bumper.loadPreset(this.config.preset);
       const recommendedBump = await bumper.bump();
-
-      const releaseType = recommendedBump.releaseType as ReleaseType;
+      const releaseTypeFromCommits = recommendedBump.releaseType as ReleaseType | undefined;
 
       if (!latestTag) {
-        return prereleaseIdentifier ? `0.0.1-${prereleaseIdentifier}` : '0.0.1';
+        // No tags yet, return initial version
+        return initialVersion;
       }
 
-      const version =
-        semver.clean(latestTag.replace(`${tagPrefix}${name ? `${name}@` : 'v'}`, '')) || '0.0.0';
-      return semver.inc(version, releaseType, prereleaseIdentifier) || '';
+      // If tags exist, check for new commits since the last tag
+      // Use path if provided, otherwise check the whole repo (cwd)
+      const checkPath = path || cwd();
+      const commitsLength = await getCommitsLength(checkPath); // Uses git describe internally
+      if (commitsLength === 0) {
+        log(
+          'info',
+          `No new commits found for ${name || 'project'} since ${latestTag}, skipping version bump`,
+        );
+        return ''; // No change needed
+      }
+
+      // If tags exist AND there are new commits, calculate the next version
+      if (!releaseTypeFromCommits) {
+        log(
+          'info',
+          `No relevant commits found for ${name || 'project'} since ${latestTag}, skipping version bump`,
+        );
+        return ''; // No bump indicated by conventional commits
+      }
+
+      const currentVersion = semver.clean(latestTag.replace(tagSearchPattern, '')) || '0.0.0';
+      return semver.inc(currentVersion, releaseTypeFromCommits, prereleaseIdentifier) || '';
     } catch (error) {
+      // Handle errors during conventional bump calculation
       log('error', `Failed to calculate version for ${name || 'project'}`);
       console.error(error);
-      return '';
+      // Check if the error is specifically due to no tags found by underlying git commands
+      if (error instanceof Error && error.message.includes('No names found')) {
+        log('info', 'No tags found, proceeding with initial version calculation (if applicable).');
+        // If conventional bump failed *because* of no tags, return initial version
+        return initialVersion;
+      }
+      return ''; // Return empty on other errors
     }
   }
 

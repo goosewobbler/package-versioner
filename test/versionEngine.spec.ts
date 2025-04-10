@@ -2,7 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { getPackagesSync } from '@manypkg/get-packages';
+import { Bumper } from 'conventional-recommended-bump';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import type { Config } from '../src/types.js';
 import { type PackagesWithRoot, VersionEngine } from '../src/versionEngine.js';
 
@@ -85,14 +87,28 @@ import * as process from 'node:process';
 // Import after mocks
 import * as utils from '../src/utils.js';
 
+// Auto-mock the module
+vi.mock('conventional-recommended-bump');
+
 describe('VersionEngine', () => {
   let engine: VersionEngine;
   let mockConfig: Config;
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>; // Spy for console.error to check logged errors
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.resetAllMocks();
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Ensure Bumper and its instances/methods are deeply mocked AFTER reset
+    vi.mocked(Bumper, { deep: true });
+
+    // Set default implementations on the PROTOTYPE of the deeply mocked class
+    vi.mocked(Bumper.prototype.loadPreset).mockImplementation(vi.fn());
+    vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'patch' });
+
+    // Explicitly reset branch mocks AFTER resetAllMocks
+    vi.mocked(utils.getCurrentBranch).mockResolvedValue('main');
+    vi.mocked(utils.lastMergeBranchName).mockResolvedValue(null);
 
     mockConfig = {
       preset: 'conventional-commits',
@@ -110,14 +126,14 @@ describe('VersionEngine', () => {
     // Create engine instance
     engine = new VersionEngine(mockConfig);
 
-    // Set/Reset mock implementations AFTER engine creation
+    // Reset mock implementations AFTER resetAllMocks and engine creation
     vi.mocked(utils.formatTag).mockReturnValue('prefix@v1.1.0');
     vi.mocked(utils.formatTagPrefix).mockReturnValue('prefix@');
     vi.mocked(utils.formatCommitMessage).mockImplementation(
       (msg, version) => `${msg.replace('${version}', version)}`,
     );
     vi.mocked(utils.getLatestTag).mockResolvedValue('v1.0.0');
-    // Reset getPackagesSync mock with explicit structure
+    vi.mocked(utils.getCommitsLength).mockResolvedValue(1);
     vi.mocked(getPackagesSync).mockReturnValue({
       packages: [
         {
@@ -146,94 +162,122 @@ describe('VersionEngine', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks(); // Ensure consoleErrorSpy is restored
+    vi.restoreAllMocks();
   });
 
   describe('syncedStrategy', () => {
-    it('should update all packages to the same version', async () => {
-      Object.defineProperty(engine, 'calculateVersion', {
-        value: vi.fn().mockResolvedValue('1.1.0'),
-        configurable: true,
-      });
+    it('should update all packages to the same version when tags exist and commits are present', async () => {
+      vi.mocked(utils.getLatestTag).mockResolvedValue('v1.0.0');
+      vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'patch' });
+      vi.mocked(utils.getCommitsLength).mockResolvedValue(1);
+
+      const expectedVersion = '1.0.1';
+      vi.mocked(utils.formatTag).mockReturnValue(`v${expectedVersion}`);
+      vi.mocked(utils.formatCommitMessage).mockReturnValue(`chore(release): v${expectedVersion}`);
 
       await engine.syncedStrategy();
 
-      // Should call for root + 2 packages
       expect(utils.updatePackageVersion).toHaveBeenCalledTimes(3);
       expect(utils.updatePackageVersion).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'root' }),
-      );
-      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'package-1' }),
+        expect.objectContaining({ version: expectedVersion }),
       );
 
       expect(utils.gitProcess).toHaveBeenCalledWith(
         expect.objectContaining({
-          files: [
+          files: expect.arrayContaining([
             path.join('/test/path', 'package.json'),
             path.join('/test/path', 'packages', 'package-1', 'package.json'),
             path.join('/test/path', 'packages', 'package-2', 'package.json'),
-          ],
-          nextTag: 'prefix@v1.1.0',
-          commitMessage: 'chore(release): 1.1.0',
+          ]),
+          nextTag: `v${expectedVersion}`,
+          commitMessage: `chore(release): v${expectedVersion}`,
         }),
       );
     });
 
-    it('should skip version update when no new version is calculated', async () => {
-      Object.defineProperty(engine, 'calculateVersion', {
-        value: vi.fn().mockResolvedValue(''),
-        configurable: true,
-      });
+    it('should use initial version 0.0.1 when no tags exist', async () => {
+      vi.mocked(utils.getLatestTag).mockResolvedValue('');
+      vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'patch' });
+
+      const expectedInitialVersion = '0.0.1';
+      vi.mocked(utils.formatTag).mockReturnValue(`v${expectedInitialVersion}`);
+      vi.mocked(utils.formatCommitMessage).mockReturnValue(
+        `chore(release): v${expectedInitialVersion}`,
+      );
+
+      await engine.syncedStrategy();
+
+      expect(utils.updatePackageVersion).toHaveBeenCalledTimes(3);
+      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ version: expectedInitialVersion }),
+      );
+      expect(utils.gitProcess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          files: expect.arrayContaining([
+            path.join('/test/path', 'package.json'),
+            path.join('/test/path', 'packages', 'package-1', 'package.json'),
+            path.join('/test/path', 'packages', 'package-2', 'package.json'),
+          ]),
+          nextTag: `v${expectedInitialVersion}`,
+          commitMessage: `chore(release): v${expectedInitialVersion}`,
+        }),
+      );
+      expect(utils.getCommitsLength).not.toHaveBeenCalled();
+    });
+
+    it('should skip version update when tags exist but no relevant commits are found', async () => {
+      vi.mocked(utils.getLatestTag).mockResolvedValue('v1.0.0');
+      vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: undefined });
+      vi.mocked(utils.getCommitsLength).mockResolvedValue(1);
 
       await engine.syncedStrategy();
 
       expect(utils.updatePackageVersion).not.toHaveBeenCalled();
       expect(utils.gitProcess).not.toHaveBeenCalled();
-      expect(utils.log).toHaveBeenCalledWith('info', 'No version change needed');
+      expect(utils.log).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('No relevant commits found'),
+      );
     });
 
-    // Rename test for clarity
-    it('should handle errors when calculateVersion fails', async () => {
-      // This test should simulate calculateVersion failing
-      const calcError = new Error('calculateVersion failed');
-      // Mock calculateVersion using Object.defineProperty
-      const calculateVersionMock = vi.fn().mockRejectedValue(calcError);
-      Object.defineProperty(engine, 'calculateVersion', {
-        value: calculateVersionMock,
-        configurable: true, // Important for cleanup
-      });
+    it('should skip version update when tags exist but getCommitsLength returns 0', async () => {
+      vi.mocked(utils.getLatestTag).mockResolvedValue('v1.0.0');
+      vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'patch' });
+      vi.mocked(utils.getCommitsLength).mockResolvedValue(0);
 
-      await expect(engine.syncedStrategy()).rejects.toThrow('calculateVersion failed');
+      await engine.syncedStrategy();
 
-      expect(calculateVersionMock).toHaveBeenCalled();
+      expect(utils.updatePackageVersion).not.toHaveBeenCalled();
+      expect(utils.gitProcess).not.toHaveBeenCalled();
+      expect(utils.log).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('No new commits found'),
+      );
     });
 
     it('should log error if updating root package.json fails', async () => {
-      Object.defineProperty(engine, 'calculateVersion', {
-        value: vi.fn().mockResolvedValue('1.1.0'),
-      });
+      vi.mocked(utils.getLatestTag).mockResolvedValue('v1.0.0');
+      vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'patch' });
+      vi.mocked(utils.getCommitsLength).mockResolvedValue(1);
+
+      const expectedVersion = '1.0.1';
+      vi.mocked(utils.formatTag).mockReturnValue(`v${expectedVersion}`);
+      vi.mocked(utils.formatCommitMessage).mockReturnValue(`chore(release): v${expectedVersion}`);
 
       const updateError = new Error('updatePackageVersion failed for root');
       vi.mocked(utils.updatePackageVersion).mockImplementation(({ name }: { name: string }) => {
         if (name === 'root') {
           throw updateError;
         }
-        // Do nothing for other packages
       });
 
       await engine.syncedStrategy();
 
-      // Check updatePackageVersion was called 3 times (root, pkg1, pkg2)
-      // It will be called for root, and throw, then called for pkg1 and pkg2
       expect(utils.updatePackageVersion).toHaveBeenCalledTimes(3);
-      // Check it was called with root args (before throwing)
       expect(utils.updatePackageVersion).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'root' }),
       );
-      // Check the specific log *was* called by the CATCH BLOCK in versionEngine.syncedStrategy
       expect(utils.log).toHaveBeenCalledWith('error', 'Failed to update root package.json');
-      // Should still attempt git process because error was handled internally in syncedStrategy
       expect(utils.gitProcess).toHaveBeenCalled();
     });
   });
@@ -242,38 +286,57 @@ describe('VersionEngine', () => {
     it('should update only the specified package', async () => {
       mockConfig.packages = ['package-1'];
       mockConfig.synced = false;
-      // Store mock fn to check calls later if needed
-      const calculateVersionMock = vi.fn().mockResolvedValue('1.1.0');
-      Object.defineProperty(engine, 'calculateVersion', {
-        value: calculateVersionMock,
-        configurable: true,
-      });
-      // Define expected commit message based on mock config and version
-      const expectedCommitMessage = 'chore(release): v1.1.0';
-      // Explicitly mock the return value for formatCommitMessage for this test
-      vi.mocked(utils.formatCommitMessage).mockReturnValue(expectedCommitMessage);
+      vi.mocked(utils.getLatestTag).mockResolvedValue('vpackage-1@1.0.0');
+      vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'minor' });
+      vi.mocked(utils.getCommitsLength).mockResolvedValue(5);
+
+      const expectedVersion = '1.1.0';
+      const pkg1Path = '/test/path/packages/package-1';
+      const expectedTag = `package-1@${expectedVersion}`;
+      vi.mocked(utils.formatTag).mockReturnValue(expectedTag);
+      vi.mocked(utils.formatCommitMessage).mockReturnValue(`chore(release): ${expectedVersion}`);
 
       await engine.singleStrategy();
 
       expect(utils.updatePackageVersion).toHaveBeenCalledTimes(1);
       expect(utils.updatePackageVersion).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'package-1', version: '1.1.0' }),
+        expect.objectContaining({ path: pkg1Path, version: expectedVersion }),
       );
-
-      // Verify formatCommitMessage mock was called correctly
-      expect(utils.formatCommitMessage).toHaveBeenCalledWith(
-        mockConfig.commitMessage, // Should be defined now
-        '1.1.0',
+      expect(utils.gitProcess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          files: [path.join(pkg1Path, 'package.json')],
+          nextTag: expectedTag,
+          commitMessage: `chore(release): ${expectedVersion}`,
+        }),
       );
+    });
 
-      // Verify gitProcess was called with the expected formatted message - Simplified check
-      expect(utils.gitProcess).toHaveBeenCalledTimes(1);
-      const gitProcessArgs = vi.mocked(utils.gitProcess).mock.calls[0][0];
-      expect(gitProcessArgs).toHaveProperty('files', [
-        path.join('/test/path', 'packages', 'package-1', 'package.json'),
-      ]);
-      expect(gitProcessArgs).toHaveProperty('nextTag', 'prefix@v1.1.0');
-      expect(gitProcessArgs).toHaveProperty('commitMessage', expectedCommitMessage);
+    it('should use initial version 0.0.1 for specified package when no tags exist', async () => {
+      mockConfig.packages = ['package-1'];
+      mockConfig.synced = false;
+      vi.mocked(utils.getLatestTag).mockResolvedValue('');
+      vi.mocked(Bumper.prototype.bump).mockResolvedValue({ releaseType: 'minor' });
+
+      const expectedVersion = '0.0.1';
+      const pkg1Path = '/test/path/packages/package-1';
+      const expectedTag = `package-1@${expectedVersion}`;
+      vi.mocked(utils.formatTag).mockReturnValue(expectedTag);
+      vi.mocked(utils.formatCommitMessage).mockReturnValue(`chore(release): ${expectedVersion}`);
+
+      await engine.singleStrategy();
+
+      expect(utils.updatePackageVersion).toHaveBeenCalledTimes(1);
+      expect(utils.updatePackageVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ path: pkg1Path, version: expectedVersion }),
+      );
+      expect(utils.gitProcess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          files: [path.join(pkg1Path, 'package.json')],
+          nextTag: expectedTag,
+          commitMessage: `chore(release): ${expectedVersion}`,
+        }),
+      );
+      expect(utils.getCommitsLength).not.toHaveBeenCalled();
     });
 
     it('should throw error when no package is specified', async () => {
@@ -366,6 +429,29 @@ describe('VersionEngine', () => {
       expect(utils.log).toHaveBeenCalledWith('error', 'Failed to get packages information');
       expect(consoleErrorSpy).toHaveBeenCalledWith(error);
       expect(process.exit).toHaveBeenCalledWith(1);
+    });
+
+    // Add test for calculateVersion failure within singleStrategy
+    it('should handle errors from calculateVersion', async () => {
+      mockConfig.packages = ['package-1'];
+      mockConfig.synced = false;
+      const calcError = new Error('Calculation failed');
+      // Mock the prototype BUMP function to throw
+      vi.mocked(Bumper.prototype.bump).mockRejectedValue(calcError);
+      vi.mocked(utils.getLatestTag).mockResolvedValue(''); // Example: no tags scenario
+
+      // Act
+      await engine.singleStrategy();
+
+      // Assert: Check logs and ensure no updates/git happened
+      expect(utils.log).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Failed to calculate version'),
+      );
+      expect(utils.updatePackageVersion).not.toHaveBeenCalled();
+      expect(utils.gitProcess).not.toHaveBeenCalled();
+      // Assert that the *original* rejected error was caught and logged by calculateVersion's catch block
+      expect(consoleErrorSpy).toHaveBeenCalledWith(calcError);
     });
   });
 

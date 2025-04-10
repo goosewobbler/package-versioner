@@ -307,7 +307,7 @@ describe('Git Module', () => {
         expect.any(Function),
       );
       expect(execMock).toHaveBeenCalledWith(
-        `git commit -m "chore: ${commitMessage}"`,
+        `git commit -m "${commitMessage}"`,
         expect.any(Object),
         expect.any(Function),
       );
@@ -325,7 +325,7 @@ describe('Git Module', () => {
       });
       await actualGit.gitProcess({ files, nextTag, commitMessage, skipHooks: true });
       expect(execMock).toHaveBeenCalledWith(
-        `git commit --no-verify -m "chore: ${commitMessage}"`,
+        `git commit --no-verify -m "${commitMessage}"`,
         expect.any(Object),
         expect.any(Function),
       );

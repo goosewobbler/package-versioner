@@ -38,6 +38,9 @@ npx package-versioner --bump minor
 # Create a prerelease (e.g., alpha)
 npx package-versioner --bump patch --prerelease alpha
 
+# Target specific packages (only in async/independent mode, comma-separated)
+npx package-versioner -t @scope/package-a,@scope/package-b
+
 # Perform a dry run: calculates version, logs actions, but makes no file changes or Git commits/tags
 npx package-versioner --dry-run
 ```

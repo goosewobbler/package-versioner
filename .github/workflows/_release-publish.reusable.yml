@@ -145,15 +145,35 @@ jobs:
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: 📢 Publish to NPM
-        if: inputs.dry_run == false
         shell: bash
         run: |
           NPM_TAG="latest"
-          if [[ "${{ steps.version.outputs.new_version }}" =~ (beta|alpha|rc|pre) ]]; then
-            NPM_TAG="next"
+          # Determine NPM tag based on version (handle potential missing version in dry run)
+          VERSION_TO_CHECK="${{ steps.version.outputs.new_version }}"
+          if [[ -z "$VERSION_TO_CHECK" ]]; then
+             echo "::warning::Cannot determine NPM tag because version is empty."
+          elif [[ "$VERSION_TO_CHECK" =~ (beta|alpha|rc|pre) ]]; then
+             NPM_TAG="next"
           fi
-          echo "Publishing version ${{ steps.version.outputs.new_version }} to NPM with tag $NPM_TAG..."
-          pnpm publish --tag $NPM_TAG --no-git-checks
+          
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+             echo "[DRY RUN] Checking NPM authentication..."
+             # Run npm whoami and output a warning on failure, but don't fail the step
+             npm whoami || echo "::warning::NPM auth check failed (npm whoami). Token might be invalid or missing."
+             echo "[DRY RUN] Would publish version $VERSION_TO_CHECK to NPM with tag \"$NPM_TAG\""
+          else
+             if [[ -z "$VERSION_TO_CHECK" ]]; then
+                echo "::error::Cannot publish to NPM because version is empty."
+                exit 1
+             fi
+             echo "Publishing version $VERSION_TO_CHECK to NPM with tag $NPM_TAG..."
+             # Ensure NODE_AUTH_TOKEN is set before publishing
+             if [[ -z "${NODE_AUTH_TOKEN}" ]]; then
+                 echo "::error::NODE_AUTH_TOKEN is not set. Cannot publish to NPM."
+                 exit 1
+             fi
+             pnpm publish --tag $NPM_TAG --no-git-checks
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
 

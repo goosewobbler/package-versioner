@@ -1,25 +1,21 @@
 #!/usr/bin/env node
-
-import { exit } from 'node:process';
-import { cwd } from 'node:process';
-import chalk from 'chalk';
 import { Command } from 'commander';
 import { loadConfig } from './config.js';
 import type { Config } from './types.js';
-import { log, printFiglet } from './utils.js';
+import { enableJsonOutput, getPackageInfo, log, printFiglet, printJsonOutput } from './utils.js';
 import { VersionEngine } from './versionEngine.js';
 
 async function run() {
-  printFiglet();
-
   const program = new Command();
+  // Get package info dynamically for version
+  const { version } = getPackageInfo();
 
   program
     .name('package-versioner')
     .description(
       'Automated semantic versioning based on Git history and conventional commits. Supports monorepos with synchronized or independent package versioning strategies.',
     )
-    .version('0.0.2') // TODO: Read from package.json
+    .version(version) // Use dynamic version from package.json
     .option('--config <path>', 'Path to the configuration file')
     .option('--dry-run', 'Simulate the versioning process without making changes')
     .option('--synced', 'Force synced versioning strategy (overrides config)') // Keep for explicit override
@@ -32,9 +28,18 @@ async function run() {
       '-t, --target <targets>',
       'Comma-separated list of package names to target (only for async strategy)',
     )
+    .option('--json', 'Output results as JSON (suppresses normal output)')
     .parse(process.argv);
 
   const options = program.opts();
+
+  // Set up JSON output mode before any logging happens
+  if (options.json) {
+    enableJsonOutput(!!options.dryRun);
+  } else {
+    // Only print figlet banner in non-JSON mode
+    printFiglet();
+  }
 
   try {
     // Load config
@@ -53,8 +58,8 @@ async function run() {
       ? options.target.split(',').map((t: string) => t.trim())
       : [];
 
-    // Initialize engine
-    const engine = new VersionEngine(config);
+    // Initialize engine with JSON mode setting
+    const engine = new VersionEngine(config, !!options.json);
 
     // Determine strategy
     if (config.synced) {
@@ -75,6 +80,9 @@ async function run() {
     }
 
     log('success', 'Versioning process completed.');
+
+    // Print JSON output if enabled (this will be the only output in JSON mode)
+    printJsonOutput();
   } catch (error) {
     log('error', error instanceof Error ? error.message : String(error));
     process.exit(1);

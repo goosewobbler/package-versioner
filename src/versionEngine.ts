@@ -19,6 +19,7 @@ import {
   gitAdd,
   gitCommit,
   gitProcess,
+  jsonOutputData,
   lastMergeBranchName,
   log,
   updatePackageVersion,
@@ -34,9 +35,11 @@ export interface PackagesWithRoot extends Packages {
  */
 export class VersionEngine {
   private config: Config;
+  private jsonMode = false;
 
-  constructor(config: Config) {
+  constructor(config: Config, jsonMode = false) {
     this.config = config;
+    this.jsonMode = jsonMode;
   }
 
   /**
@@ -217,6 +220,15 @@ export class VersionEngine {
     dryRun?: boolean,
   ): Promise<void> {
     try {
+      // Track commit message and tag for JSON output
+      if (commitMessage && !jsonOutputData.commitMessage) {
+        jsonOutputData.commitMessage = commitMessage;
+      }
+
+      if (nextTag) {
+        jsonOutputData.tags.push(nextTag);
+      }
+
       await gitProcess({
         files,
         nextTag,
@@ -550,6 +562,9 @@ export class VersionEngine {
       );
       const tagMessage = `chore(release): ${name} ${nextVersion}`;
 
+      // Track tag for JSON output
+      jsonOutputData.tags.push(packageTag);
+
       if (!dryRun) {
         try {
           await createGitTag({ tag: packageTag, message: tagMessage });
@@ -591,6 +606,11 @@ export class VersionEngine {
       commitMessage = `chore(release): ${packageNames} ${representativeVersion}`;
     }
     commitMessage += ' [skip-ci]'; // Add skip-ci trailer
+
+    // Track commit message for JSON output
+    if (commitMessage) {
+      jsonOutputData.commitMessage = commitMessage;
+    }
 
     if (!dryRun) {
       try {

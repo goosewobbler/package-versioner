@@ -80,12 +80,21 @@ export async function getLatestTagForPackage(
   tagPrefix?: string,
 ): Promise<string> {
   try {
-    // Use the package option to get package-specific tags
-    const tags: string[] = await getSemverTags({
-      package: packageName,
+    // Instead of using the package option which requires lerna mode,
+    // get all tags and filter manually for the package
+    const allTags: string[] = await getSemverTags({
       tagPrefix,
     });
-    return tags[0] || ''; // Return the latest tag or empty string
+
+    // Filter for tags that match this package's format
+    // This supports both packageName@version and prefix+packageName@version formats
+    const packageTagPattern = tagPrefix
+      ? new RegExp(`^${escapeRegExp(tagPrefix)}${escapeRegExp(packageName)}@`)
+      : new RegExp(`^${escapeRegExp(packageName)}@`);
+
+    const packageTags = allTags.filter((tag) => packageTagPattern.test(tag));
+
+    return packageTags[0] || ''; // Return the latest tag or empty string
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log(`Failed to get latest tag for package ${packageName}: ${errorMessage}`, 'error');

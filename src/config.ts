@@ -27,6 +27,3 @@ export function loadConfig(configPath?: string): Promise<Config> {
     });
   });
 }
-
-// For backward compatibility
-export const setup = loadConfig;

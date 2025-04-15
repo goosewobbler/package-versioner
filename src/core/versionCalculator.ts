@@ -45,8 +45,22 @@ export async function calculateVersion(config: Config, options: VersionOptions):
     if (!latestTag) {
       return initialVersion;
     }
+
     const currentVersion =
       semver.clean(latestTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
+
+    // Auto-clean prerelease identifiers when using standard bump types (major, minor, patch)
+    const standardBumpTypes = ['major', 'minor', 'patch'];
+
+    if (standardBumpTypes.includes(determinedReleaseType) && semver.prerelease(currentVersion)) {
+      // Auto-clean by ignoring prerelease identifier when an explicit standard bump is requested
+      log(
+        `Cleaning prerelease identifier from ${currentVersion} for ${determinedReleaseType} bump`,
+        'debug',
+      );
+      return semver.inc(currentVersion, determinedReleaseType) || '';
+    }
+
     return semver.inc(currentVersion, determinedReleaseType, prereleaseIdentifier) || '';
   }
 

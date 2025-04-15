@@ -43,7 +43,15 @@ describe('Version Calculator', () => {
       // Handle different release types
       if (releaseType === 'major') return `${Number(parts[0]) + 1}.0.0`;
       if (releaseType === 'minor') return `${parts[0]}.${Number(parts[1]) + 1}.0`;
-      if (releaseType === 'patch') return `${parts[0]}.${parts[1]}.${Number(parts[2]) + 1}`;
+      if (releaseType === 'patch') {
+        // Handle prerelease versions - we need to extract the base version if it's a prerelease
+        if (version.toString().includes('-')) {
+          const baseVersion = version.toString().split('-')[0];
+          const baseParts = baseVersion.split('.');
+          return `${baseParts[0]}.${baseParts[1]}.${Number(baseParts[2]) + 1}`;
+        }
+        return `${parts[0]}.${parts[1]}.${Number(parts[2]) + 1}`;
+      }
 
       // Handle prerelease with identifier
       if (identifier)
@@ -93,9 +101,61 @@ describe('Version Calculator', () => {
       expect(version).toBe('1.1.0');
     });
 
-    it('should handle prerelease identifier', async () => {
-      // No need for additional mock, our improved mock above already handles identifier
+    it('should automatically clean prerelease identifiers when using major bump', async () => {
+      // Setup semver.prerelease to return a non-empty array for prerelease versions
+      vi.mocked(semver.prerelease).mockReturnValue(['next', '0']);
 
+      const options: VersionOptions = {
+        latestTag: 'v1.0.0-next.0',
+        type: 'major',
+        tagPrefix: 'v',
+      };
+
+      const version = await calculateVersion(defaultConfig as Config, options);
+
+      expect(semver.clean).toHaveBeenCalledWith('v1.0.0-next.0');
+      expect(semver.prerelease).toHaveBeenCalledWith('1.0.0-next.0');
+      expect(semver.inc).toHaveBeenCalledWith('1.0.0-next.0', 'major');
+      expect(version).toBe('2.0.0');
+    });
+
+    it('should automatically clean prerelease identifiers when using minor bump', async () => {
+      // Setup semver.prerelease to return a non-empty array for prerelease versions
+      vi.mocked(semver.prerelease).mockReturnValue(['beta', '1']);
+
+      const options: VersionOptions = {
+        latestTag: 'v1.0.0-beta.1',
+        type: 'minor',
+        tagPrefix: 'v',
+      };
+
+      const version = await calculateVersion(defaultConfig as Config, options);
+
+      expect(semver.clean).toHaveBeenCalledWith('v1.0.0-beta.1');
+      expect(semver.prerelease).toHaveBeenCalledWith('1.0.0-beta.1');
+      expect(semver.inc).toHaveBeenCalledWith('1.0.0-beta.1', 'minor');
+      expect(version).toBe('1.1.0');
+    });
+
+    it('should automatically clean prerelease identifiers when using patch bump', async () => {
+      // Setup semver.prerelease to return a non-empty array for prerelease versions
+      vi.mocked(semver.prerelease).mockReturnValue(['alpha', '2']);
+
+      const options: VersionOptions = {
+        latestTag: 'v1.0.0-alpha.2',
+        type: 'patch',
+        tagPrefix: 'v',
+      };
+
+      const version = await calculateVersion(defaultConfig as Config, options);
+
+      expect(semver.clean).toHaveBeenCalledWith('v1.0.0-alpha.2');
+      expect(semver.prerelease).toHaveBeenCalledWith('1.0.0-alpha.2');
+      expect(semver.inc).toHaveBeenCalledWith('1.0.0-alpha.2', 'patch');
+      expect(version).toBe('1.0.1');
+    });
+
+    it('should still use prerelease identifiers when using prerelease bump types', async () => {
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
         type: 'prerelease',

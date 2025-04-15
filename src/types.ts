@@ -5,10 +5,22 @@
 import type { ReleaseType } from 'semver';
 
 /**
+ * Git information for version calculation
+ */
+export interface GitInfo {
+  currentBranch: string;
+  mergeBranch?: string;
+}
+
+/**
  * Configuration for the versioner
  */
 export interface Config {
-  tagPrefix: string;
+  // Tag formatting templates with default templates
+  tagTemplate: string; // Default: '${prefix}${version}'
+  packageTagTemplate: string; // Default: '${packageName}@${prefix}${version}'
+  versionPrefix: string; // Used in templates
+
   preset: string;
   baseBranch: string;
   synced: boolean;
@@ -18,10 +30,24 @@ export interface Config {
   commitMessage?: string;
   versionStrategy?: 'branchPattern' | 'commitMessage';
   branchPattern: string[];
+  branchPatterns?: BranchPattern[];
+  defaultReleaseType?: ReleaseType;
   prereleaseIdentifier?: string;
   skipHooks?: boolean;
   dryRun?: boolean;
   forceType?: ReleaseType;
+  latestTag?: string;
+  type?: ReleaseType;
+  path?: string;
+  name?: string;
+}
+
+/**
+ * Branch pattern for version strategy
+ */
+export interface BranchPattern {
+  pattern: string;
+  releaseType: ReleaseType;
 }
 
 /**
@@ -39,7 +65,9 @@ export type PkgJson = {
  * Git tag formatting options
  */
 export interface TagFormat {
-  tagPrefix?: string;
+  tagTemplate?: string;
+  packageTagTemplate?: string;
+  prefix?: string;
   name?: string;
   synced: boolean;
 }
@@ -48,8 +76,9 @@ export interface TagFormat {
  * Tag properties for format functions
  */
 export interface TagProps {
-  tagPrefix: string;
+  prefix: string;
   version: string;
+  packageName?: string;
 }
 
 /**
@@ -57,7 +86,7 @@ export interface TagProps {
  */
 export interface VersionOptions {
   latestTag: string;
-  tagPrefix: string;
+  versionPrefix: string;
   type?: ReleaseType;
   path?: string;
   name?: string;

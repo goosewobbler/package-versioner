@@ -57,7 +57,7 @@ describe('Version Strategies', () => {
   // Default config for tests
   const defaultConfig: Partial<Config> = {
     preset: 'conventional-commits',
-    tagPrefix: 'v',
+    versionPrefix: 'v',
     baseBranch: 'main',
   };
 
@@ -168,7 +168,7 @@ describe('Version Strategies', () => {
         config as Config,
         expect.objectContaining({
           latestTag: 'v1.0.0',
-          tagPrefix: 'v',
+          versionPrefix: 'v',
         }),
       );
 
@@ -251,7 +251,7 @@ describe('Version Strategies', () => {
         config as Config,
         expect.objectContaining({
           latestTag: 'v1.0.0',
-          tagPrefix: 'v',
+          versionPrefix: 'v',
           path: '/test/workspace/packages/a',
           name: 'package-a',
         }),

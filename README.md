@@ -39,10 +39,6 @@ npx package-versioner --bump minor
 # Create a prerelease (e.g., alpha)
 npx package-versioner --bump patch --prerelease alpha
 
-# Promote a prerelease to a stable release (automatic cleaning)
-# For example, 1.0.0-beta.1 -> 2.0.0:
-npx package-versioner --bump major
-
 # Target specific packages (only in async/independent mode, comma-separated)
 npx package-versioner -t @scope/package-a,@scope/package-b
 
@@ -87,24 +83,23 @@ Customize behavior by creating a `version.config.json` file in your project root
 
 ```json
 {
-  "preset": "conventional-commits", // Preset for conventional-commits analysis
-  "tagPrefix": "v",                 // Prefix for Git tags (e.g., v1.0.0)
-  "commitMessage": "chore(release): v${version}", // Template for the release commit (defaults to this if omitted)
-  "versionStrategy": "commitMessage", // Use conventional commit messages (default) or "branchPattern"
-  "baseBranch": "main",               // Base branch for calculations
-  "branchPattern": [                // Used if versionStrategy is branchPattern
-    "feature:minor", 
-    "fix:patch"
-  ],
-  "prereleaseIdentifier": null,     // Default prerelease identifier (e.g., "beta")
-  "skipHooks": false,               // Skip git commit hooks (--no-verify)
-  "synced": true,                   // (Monorepo-specific) Treat as a single synchronized unit
-  "packages": [],                   // (Monorepo-specific) Specify packages (not typical for single repo)
-  "updateInternalDependencies": "no-internal-update" // (Monorepo-specific) How to handle workspace deps
+  "preset": "angular",
+  "versionPrefix": "v",
+  "tagTemplate": "${prefix}${version}",
+  "packageTagTemplate": "${packageName}@${prefix}${version}",
+  "commitMessage": "chore(release): {{currentTag}} [skip ci]",
+  "monorepo": {
+    "synced": true,
+    "skip": [
+      "docs",
+      "e2e"
+    ],
+    "packagePath": "packages"
+  }
 }
 ```
 
-**Note:** Options like `synced`, `packages`, and `updateInternalDependencies` enable monorepo-specific behaviours.
+**Note:** Options like `synced`, `packages`, and `updateInternalDependencies` enable monorepo-specific behaviours. The `tagTemplate` and `packageTagTemplate` allow you to customize how Git tags are formatted for releases.
 
 ## How Versioning Works
 

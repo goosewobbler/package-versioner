@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Config } from '../src/types.js';
+import type { Config } from '../../src/types.js';
 
 // Mock modules before importing anything
 vi.mock('node:process', () => ({
@@ -16,7 +16,7 @@ vi.mock('node:fs', () => ({
 
 import * as fs from 'node:fs';
 // Import after mocking
-import { loadConfig } from '../src/config.js';
+import { loadConfig } from '../../src/config.js';
 
 describe('Config', () => {
   describe('loadConfig', () => {

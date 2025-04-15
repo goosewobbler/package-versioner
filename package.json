@@ -1,6 +1,6 @@
 {
   "name": "package-versioner",
-  "description": "A powerful CLI tool for automated semantic versioning based on Git history and conventional commits. Supports monorepos with synchronized or independent package versioning strategies.",
+  "description": "A lightweight yet powerful CLI tool for automated semantic versioning based on Git history and conventional commits.",
   "version": "0.2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,18 +15,9 @@
     "url": "https://github.com/goosewobbler/package-versioner",
     "homepage": "https://github.com/goosewobbler/package-versioner"
   },
-  "keywords": [
-    "version",
-    "semver",
-    "git",
-    "package"
-  ],
+  "keywords": ["version", "semver", "git", "package"],
   "license": "MIT",
-  "files": [
-    "dist/**",
-    "docs/**",
-    "package-versioner.schema.json"
-  ],
+  "files": ["dist/**", "docs/**", "package-versioner.schema.json"],
   "bin": {
     "package-versioner": "./dist/index.js"
   },
@@ -44,19 +35,16 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{js,ts,jsx,tsx}": [
-      "biome check --apply",
-      "biome format --write"
-    ]
+    "*.{js,ts,jsx,tsx}": ["biome check --apply", "biome format --write"]
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/figlet": "^1.5.5",
-    "@types/node": "^22.14.0",
+    "@types/node": "^22.14.1",
     "@types/semver": "^7.3.13",
     "@vitest/coverage-v8": "^3.1.1",
     "husky": "^9.1.7",
-    "lint-staged": "^15.5.0",
+    "lint-staged": "^15.5.1",
     "tsup": "^8.4.0",
     "typescript": "^5.8.3",
     "vitest": "^3.1.1"
@@ -67,7 +55,7 @@
     "commander": "^13.1.0",
     "conventional-changelog-angular": "^8.0.0",
     "conventional-recommended-bump": "^11.0.0",
-    "figlet": "^1.8.0",
+    "figlet": "^1.8.1",
     "git-semver-tags": "^8.0.0",
     "semver": "^7.7.1"
   },

@@ -1,0 +1,7 @@
+{
+  "preset": "conventional-commits",
+  "packages": [
+    "packages/*"
+  ],
+  "synced": false
+}

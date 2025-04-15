@@ -6,17 +6,18 @@
 <a href="https://www.npmjs.com/package/package-versioner" alt="NPM Downloads">
   <img src="https://img.shields.io/npm/dw/package-versioner" /></a>
 
-A powerful CLI tool for automated semantic versioning based on Git history and conventional commits. Simplifies version management in JavaScript/TypeScript projects.
+A lightweight yet powerful CLI tool for automated semantic versioning based on Git history and conventional commits. Supports both single package projects and monorepos with flexible versioning strategies.
 
 ## Features
 
 - Automatically determines version bumps based on commit history (using conventional commits)
-- Primarily designed for single package projects, but configurable
+- Supports both single package projects and monorepos with minimal configuration
 - Flexible versioning strategies (e.g., based on commit types, branch patterns)
 - Integrates with conventional commits presets
 - Customizable through a `version.config.json` file or CLI options
 - Automatically updates `package.json` version
-- Creates and pushes appropriate Git tags for releases
+- Creates appropriate Git tags for releases
+- CI/CD friendly with JSON output support
 
 ## Usage
 
@@ -43,9 +44,38 @@ npx package-versioner -t @scope/package-a,@scope/package-b
 
 # Perform a dry run: calculates version, logs actions, but makes no file changes or Git commits/tags
 npx package-versioner --dry-run
+
+# Output results as JSON (useful for CI/CD scripts)
+npx package-versioner --json
+
+# Combine with dry-run for CI planning
+npx package-versioner --dry-run --json
 ```
 
 **Note on Targeting:** Using the `-t` flag creates package-specific tags (e.g., `@scope/package-a@1.2.0`) but *not* a global tag (like `v1.2.0`). If needed, create the global tag manually in your CI/CD script after this command.
+
+## JSON Output
+
+When using the `--json` flag, normal console output is suppressed and the tool outputs a structured JSON object that includes information about the versioning operation.
+
+```json
+{
+  "dryRun": true,
+  "updates": [
+    {
+      "packageName": "@scope/package-a",
+      "newVersion": "1.2.3",
+      "filePath": "/path/to/package.json"
+    }
+  ],
+  "commitMessage": "chore(release): v1.2.3",
+  "tags": [
+    "@scope/package-a@v1.2.3"
+  ]
+}
+```
+
+For detailed examples of how to use this in CI/CD pipelines, see [CI/CD Integration](./docs/CI_CD_INTEGRATION.md).
 
 ## Configuration
 
@@ -82,6 +112,9 @@ Customize behavior by creating a `version.config.json` file in your project root
 For a detailed explanation of these concepts and monorepo modes (Synced vs. Async), see [Versioning Strategies and Concepts](./docs/VERSIONING_STRATEGIES.md).
 
 ## Documentation
+
+- [Versioning Strategies and Concepts](./docs/VERSIONING_STRATEGIES.md) - Detailed explanation of versioning approaches
+- [CI/CD Integration](./docs/CI_CD_INTEGRATION.md) - Guide for integrating with CI/CD pipelines
 
 For more details on available CLI options, run:
 

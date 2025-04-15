@@ -1,23 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GitError, GitErrorCode } from '../../src/errors/gitError.js';
-import * as commandExecutor from '../../src/git/commandExecutor.js';
+import { GitError, GitErrorCode } from '../../../src/errors/gitError.js';
+import * as commandExecutor from '../../../src/git/commandExecutor.js';
 // Import types only to avoid conflicts
-import type { GitCommitOptions, GitProcessOptions, GitTagOptions } from '../../src/git/commands.js';
-import * as repository from '../../src/git/repository.js';
-import * as jsonOutput from '../../src/utils/jsonOutput.js';
-import * as logging from '../../src/utils/logging.js';
+import type {
+  GitCommitOptions,
+  GitProcessOptions,
+  GitTagOptions,
+} from '../../../src/git/commands.js';
+import * as repository from '../../../src/git/repository.js';
+import * as jsonOutput from '../../../src/utils/jsonOutput.js';
+import * as logging from '../../../src/utils/logging.js';
 
 // Mock dependencies
-vi.mock('../../src/git/commandExecutor.js');
-vi.mock('../../src/git/repository.js');
-vi.mock('../../src/utils/logging.js');
-vi.mock('../../src/utils/jsonOutput.js');
+vi.mock('../../../src/git/commandExecutor.js');
+vi.mock('../../../src/git/repository.js');
+vi.mock('../../../src/utils/logging.js');
+vi.mock('../../../src/utils/jsonOutput.js');
 vi.mock('node:process', () => ({
   cwd: () => '/fake/path',
 }));
 
 // Import the actual commands module
-import * as commands from '../../src/git/commands.js';
+import * as commands from '../../../src/git/commands.js';
 
 describe('Git Commands', () => {
   beforeEach(() => {

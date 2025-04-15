@@ -1,6 +1,6 @@
 import * as cp from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { execAsync, execSync } from '../../src/git/commandExecutor.js';
+import { execAsync, execSync } from '../../../src/git/commandExecutor.js';
 
 // Mock child_process module
 vi.mock('node:child_process', () => ({

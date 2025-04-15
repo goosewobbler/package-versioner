@@ -1,15 +1,15 @@
 import { getPackagesSync } from '@manypkg/get-packages';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { VersionEngine } from '../../src/core/versionEngine.js';
-import * as strategyModule from '../../src/core/versionStrategies.js';
-import { VersionError } from '../../src/errors/versionError.js';
-import type { Config } from '../../src/types.js';
-import { log } from '../../src/utils/logging.js';
+import { VersionEngine } from '../../../src/core/versionEngine.js';
+import * as strategyModule from '../../../src/core/versionStrategies.js';
+import { VersionError } from '../../../src/errors/versionError.js';
+import type { Config } from '../../../src/types.js';
+import { log } from '../../../src/utils/logging.js';
 
 // Mock dependencies
 vi.mock('@manypkg/get-packages');
-vi.mock('../../src/core/versionStrategies.js');
-vi.mock('../../src/utils/logging.js');
+vi.mock('../../../src/core/versionStrategies.js');
+vi.mock('../../../src/utils/logging.js');
 vi.mock('node:process', () => ({
   cwd: vi.fn().mockReturnValue('/test/workspace'),
 }));
@@ -131,7 +131,7 @@ describe('Version Engine', () => {
     it('should log and rethrow error if strategy function throws', async () => {
       // Import the VersionError and helper function
       const { VersionError, createVersionError, VersionErrorCode } = await import(
-        '../../src/errors/versionError.js'
+        '../../../src/errors/versionError.js'
       );
 
       // Create an error using the factory function

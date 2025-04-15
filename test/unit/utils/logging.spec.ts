@@ -1,11 +1,11 @@
 import chalk from 'chalk';
 import figlet from 'figlet';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as jsonOutput from '../../src/utils/jsonOutput.js';
-import { log, printFiglet } from '../../src/utils/logging.js';
+import * as jsonOutput from '../../../src/utils/jsonOutput.js';
+import { log, printFiglet } from '../../../src/utils/logging.js';
 
 // Mock dependencies
-vi.mock('../../src/utils/jsonOutput.js');
+vi.mock('../../../src/utils/jsonOutput.js');
 vi.mock('chalk', () => ({
   default: {
     blue: vi.fn((text) => `BLUE:${text}`),

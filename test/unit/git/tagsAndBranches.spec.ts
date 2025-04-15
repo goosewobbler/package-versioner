@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { execAsync, execSync } from '../../src/git/commandExecutor.js';
+import { execAsync, execSync } from '../../../src/git/commandExecutor.js';
 import {
   getCommitsLength,
   getLatestTag,
   lastMergeBranchName,
-} from '../../src/git/tagsAndBranches.js';
-import { log } from '../../src/utils/logging.js';
+} from '../../../src/git/tagsAndBranches.js';
+import { log } from '../../../src/utils/logging.js';
 
 // Mock dependencies
-vi.mock('../../src/git/commandExecutor.js');
-vi.mock('../../src/utils/logging.js');
+vi.mock('../../../src/git/commandExecutor.js');
+vi.mock('../../../src/utils/logging.js');
 vi.mock('git-semver-tags', () => ({
   getSemverTags: vi.fn(),
 }));

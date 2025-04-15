@@ -4,7 +4,7 @@ import {
   formatCommitMessage,
   formatTag,
   formatTagPrefix,
-} from '../../src/utils/formatting.js';
+} from '../../../src/utils/formatting.js';
 
 describe('Formatting Utilities', () => {
   describe('formatTag', () => {

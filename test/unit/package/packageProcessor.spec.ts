@@ -1,28 +1,28 @@
 import path from 'node:path';
 import type { Package } from '@manypkg/get-packages';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as calculator from '../../src/core/versionCalculator.js';
-import { calculateVersion } from '../../src/core/versionCalculator.js';
-import * as gitCommands from '../../src/git/commands.js';
-import * as gitTags from '../../src/git/tagsAndBranches.js';
-import * as packageManagement from '../../src/package/packageManagement.js';
-import { PackageProcessor } from '../../src/package/packageProcessor.js';
-import type { Config } from '../../src/types.js';
-import * as formatting from '../../src/utils/formatting.js';
-import * as jsonOutput from '../../src/utils/jsonOutput.js';
-import * as logging from '../../src/utils/logging.js';
+import * as calculator from '../../../src/core/versionCalculator.js';
+import { calculateVersion } from '../../../src/core/versionCalculator.js';
+import * as gitCommands from '../../../src/git/commands.js';
+import * as gitTags from '../../../src/git/tagsAndBranches.js';
+import * as packageManagement from '../../../src/package/packageManagement.js';
+import { PackageProcessor } from '../../../src/package/packageProcessor.js';
+import type { Config } from '../../../src/types.js';
+import * as formatting from '../../../src/utils/formatting.js';
+import * as jsonOutput from '../../../src/utils/jsonOutput.js';
+import * as logging from '../../../src/utils/logging.js';
 
 // Mock dependencies
 vi.mock('node:path');
 vi.mock('node:process');
-vi.mock('../../src/package/packageManagement.js');
-vi.mock('../../src/git/commands.js');
-vi.mock('../../src/git/tagsAndBranches.js');
-vi.mock('../../src/utils/logging.js');
-vi.mock('../../src/utils/formatting.js');
-vi.mock('../../src/utils/jsonOutput.js');
-vi.mock('../../src/core/versionCalculator.js');
-vi.mock('../../src/version/versionCalc.js');
+vi.mock('../../../src/package/packageManagement.js');
+vi.mock('../../../src/git/commands.js');
+vi.mock('../../../src/git/tagsAndBranches.js');
+vi.mock('../../../src/utils/logging.js');
+vi.mock('../../../src/utils/formatting.js');
+vi.mock('../../../src/utils/jsonOutput.js');
+vi.mock('../../../src/core/versionCalculator.js');
+vi.mock('../../../src/version/versionCalc.js');
 
 describe('Package Processor', () => {
   // Mock data

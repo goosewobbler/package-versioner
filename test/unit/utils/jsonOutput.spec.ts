@@ -7,7 +7,7 @@ import {
   isJsonOutputMode,
   printJsonOutput,
   setCommitMessage,
-} from '../../src/utils/jsonOutput.js';
+} from '../../../src/utils/jsonOutput.js';
 
 describe('JSON Output Utilities', () => {
   beforeEach(() => {

@@ -1,16 +1,16 @@
 import { Bumper } from 'conventional-recommended-bump';
 import semver from 'semver';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { calculateVersion } from '../../src/core/versionCalculator.js';
-import * as gitRepo from '../../src/git/repository.js';
-import * as gitTags from '../../src/git/tagsAndBranches.js';
-import type { Config, VersionOptions } from '../../src/types.js';
-import * as logging from '../../src/utils/logging.js';
+import { calculateVersion } from '../../../src/core/versionCalculator.js';
+import * as gitRepo from '../../../src/git/repository.js';
+import * as gitTags from '../../../src/git/tagsAndBranches.js';
+import type { Config, VersionOptions } from '../../../src/types.js';
+import * as logging from '../../../src/utils/logging.js';
 
 // Mock dependencies
-vi.mock('../../src/git/repository.js');
-vi.mock('../../src/git/tagsAndBranches.js');
-vi.mock('../../src/utils/logging.js');
+vi.mock('../../../src/git/repository.js');
+vi.mock('../../../src/git/tagsAndBranches.js');
+vi.mock('../../../src/utils/logging.js');
 vi.mock('conventional-recommended-bump');
 vi.mock('semver');
 

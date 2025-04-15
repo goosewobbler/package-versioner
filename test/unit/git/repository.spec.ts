@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as commandExecutor from '../../src/git/commandExecutor.js';
-import { getCurrentBranch, isGitRepository } from '../../src/git/repository.js';
+import * as commandExecutor from '../../../src/git/commandExecutor.js';
+import { getCurrentBranch, isGitRepository } from '../../../src/git/repository.js';
 
 // Mock the dependencies
 vi.mock('node:fs', () => ({
@@ -11,7 +11,7 @@ vi.mock('node:fs', () => ({
   })),
 }));
 
-vi.mock('../../src/git/commandExecutor.js', () => ({
+vi.mock('../../../src/git/commandExecutor.js', () => ({
   execSync: vi.fn(),
 }));
 

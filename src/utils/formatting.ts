@@ -11,34 +11,48 @@ export function escapeRegExp(string: string): string {
 }
 
 /**
- * Format a version tag with optional prefix and package name
- * Format: packageName@tagPrefix for packages, or tagPrefix+version for non-package tags (e.g., v1.0.0)
+ * Format a version tag with optional prefix and package name based on templates
+ *
+ * @param version The version number
+ * @param versionPrefix The prefix to use in the template
+ * @param packageName Optional package name
+ * @param tagTemplate Template for non-package tags
+ * @param packageTagTemplate Template for package-specific tags
+ * @returns Formatted tag string
  */
-export function formatTag(version: string, tagPrefix: string, packageName?: string | null): string {
-  if (!tagPrefix) return version;
+export function formatTag(
+  version: string,
+  versionPrefix: string,
+  packageName?: string | null,
+  tagTemplate = '${prefix}${version}',
+  packageTagTemplate = '${packageName}@${prefix}${version}',
+): string {
+  // Variables available for templates
+  const variables = {
+    version,
+    prefix: versionPrefix || '',
+    packageName: packageName || '',
+  };
 
-  // If package name is provided, use packageName@tagPrefix format (e.g., @scope/name@v1.0.0)
-  if (packageName) {
-    return `${packageName}@${tagPrefix}${version}`;
-  }
+  // Use the appropriate template based on whether a package name is provided
+  const template = packageName ? packageTagTemplate : tagTemplate;
 
-  // Standard format is vx.y.z (without slash)
-  return `${tagPrefix}${version}`;
+  return createTemplateString(template, variables);
 }
 
 /**
  * Format a tag prefix based on configuration
  */
-export function formatTagPrefix(tagPrefix: string, scope?: string): string {
-  if (!tagPrefix) return '';
+export function formatTagPrefix(versionPrefix: string, scope?: string): string {
+  if (!versionPrefix) return '';
 
-  const prefix = tagPrefix.replace(/\/$/, ''); // Remove trailing slash
+  const cleanPrefix = versionPrefix.replace(/\/$/, ''); // Remove trailing slash
 
   if (scope) {
-    return `${prefix}/${scope}`;
+    return `${cleanPrefix}/${scope}`;
   }
 
-  return prefix;
+  return cleanPrefix;
 }
 
 /**

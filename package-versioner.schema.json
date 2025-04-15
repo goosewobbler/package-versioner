@@ -6,11 +6,23 @@
       "type": "string",
       "description": "JSON schema reference"
     },
-    "tagPrefix": {
+    "versionPrefix": {
       "type": "string",
       "minLength": 1,
       "description": "The prefix used for Git tags",
       "default": "v"
+    },
+    "tagTemplate": {
+      "type": "string",
+      "minLength": 1,
+      "default": "${prefix}${version}",
+      "description": "Template for formatting Git tags"
+    },
+    "packageTagTemplate": {
+      "type": "string",
+      "minLength": 1,
+      "default": "${packageName}@${prefix}${version}",
+      "description": "Template for formatting package-specific Git tags"
     },
     "preset": {
       "type": "string",
@@ -85,6 +97,6 @@
       "description": "Whether to skip Git hooks"
     }
   },
-  "required": ["tagPrefix", "preset", "updateInternalDependencies"],
+  "required": ["versionPrefix", "preset", "updateInternalDependencies"],
   "additionalProperties": false
 }

@@ -54,7 +54,8 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
   return async (packages: PackagesWithRoot): Promise<void> => {
     try {
       const {
-        tagPrefix,
+        versionPrefix,
+        tagTemplate,
         baseBranch,
         branchPattern,
         commitMessage = 'chore(release): v${version}',
@@ -64,13 +65,13 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
       } = config;
 
       // Calculate version for root package first
-      const prefix = formatTagPrefix(tagPrefix || 'v');
+      const formattedPrefix = formatTagPrefix(versionPrefix || 'v');
       const latestTag = await getLatestTag();
 
       // Calculate the next version
       const nextVersion = await calculateVersion(config, {
         latestTag,
-        tagPrefix: prefix,
+        versionPrefix: formattedPrefix,
         branchPattern,
         baseBranch,
         prereleaseIdentifier,
@@ -118,8 +119,8 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
         return;
       }
 
-      // Create tag
-      const nextTag = formatTag(nextVersion, tagPrefix || 'v', null);
+      // Create tag using the template
+      const nextTag = formatTag(nextVersion, formattedPrefix, null, tagTemplate);
       const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion);
 
       // Use the Git service functions
@@ -144,7 +145,9 @@ export function createSingleStrategy(config: Config): StrategyFunction {
     try {
       const {
         packages: configPackages,
-        tagPrefix,
+        prefix,
+        tagTemplate,
+        packageTagTemplate,
         commitMessage = 'chore(release): ${version}',
         dryRun,
         skipHooks,
@@ -165,10 +168,10 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       }
 
       const pkgPath = pkg.dir;
-      const prefix = formatTagPrefix(tagPrefix || 'v');
+      const formattedPrefix = formatTagPrefix(prefix || 'v');
 
       // Try to get the latest tag specific to this package first
-      let latestTagResult = await getLatestTagForPackage(packageName, prefix);
+      let latestTagResult = await getLatestTagForPackage(packageName, formattedPrefix);
 
       // Fallback to global tag if no package-specific tag exists
       if (!latestTagResult) {
@@ -184,7 +187,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
         // Calculate the next version
         nextVersion = await calculateVersion(config, {
           latestTag,
-          tagPrefix: prefix,
+          versionPrefix: formattedPrefix,
           path: pkgPath,
           name: packageName,
         });
@@ -206,7 +209,13 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       log(`Updated package ${packageName} to version ${nextVersion}`, 'success');
 
       // Create tag
-      const nextTag = formatTag(nextVersion, tagPrefix || 'v', packageName);
+      const nextTag = formatTag(
+        nextVersion,
+        prefix || 'v',
+        packageName,
+        tagTemplate,
+        packageTagTemplate,
+      );
       const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion);
 
       // Use the Git service functions
@@ -245,7 +254,9 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
   const processorOptions = {
     skip: config.skip || [],
     targets: config.packages || [],
-    tagPrefix: config.tagPrefix || 'v',
+    prefix: config.prefix || 'v',
+    tagTemplate: config.tagTemplate,
+    packageTagTemplate: config.packageTagTemplate,
     commitMessageTemplate: config.commitMessage || '',
     dryRun: config.dryRun || false,
     skipHooks: config.skipHooks || false,

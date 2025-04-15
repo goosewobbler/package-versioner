@@ -8,19 +8,34 @@ import {
 
 describe('Formatting Utilities', () => {
   describe('formatTag', () => {
-    it('should return version if tag prefix is empty', () => {
-      const result = formatTag('1.0.0', '');
-      expect(result).toBe('1.0.0');
-    });
-
-    it('should append version to prefix if prefix ends with /', () => {
-      const result = formatTag('1.0.0', 'v/');
-      expect(result).toBe('v/1.0.0');
-    });
-
-    it('should concatenate prefix and version without a slash if prefix does not end with /', () => {
+    it('should use default template when no templates provided', () => {
       const result = formatTag('1.0.0', 'v');
       expect(result).toBe('v1.0.0');
+    });
+
+    it('should format package tags using package template', () => {
+      const result = formatTag('1.0.0', 'v', 'my-package');
+      expect(result).toBe('my-package@v1.0.0');
+    });
+
+    it('should support custom non-package tag templates', () => {
+      const result = formatTag('1.0.0', 'v', null, 'version-${version}');
+      expect(result).toBe('version-1.0.0');
+    });
+
+    it('should support custom package tag templates', () => {
+      const result = formatTag('1.0.0', 'v', 'my-package', undefined, '${packageName}-${version}');
+      expect(result).toBe('my-package-1.0.0');
+    });
+
+    it('should handle complex templates', () => {
+      const result = formatTag('1.0.0', 'v', null, '[${prefix}] ${version}');
+      expect(result).toBe('[v] 1.0.0');
+    });
+
+    it('should handle empty prefix', () => {
+      const result = formatTag('1.0.0', '');
+      expect(result).toBe('1.0.0');
     });
   });
 

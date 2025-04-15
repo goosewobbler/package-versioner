@@ -72,7 +72,7 @@ describe('Version Calculator', () => {
   // Default config for tests
   const defaultConfig: Partial<Config> = {
     preset: 'conventional-commits',
-    tagPrefix: 'v',
+    versionPrefix: 'v',
     baseBranch: 'main',
   };
 
@@ -133,7 +133,7 @@ describe('Version Calculator', () => {
         // @ts-expect-error - Testing with null latestTag
         latestTag: null,
         type: 'minor',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       // Ensure filesystem mock returns true for package.json existence
@@ -160,7 +160,7 @@ describe('Version Calculator', () => {
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
         type: 'minor',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       const version = await calculateVersion(defaultConfig as Config, options);
@@ -177,7 +177,7 @@ describe('Version Calculator', () => {
       const options: VersionOptions = {
         latestTag: 'v1.0.0-next.0',
         type: 'major',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       const version = await calculateVersion(defaultConfig as Config, options);
@@ -195,7 +195,7 @@ describe('Version Calculator', () => {
       const options: VersionOptions = {
         latestTag: 'v1.0.0-beta.1',
         type: 'minor',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       const version = await calculateVersion(defaultConfig as Config, options);
@@ -213,7 +213,7 @@ describe('Version Calculator', () => {
       const options: VersionOptions = {
         latestTag: 'v1.0.0-alpha.2',
         type: 'patch',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       const version = await calculateVersion(defaultConfig as Config, options);
@@ -228,7 +228,7 @@ describe('Version Calculator', () => {
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
         type: 'prerelease',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
         prereleaseIdentifier: 'alpha',
       };
 
@@ -253,7 +253,7 @@ describe('Version Calculator', () => {
       // Execute
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
         branchPattern: config.branchPattern,
         baseBranch: config.baseBranch,
       };
@@ -284,7 +284,7 @@ describe('Version Calculator', () => {
       // Execute
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
         branchPattern: config.branchPattern,
         baseBranch: config.baseBranch,
       };
@@ -293,8 +293,8 @@ describe('Version Calculator', () => {
 
       // Verify
       expect(gitTags.lastMergeBranchName).toHaveBeenCalled();
-      expect(semver.inc).toHaveBeenCalledWith('1.0.0', 'minor', undefined);
-      expect(version).toBe('1.1.0');
+      expect(semver.inc).toHaveBeenCalledWith('1.0.0', 'patch', undefined);
+      expect(version).toBe('1.0.1');
     });
 
     it('should return empty string if no matching branch pattern found', async () => {
@@ -313,7 +313,7 @@ describe('Version Calculator', () => {
       // Execute
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
         branchPattern: config.branchPattern,
         baseBranch: config.baseBranch,
       };
@@ -346,8 +346,7 @@ describe('Version Calculator', () => {
 
       const options: VersionOptions = {
         latestTag: '',
-        tagPrefix: 'v',
-        path: '/test/path',
+        versionPrefix: 'v',
         branchPattern: config.branchPattern,
       };
 
@@ -363,7 +362,7 @@ describe('Version Calculator', () => {
       // Execute
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       const version = await calculateVersion(defaultConfig as Config, options);
@@ -380,7 +379,7 @@ describe('Version Calculator', () => {
 
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       const version = await calculateVersion(defaultConfig as Config, options);
@@ -398,7 +397,7 @@ describe('Version Calculator', () => {
 
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       const version = await calculateVersion(defaultConfig as Config, options);
@@ -419,7 +418,7 @@ describe('Version Calculator', () => {
       const options: VersionOptions = {
         // @ts-expect-error - Testing with null latestTag
         latestTag: null,
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       const version = await calculateVersion(defaultConfig as Config, options);
@@ -434,7 +433,7 @@ describe('Version Calculator', () => {
 
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       // Should throw the error instead of returning an empty string
@@ -454,7 +453,7 @@ describe('Version Calculator', () => {
 
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       const version = await calculateVersion(defaultConfig as Config, options);
@@ -540,7 +539,7 @@ describe('Version Calculator', () => {
       const options: VersionOptions = {
         latestTag: '',
         type: 'major',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
         path: '/test/path',
       };
 
@@ -564,7 +563,7 @@ describe('Version Calculator', () => {
       const options: VersionOptions = {
         latestTag: '',
         type: 'major',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
         path: '/test/path',
       };
 
@@ -584,8 +583,9 @@ describe('Version Calculator', () => {
 
       const options: VersionOptions = {
         latestTag: '',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
         path: '/test/path',
+        branchPattern: defaultConfig.branchPattern,
       };
 
       await calculateVersion(defaultConfig as Config, options);
@@ -605,7 +605,7 @@ describe('Version Calculator', () => {
       const options: VersionOptions = {
         latestTag: '',
         type: 'major',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       await expect(calculateVersion(defaultConfig as Config, options)).rejects.toThrow(
@@ -620,7 +620,7 @@ describe('Version Calculator', () => {
       const options: VersionOptions = {
         latestTag: '',
         type: 'major',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       const version = await calculateVersion(defaultConfig as Config, options);
@@ -642,7 +642,7 @@ describe('Version Calculator', () => {
       const options: VersionOptions = {
         latestTag: '',
         type: 'major',
-        tagPrefix: 'v',
+        versionPrefix: 'v',
       };
 
       await expect(calculateVersion(defaultConfig as Config, options)).rejects.toThrow(

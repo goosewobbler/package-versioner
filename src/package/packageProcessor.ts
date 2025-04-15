@@ -14,7 +14,9 @@ import { updatePackageVersion } from './packageManagement.js';
 export interface PackageProcessorOptions {
   skip?: string[];
   targets?: string[];
-  tagPrefix?: string;
+  versionPrefix?: string;
+  tagTemplate?: string;
+  packageTagTemplate?: string;
   commitMessageTemplate?: string;
   dryRun?: boolean;
   skipHooks?: boolean;
@@ -42,7 +44,9 @@ export interface ProcessResult {
 export class PackageProcessor {
   private skip: string[];
   private targets: string[];
-  private tagPrefix: string;
+  private versionPrefix: string;
+  private tagTemplate?: string;
+  private packageTagTemplate?: string;
   private commitMessageTemplate: string;
   private dryRun: boolean;
   private skipHooks: boolean;
@@ -59,7 +63,9 @@ export class PackageProcessor {
   constructor(options: PackageProcessorOptions) {
     this.skip = options.skip || [];
     this.targets = options.targets || [];
-    this.tagPrefix = options.tagPrefix || 'v';
+    this.versionPrefix = options.versionPrefix || 'v';
+    this.tagTemplate = options.tagTemplate;
+    this.packageTagTemplate = options.packageTagTemplate;
     this.commitMessageTemplate = options.commitMessageTemplate || '';
     this.dryRun = options.dryRun || false;
     this.skipHooks = options.skipHooks || false;
@@ -81,7 +87,6 @@ export class PackageProcessor {
   async processPackages(packages: Package[]): Promise<ProcessResult> {
     const tags: string[] = [];
     const updatedPackagesInfo: Array<{ name: string; version: string; path: string }> = [];
-    const tagPrefix = this.tagPrefix;
 
     // 1. Basic validation
     if (!packages || !Array.isArray(packages)) {
@@ -123,10 +128,10 @@ export class PackageProcessor {
     for (const pkg of pkgsToConsider) {
       const name = pkg.packageJson.name;
       const pkgPath = pkg.dir;
-      const prefix = formatTagPrefix(tagPrefix);
+      const formattedPrefix = formatTagPrefix(this.versionPrefix);
       // For package-specific tags, we may need to request package-specific version history
       // Try to get the latest tag specific to this package first
-      let latestTagResult = await getLatestTagForPackage(name, tagPrefix);
+      let latestTagResult = await getLatestTagForPackage(name, this.versionPrefix);
 
       // Fallback to global tag if no package-specific tag exists
       if (!latestTagResult) {
@@ -139,7 +144,7 @@ export class PackageProcessor {
 
       const nextVersion = await calculateVersion(this.fullConfig, {
         latestTag,
-        tagPrefix: prefix,
+        versionPrefix: formattedPrefix,
         path: pkgPath,
         name,
         branchPattern: this.config.branchPattern,
@@ -156,7 +161,13 @@ export class PackageProcessor {
       updatePackageVersion(path.join(pkgPath, 'package.json'), nextVersion);
 
       // Create package-specific tag (using the updated formatTag function with package name)
-      const packageTag = formatTag(nextVersion, tagPrefix, name);
+      const packageTag = formatTag(
+        nextVersion,
+        this.versionPrefix,
+        name,
+        this.tagTemplate,
+        this.packageTagTemplate,
+      );
       const tagMessage = `chore(release): ${name} ${nextVersion}`;
 
       // Track tag for JSON output

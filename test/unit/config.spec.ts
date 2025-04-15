@@ -23,7 +23,9 @@ describe('Config', () => {
     const mockConfig: Config = {
       preset: 'conventional-commits',
       packages: [],
-      tagPrefix: 'v',
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      packageTagTemplate: '${packageName}@${prefix}${version}',
       versionStrategy: 'branchPattern' as const,
       baseBranch: 'main',
       synced: true,

@@ -39,7 +39,9 @@ describe('Version Engine', () => {
   const defaultConfig: Partial<Config> = {
     preset: 'conventional-commits',
     synced: true,
-    tagPrefix: 'v',
+    versionPrefix: 'v',
+    tagTemplate: '${prefix}${version}',
+    packageTagTemplate: '${packageName}@${prefix}${version}',
     baseBranch: 'main',
     packages: [],
   };
@@ -77,7 +79,9 @@ describe('Version Engine', () => {
     it('should set default preset if not provided', () => {
       const config: Partial<Config> = {
         synced: true,
-        tagPrefix: 'v',
+        versionPrefix: 'v',
+        tagTemplate: '${prefix}${version}',
+        packageTagTemplate: '${packageName}@${prefix}${version}',
         baseBranch: 'main',
         packages: [],
       };
@@ -159,6 +163,12 @@ describe('Version Engine', () => {
         expect.stringContaining('Failed to get packages information'),
         'error',
       );
+    });
+
+    it('should process all packages', async () => {
+      const engine = new VersionEngine(defaultConfig as Config);
+      await engine.run();
+      expect(syncedStrategyMock).toHaveBeenCalledWith(mockPackages, []);
     });
   });
 

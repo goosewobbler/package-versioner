@@ -47,7 +47,8 @@ export async function calculateVersion(
       return prefix ? `${prefix}${packageName}@` : `${packageName}@`;
     }
 
-    // If no package name, use version-only format
+    // If no package name, return the prefix (typically 'v')
+    // This is intended behavior as the prefix itself (like 'v') is used for matching
     return prefix;
   }
 

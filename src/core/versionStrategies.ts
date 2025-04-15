@@ -145,7 +145,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
     try {
       const {
         packages: configPackages,
-        prefix,
+        versionPrefix,
         tagTemplate,
         packageTagTemplate,
         commitMessage = 'chore(release): ${version}',
@@ -168,7 +168,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       }
 
       const pkgPath = pkg.dir;
-      const formattedPrefix = formatTagPrefix(prefix || 'v');
+      const formattedPrefix = formatTagPrefix(versionPrefix || 'v');
 
       // Try to get the latest tag specific to this package first
       let latestTagResult = await getLatestTagForPackage(packageName, formattedPrefix);
@@ -211,7 +211,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       // Create tag
       const nextTag = formatTag(
         nextVersion,
-        prefix || 'v',
+        formattedPrefix,
         packageName,
         tagTemplate,
         packageTagTemplate,
@@ -254,7 +254,7 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
   const processorOptions = {
     skip: config.skip || [],
     targets: config.packages || [],
-    prefix: config.prefix || 'v',
+    versionPrefix: config.versionPrefix || 'v',
     tagTemplate: config.tagTemplate,
     packageTagTemplate: config.packageTagTemplate,
     commitMessageTemplate: config.commitMessage || '',

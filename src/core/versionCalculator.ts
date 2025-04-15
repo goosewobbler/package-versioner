@@ -106,6 +106,10 @@ export async function calculateVersion(
     let branchVersionType: ReleaseType | undefined;
 
     for (const pattern of branchPattern) {
+      if (!pattern.includes(':')) {
+        log(`Invalid branch pattern "${pattern}" - missing colon. Skipping.`, 'warning');
+        continue;
+      }
       const [patternRegex, releaseType] = pattern.split(':') as [string, ReleaseType];
       if (new RegExp(patternRegex).test(branchToCheck)) {
         branchVersionType = releaseType;

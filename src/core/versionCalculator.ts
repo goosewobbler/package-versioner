@@ -34,7 +34,13 @@ export async function calculateVersion(config: Config, options: VersionOptions):
     return prefix ? `${prefix}v` : 'v';
   }
 
+  // Escape special regex characters to prevent regex injection
+  function escapeRegExp(string: string): string {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   const tagSearchPattern = determineTagSearchPattern(name, originalPrefix);
+  const escapedTagPattern = escapeRegExp(tagSearchPattern);
 
   let determinedReleaseType: ReleaseType | null = type || null;
 
@@ -44,7 +50,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
       return initialVersion;
     }
     const currentVersion =
-      semver.clean(latestTag.replace(new RegExp(`^${tagSearchPattern}`), '')) || '0.0.0';
+      semver.clean(latestTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
     return semver.inc(currentVersion, determinedReleaseType, prereleaseIdentifier) || '';
   }
 
@@ -67,7 +73,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
         return initialVersion;
       }
       const currentVersion =
-        semver.clean(latestTag.replace(new RegExp(`^${tagSearchPattern}`), '')) || '0.0.0';
+        semver.clean(latestTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
       return semver.inc(currentVersion, determinedReleaseType, prereleaseIdentifier) || '';
     }
   }
@@ -106,7 +112,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
     }
 
     const currentVersion =
-      semver.clean(latestTag.replace(new RegExp(`^${tagSearchPattern}`), '')) || '0.0.0';
+      semver.clean(latestTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
     return semver.inc(currentVersion, releaseTypeFromCommits, prereleaseIdentifier) || '';
   } catch (error) {
     // Handle errors during conventional bump calculation

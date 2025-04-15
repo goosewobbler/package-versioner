@@ -52,7 +52,10 @@ export async function lastMergeBranchName(
   baseBranch: string,
 ): Promise<string | null> {
   try {
-    const branchesRegex = `${branches.join('/(.*)|')}/(.*)`;
+    // Escape special regex characters in branch patterns
+    const escapedBranches = branches.map((branch) => branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+    const branchesRegex = `${escapedBranches.join('/(.*)|')}/(.*)`;
     const command = `git for-each-ref --sort=-committerdate --format='%(refname:short)' refs/heads --merged ${baseBranch} | grep -o -i -E "${branchesRegex}" | awk -F'[ ]' '{print $1}' | head -n 1`;
     const { stdout } = await execAsync(command);
     return stdout.trim();

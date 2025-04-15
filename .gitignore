@@ -4,5 +4,6 @@ node_modules
 *.log
 coverage
 dist
-/test/fixtures/*/.git
-/test/fixtures/
+# Explicitly include test fixtures
+!test/fixtures/
+!test/fixtures/**

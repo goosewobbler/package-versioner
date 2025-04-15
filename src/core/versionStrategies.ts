@@ -64,7 +64,7 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
       } = config;
 
       // Calculate version for root package first
-      const prefix = formatTagPrefix(tagPrefix || '');
+      const prefix = formatTagPrefix(tagPrefix || 'v');
       const latestTag = await getLatestTag();
 
       // Calculate the next version
@@ -165,7 +165,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       }
 
       const pkgPath = pkg.dir;
-      const prefix = formatTagPrefix(tagPrefix || '');
+      const prefix = formatTagPrefix(tagPrefix || 'v');
       const latestTag = await getLatestTag();
 
       let nextVersion: string | undefined = undefined;
@@ -195,7 +195,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       log(`Updated package ${packageName} to version ${nextVersion}`, 'success');
 
       // Create tag
-      const nextTag = formatTag(nextVersion, tagPrefix || '');
+      const nextTag = formatTag(nextVersion, tagPrefix || 'v');
       const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion);
 
       // Use the Git service functions
@@ -234,7 +234,7 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
   const processorOptions = {
     skip: config.skip || [],
     targets: config.packages || [],
-    tagPrefix: config.tagPrefix || '',
+    tagPrefix: config.tagPrefix || 'v',
     commitMessageTemplate: config.commitMessage || '',
     dryRun: config.dryRun || false,
     skipHooks: config.skipHooks || false,

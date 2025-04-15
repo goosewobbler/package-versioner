@@ -19,7 +19,7 @@ import { log } from '../utils/logging.js';
 export async function calculateVersion(config: Config, options: VersionOptions): Promise<string> {
   const { latestTag, type, path, name, branchPattern, prereleaseIdentifier } = options;
   // Get the ORIGINAL prefix from the config for pattern matching
-  const originalPrefix = config.tagPrefix || ''; // Default to empty string
+  const originalPrefix = config.tagPrefix || 'v'; // Default to 'v'
 
   const initialVersion = prereleaseIdentifier ? `0.0.1-${prereleaseIdentifier}` : '0.0.1';
 
@@ -39,7 +39,9 @@ export async function calculateVersion(config: Config, options: VersionOptions):
     if (!latestTag) {
       return initialVersion;
     }
-    const currentVersion = semver.clean(latestTag.replace(new RegExp('^' + tagSearchPattern), '')) || '0.0.0';
+    const currentVersion =
+      semver.clean(latestTag.replace(new RegExp(`^${tagSearchPattern}`), '')) || '0.0.0';
+    return semver.inc(currentVersion, determinedReleaseType, prereleaseIdentifier) || '';
   }
 
   // 2. Handle branch pattern versioning (if configured)

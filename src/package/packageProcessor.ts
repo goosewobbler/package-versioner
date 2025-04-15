@@ -58,7 +58,7 @@ export class PackageProcessor {
   constructor(options: PackageProcessorOptions) {
     this.skip = options.skip || [];
     this.targets = options.targets || [];
-    this.tagPrefix = options.tagPrefix || '';
+    this.tagPrefix = options.tagPrefix || 'v';
     this.commitMessageTemplate = options.commitMessageTemplate || '';
     this.dryRun = options.dryRun || false;
     this.skipHooks = options.skipHooks || false;

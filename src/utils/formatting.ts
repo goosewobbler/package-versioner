@@ -3,6 +3,14 @@
  */
 
 /**
+ * Escapes special characters in a string to be used in a RegExp safely
+ * Prevents regex injection when using user-provided strings in RegExp constructors
+ */
+export function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Format a version tag with optional prefix
  */
 export function formatTag(version: string, tagPrefix: string): string {

@@ -8,6 +8,7 @@ import { getCurrentBranch } from '../git/repository.js';
 import { getCommitsLength } from '../git/tagsAndBranches.js';
 import { lastMergeBranchName } from '../git/tagsAndBranches.js';
 import type { Config, VersionOptions } from '../types.js';
+import { escapeRegExp } from '../utils/formatting.js';
 import { log } from '../utils/logging.js';
 
 /**
@@ -32,11 +33,6 @@ export async function calculateVersion(config: Config, options: VersionOptions):
 
     // If no package name, use version-only format
     return prefix ? `${prefix}v` : 'v';
-  }
-
-  // Escape special regex characters to prevent regex injection
-  function escapeRegExp(string: string): string {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   const tagSearchPattern = determineTagSearchPattern(name, originalPrefix);

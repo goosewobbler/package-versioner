@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { cwd } from 'node:process';
 
 import { Bumper } from 'conventional-recommended-bump';
@@ -18,11 +20,14 @@ import { log } from '../utils/logging.js';
  * 3. Conventional commits analysis
  */
 export async function calculateVersion(config: Config, options: VersionOptions): Promise<string> {
-  const { latestTag, type, path, name, branchPattern, prereleaseIdentifier } = options;
+  const { latestTag, type, path: pkgPath, name, branchPattern, prereleaseIdentifier } = options;
   // Get the ORIGINAL prefix from the config for pattern matching
   const originalPrefix = config.tagPrefix || 'v'; // Default to 'v'
 
   const initialVersion = prereleaseIdentifier ? `0.0.1-${prereleaseIdentifier}` : '0.0.1';
+
+  // Check if we need to fallback to package.json version (no tags found)
+  const hasNoTags = !latestTag || latestTag === '';
 
   // Determine tag search pattern with a clearer approach
   function determineTagSearchPattern(packageName: string | undefined, prefix: string): string {
@@ -42,8 +47,15 @@ export async function calculateVersion(config: Config, options: VersionOptions):
 
   // 1. Handle specific type if provided
   if (determinedReleaseType) {
-    if (!latestTag) {
-      return initialVersion;
+    if (hasNoTags) {
+      // Get package version from package.json
+      return getPackageVersionFallback(
+        pkgPath,
+        name,
+        determinedReleaseType,
+        prereleaseIdentifier,
+        initialVersion,
+      );
     }
 
     const currentVersion =
@@ -79,8 +91,15 @@ export async function calculateVersion(config: Config, options: VersionOptions):
     }
 
     if (determinedReleaseType) {
-      if (!latestTag) {
-        return initialVersion;
+      if (hasNoTags) {
+        // Get package version from package.json
+        return getPackageVersionFallback(
+          pkgPath,
+          name,
+          determinedReleaseType,
+          prereleaseIdentifier,
+          initialVersion,
+        );
       }
       const currentVersion =
         semver.clean(latestTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
@@ -95,14 +114,24 @@ export async function calculateVersion(config: Config, options: VersionOptions):
     const recommendedBump = await bumper.bump();
     const releaseTypeFromCommits = recommendedBump.releaseType as ReleaseType | undefined;
 
-    if (!latestTag) {
+    if (hasNoTags) {
+      // Get package version from package.json if releaseTypeFromCommits is found
+      if (releaseTypeFromCommits) {
+        return getPackageVersionFallback(
+          pkgPath,
+          name,
+          releaseTypeFromCommits,
+          prereleaseIdentifier,
+          initialVersion,
+        );
+      }
       // No tags yet, return initial version
       return initialVersion;
     }
 
     // If tags exist, check for new commits since the last tag
     // Use path if provided, otherwise check the whole repo (cwd)
-    const checkPath = path || cwd();
+    const checkPath = pkgPath || cwd();
     const commitsLength = getCommitsLength(checkPath); // Uses git describe internally
     if (commitsLength === 0) {
       log(
@@ -137,5 +166,59 @@ export async function calculateVersion(config: Config, options: VersionOptions):
 
     // Rethrow unexpected errors to prevent silent failures
     throw error;
+  }
+}
+
+/**
+ * Helper function to get package version from package.json when no tags are found
+ */
+function getPackageVersionFallback(
+  pkgPath: string | undefined,
+  name: string | undefined,
+  releaseType: ReleaseType,
+  prereleaseIdentifier: string | undefined,
+  initialVersion: string,
+): string {
+  const packageDir = pkgPath || cwd();
+  const packageJsonPath = path.join(packageDir, 'package.json');
+
+  // Case 1: package.json doesn't exist - error
+  if (!fs.existsSync(packageJsonPath)) {
+    throw new Error(`package.json not found at ${packageJsonPath}. Cannot determine version.`);
+  }
+
+  try {
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+
+    // Case 2: package.json exists but has no version property - return initialVersion
+    if (!packageJson.version) {
+      log(`No version found in package.json. Using initial version ${initialVersion}`, 'info');
+      return initialVersion;
+    }
+
+    // Normal case: use the package.json version
+    log(
+      `No tags found for ${name || 'package'}, using package.json version: ${packageJson.version} as base`,
+      'info',
+    );
+
+    // Auto-clean prerelease identifiers when using standard bump types
+    const standardBumpTypes = ['major', 'minor', 'patch'];
+
+    if (standardBumpTypes.includes(releaseType) && semver.prerelease(packageJson.version)) {
+      log(
+        `Cleaning prerelease identifier from ${packageJson.version} for ${releaseType} bump`,
+        'debug',
+      );
+      const cleanVersion = semver.inc(packageJson.version, 'patch') || packageJson.version;
+      return semver.inc(cleanVersion, releaseType) || initialVersion;
+    }
+
+    return semver.inc(packageJson.version, releaseType, prereleaseIdentifier) || initialVersion;
+  } catch (err) {
+    // Case 3: Error reading package.json - error
+    throw new Error(
+      `Error reading package.json: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }

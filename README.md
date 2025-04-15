@@ -70,7 +70,7 @@ When using the `--json` flag, normal console output is suppressed and the tool o
   ],
   "commitMessage": "chore(release): v1.2.3",
   "tags": [
-    "v@scope/package-a@1.2.3"
+    "@scope/package-a@v1.2.3"
   ]
 }
 ```

@@ -1,6 +1,6 @@
 {
   "name": "package-versioner",
-  "description": "A powerful CLI tool for automated semantic versioning based on Git history and conventional commits. Supports monorepos with synchronized or independent package versioning strategies.",
+  "description": "A lightweight yet powerful CLI tool for automated semantic versioning based on Git history and conventional commits.",
   "version": "0.2.0",
   "type": "module",
   "main": "./dist/index.js",

@@ -12,7 +12,7 @@ export function escapeRegExp(string: string): string {
 
 /**
  * Format a version tag with optional prefix and package name
- * Format: packageName@tagPrefix or tagPrefix/version if no package name
+ * Format: packageName@tagPrefix for packages, or tagPrefix+version for non-package tags (e.g., v1.0.0)
  */
 export function formatTag(version: string, tagPrefix: string, packageName?: string | null): string {
   if (!tagPrefix) return version;
@@ -22,8 +22,8 @@ export function formatTag(version: string, tagPrefix: string, packageName?: stri
     return `${packageName}@${tagPrefix}${version}`;
   }
 
-  // Otherwise just use prefix/version format
-  return tagPrefix.endsWith('/') ? `${tagPrefix}${version}` : `${tagPrefix}/${version}`;
+  // Standard format is vx.y.z (without slash)
+  return `${tagPrefix}${version}`;
 }
 
 /**

@@ -18,9 +18,9 @@ describe('Formatting Utilities', () => {
       expect(result).toBe('v/1.0.0');
     });
 
-    it('should add slash between prefix and version if prefix does not end with /', () => {
+    it('should concatenate prefix and version without a slash if prefix does not end with /', () => {
       const result = formatTag('1.0.0', 'v');
-      expect(result).toBe('v/1.0.0');
+      expect(result).toBe('v1.0.0');
     });
   });
 

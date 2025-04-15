@@ -93,7 +93,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
     // If tags exist, check for new commits since the last tag
     // Use path if provided, otherwise check the whole repo (cwd)
     const checkPath = path || cwd();
-    const commitsLength = await getCommitsLength(checkPath); // Uses git describe internally
+    const commitsLength = getCommitsLength(checkPath); // Uses git describe internally
     if (commitsLength === 0) {
       log(
         `No new commits found for ${name || 'project'} since ${latestTag}, skipping version bump`,

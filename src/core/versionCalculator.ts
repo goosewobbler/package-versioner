@@ -120,6 +120,8 @@ export async function calculateVersion(config: Config, options: VersionOptions):
       // If conventional bump failed *because* of no tags, return initial version
       return initialVersion;
     }
-    return ''; // Return empty on other errors
+
+    // Rethrow unexpected errors to prevent silent failures
+    throw error;
   }
 }

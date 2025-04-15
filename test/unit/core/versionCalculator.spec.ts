@@ -266,7 +266,7 @@ describe('Version Calculator', () => {
   });
 
   describe('Error handling', () => {
-    it('should handle errors during conventional bump calculation', async () => {
+    it('should rethrow errors during conventional bump calculation', async () => {
       vi.mocked(Bumper.prototype.bump).mockRejectedValue(new Error('Failed to analyze commits'));
 
       const options: VersionOptions = {
@@ -274,9 +274,11 @@ describe('Version Calculator', () => {
         tagPrefix: 'v',
       };
 
-      const version = await calculateVersion(defaultConfig as Config, options);
+      // Should throw the error instead of returning an empty string
+      await expect(calculateVersion(defaultConfig as Config, options)).rejects.toThrow(
+        'Failed to analyze commits',
+      );
 
-      expect(version).toBe('');
       expect(logging.log).toHaveBeenCalledWith(
         expect.stringContaining('Failed to calculate version'),
         'error',

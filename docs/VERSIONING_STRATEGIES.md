@@ -133,3 +133,55 @@ This applies to all standard bump types:
 - `--bump major`: 1.0.0-beta.1 -> 2.0.0
 - `--bump minor`: 1.0.0-beta.1 -> 1.1.0 
 - `--bump patch`: 1.0.0-beta.1 -> 1.0.1
+
+## Tag Templates and Configuration
+
+`package-versioner` provides flexible configuration for how Git tags are formatted, allowing you to customize the tag structure for both single package repositories and monorepos.
+
+### Tag Template Configuration
+
+You can customize how tags are formatted using the following configuration options in `version.config.json`:
+
+```json
+{
+  "versionPrefix": "v",
+  "tagTemplate": "${prefix}${version}",
+  "packageTagTemplate": "${packageName}@${prefix}${version}"
+}
+```
+
+- **versionPrefix**: The prefix used for all version numbers in tags (default: `"v"`)
+- **tagTemplate**: The template for the main Git tag (default: `"${prefix}${version}"`)
+- **packageTagTemplate**: The template for package-specific Git tags in monorepos (default: `"${packageName}@${prefix}${version}"`)
+
+### Available Template Variables
+
+The tag templates support the following variables:
+
+- `${prefix}`: Replaced with the value of `versionPrefix`
+- `${version}`: Replaced with the calculated version number
+- `${packageName}`: (Only in `packageTagTemplate`) Replaced with the package name
+
+### Examples
+
+#### Default Tag Format
+With default settings, tags will look like:
+- Single repository or synced monorepo: `v1.2.3`
+- Package-specific tag in async monorepo: `@scope/package-name@v1.2.3`
+
+#### Custom Tag Format Examples
+```json
+{
+  "versionPrefix": "",
+  "tagTemplate": "release-${version}"
+}
+```
+This would produce tags like `release-1.2.3` instead of `v1.2.3`.
+
+```json
+{
+  "versionPrefix": "v",
+  "packageTagTemplate": "${packageName}-${prefix}${version}"
+}
+```
+This would produce package tags like `@scope/package-name-v1.2.3` instead of `@scope/package-name@v1.2.3`.

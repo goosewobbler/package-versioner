@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as commandExecutor from '../../../src/git/commandExecutor.js';
 import { getCurrentBranch, isGitRepository } from '../../../src/git/repository.js';
@@ -21,16 +22,19 @@ describe('repository', () => {
   });
 
   describe('isGitRepository', () => {
+    const testDir = '/path/to/repo';
+    const gitDir = join(testDir, '.git');
+
     it('should return false if .git directory does not exist', () => {
       // Setup
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
       // Execute
-      const result = isGitRepository('/path/to/repo');
+      const result = isGitRepository(testDir);
 
       // Verify
       expect(result).toBe(false);
-      expect(fs.existsSync).toHaveBeenCalledWith('/path/to/repo/.git');
+      expect(fs.existsSync).toHaveBeenCalledWith(gitDir);
       expect(fs.statSync).not.toHaveBeenCalled();
       expect(commandExecutor.execSync).not.toHaveBeenCalled();
     });
@@ -46,12 +50,12 @@ describe('repository', () => {
       });
 
       // Execute
-      const result = isGitRepository('/path/to/repo');
+      const result = isGitRepository(testDir);
 
       // Verify
       expect(result).toBe(false);
-      expect(fs.existsSync).toHaveBeenCalledWith('/path/to/repo/.git');
-      expect(fs.statSync).toHaveBeenCalledWith('/path/to/repo/.git');
+      expect(fs.existsSync).toHaveBeenCalledWith(gitDir);
+      expect(fs.statSync).toHaveBeenCalledWith(gitDir);
       expect(commandExecutor.execSync).not.toHaveBeenCalled();
     });
 
@@ -68,14 +72,14 @@ describe('repository', () => {
       });
 
       // Execute
-      const result = isGitRepository('/path/to/repo');
+      const result = isGitRepository(testDir);
 
       // Verify
       expect(result).toBe(false);
-      expect(fs.existsSync).toHaveBeenCalledWith('/path/to/repo/.git');
-      expect(fs.statSync).toHaveBeenCalledWith('/path/to/repo/.git');
+      expect(fs.existsSync).toHaveBeenCalledWith(gitDir);
+      expect(fs.statSync).toHaveBeenCalledWith(gitDir);
       expect(commandExecutor.execSync).toHaveBeenCalledWith('git rev-parse --is-inside-work-tree', {
-        cwd: '/path/to/repo',
+        cwd: testDir,
       });
     });
 
@@ -90,14 +94,14 @@ describe('repository', () => {
       vi.mocked(commandExecutor.execSync).mockReturnValue(Buffer.from('true'));
 
       // Execute
-      const result = isGitRepository('/path/to/repo');
+      const result = isGitRepository(testDir);
 
       // Verify
       expect(result).toBe(true);
-      expect(fs.existsSync).toHaveBeenCalledWith('/path/to/repo/.git');
-      expect(fs.statSync).toHaveBeenCalledWith('/path/to/repo/.git');
+      expect(fs.existsSync).toHaveBeenCalledWith(gitDir);
+      expect(fs.statSync).toHaveBeenCalledWith(gitDir);
       expect(commandExecutor.execSync).toHaveBeenCalledWith('git rev-parse --is-inside-work-tree', {
-        cwd: '/path/to/repo',
+        cwd: testDir,
       });
     });
   });

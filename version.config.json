@@ -1,6 +1,6 @@
 {
   "$schema": "./package-versioner.schema.json",
-  "tagPrefix": "v",
+  "versionPrefix": "v",
   "preset": "angular",
   "updateInternalDependencies": "patch",
   "commitMessage": "chore(release): v${version} [skip-ci]"

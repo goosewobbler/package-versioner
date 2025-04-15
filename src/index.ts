@@ -1,50 +1,45 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { loadConfig } from './config.js';
+import { VersionEngine } from './core/versionEngine.js';
 import type { Config } from './types.js';
-import { enableJsonOutput, getPackageInfo, log, printFiglet, printJsonOutput } from './utils.js';
-import { VersionEngine } from './versionEngine.js';
+import { enableJsonOutput, printJsonOutput } from './utils/jsonOutput.js';
+import { log } from './utils/logging.js';
 
+// Main execution function for the CLI
 async function run() {
   const program = new Command();
-  // Get package info dynamically for version
-  const { version } = getPackageInfo();
 
+  // Configure the CLI options
   program
     .name('package-versioner')
     .description(
-      'Automated semantic versioning based on Git history and conventional commits. Supports monorepos with synchronized or independent package versioning strategies.',
+      'A lightweight yet powerful CLI tool for automated semantic versioning based on Git history and conventional commits.',
     )
-    .version(version) // Use dynamic version from package.json
-    .option('--config <path>', 'Path to the configuration file')
-    .option('--dry-run', 'Simulate the versioning process without making changes')
-    .option('--synced', 'Force synced versioning strategy (overrides config)') // Keep for explicit override
-    .option('--bump <type>', 'Force a specific release type (patch, minor, major)')
+    .version(process.env.npm_package_version || '0.0.0')
     .option(
-      '--prerelease <identifier>',
-      'Create a prerelease version with the specified identifier',
+      '-c, --config <path>',
+      'Path to config file (defaults to version.config.json in current directory)',
     )
-    .option(
-      '-t, --target <targets>',
-      'Comma-separated list of package names to target (only for async strategy)',
-    )
-    .option('--json', 'Output results as JSON (suppresses normal output)')
+    .option('-d, --dry-run', 'Dry run (no changes made)', false)
+    .option('-b, --bump <type>', 'Force specific bump type (patch|minor|major)')
+    .option('-p, --prerelease [identifier]', 'Create prerelease version')
+    .option('-s, --synced', 'Force synchronized versioning across all packages')
+    .option('-j, --json', 'Output results as JSON', false)
+    .option('-t, --target <packages>', 'Comma-delimited list of package names to target')
     .parse(process.argv);
 
   const options = program.opts();
 
-  // Set up JSON output mode before any logging happens
+  // Enable JSON output mode if requested
   if (options.json) {
-    enableJsonOutput(!!options.dryRun);
-  } else {
-    // Only print figlet banner in non-JSON mode
-    printFiglet();
+    enableJsonOutput(options.dryRun);
   }
 
   try {
     // Load config
     const config: Config = await loadConfig(options.config);
-    log('info', `Loaded configuration from ${options.config || 'version.config.json'}`);
+    log(`Loaded configuration from ${options.config || 'version.config.json'}`, 'info');
 
     // Override config with CLI options
     if (options.dryRun) config.dryRun = true;
@@ -61,32 +56,39 @@ async function run() {
     // Initialize engine with JSON mode setting
     const engine = new VersionEngine(config, !!options.json);
 
-    // Determine strategy
+    // Determine strategy and run
     if (config.synced) {
-      log('info', 'Using synced versioning strategy.');
-      await engine.syncedStrategy(); // Synced doesn't use targets
+      log('Using synced versioning strategy.', 'info');
+      engine.setStrategy('synced');
+      await engine.run(); // Synced doesn't use targets
     } else if (config.packages && config.packages.length === 1) {
-      log('info', 'Using single package versioning strategy.');
+      log('Using single package versioning strategy.', 'info');
       if (cliTargets.length > 0) {
-        log('warning', '--target flag is ignored for single package strategy.');
+        log('--target flag is ignored for single package strategy.', 'warning');
       }
-      await engine.singleStrategy();
+      engine.setStrategy('single');
+      await engine.run();
     } else {
-      log('info', 'Using async versioning strategy.');
+      log('Using async versioning strategy.', 'info');
       if (cliTargets.length > 0) {
-        log('info', `Targeting specific packages: ${cliTargets.join(', ')}`);
+        log(`Targeting specific packages: ${cliTargets.join(', ')}`, 'info');
       }
-      await engine.asyncStrategy(cliTargets); // Pass targets to async strategy
+      engine.setStrategy('async');
+      await engine.run(cliTargets); // Pass targets to async strategy
     }
 
-    log('success', 'Versioning process completed.');
+    log('Versioning process completed.', 'success');
 
     // Print JSON output if enabled (this will be the only output in JSON mode)
     printJsonOutput();
   } catch (error) {
-    log('error', error instanceof Error ? error.message : String(error));
+    log(error instanceof Error ? error.message : String(error), 'error');
     process.exit(1);
   }
 }
 
-run();
+// Entry point
+run().catch((error) => {
+  console.error('Fatal error:', error);
+  process.exit(1);
+});

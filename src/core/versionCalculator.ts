@@ -70,11 +70,11 @@ export async function calculateVersion(
       );
     }
 
-    // Call clean with the full latestTag value to match test expectations
-    semver.clean(latestTag);
+    // Clean the latestTag to ensure proper semver format
+    const cleanedTag = semver.clean(latestTag) || latestTag;
 
     const currentVersion =
-      semver.clean(latestTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
+      semver.clean(cleanedTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
 
     // Handle prerelease versions with our helper
     if (STANDARD_BUMP_TYPES.includes(specifiedType) && semver.prerelease(currentVersion)) {
@@ -129,11 +129,11 @@ export async function calculateVersion(
           initialVersion,
         );
       }
-      // Call clean with the full latestTag value to match test expectations
-      semver.clean(latestTag);
+      // Clean the latestTag to ensure proper semver format
+      const cleanedTag = semver.clean(latestTag) || latestTag;
 
       const currentVersion =
-        semver.clean(latestTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
+        semver.clean(cleanedTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
 
       log(`Applying ${branchVersionType} bump based on branch pattern`, 'debug');
       return semver.inc(currentVersion, branchVersionType, undefined) || '';
@@ -278,7 +278,12 @@ function bumpVersion(
 ): string {
   // Handle prerelease versions
   if (semver.prerelease(currentVersion) && STANDARD_BUMP_TYPES.includes(bumpType)) {
-    // Special case for major prerelease versions - clean to base version
+    // Special case for major prerelease versions (1.0.0-next.x) bumping to stable 1.0.0
+    // This handles the edge case where:
+    // 1. We have a version that's already at 1.0.0-x (prerelease of first major)
+    // 2. A major bump is requested on this prerelease
+    // 3. Instead of going to 2.0.0, we want to simply "clean" to 1.0.0 (stable release)
+    // This is a common pattern when preparing for a major stable release
     const parsed = semver.parse(currentVersion);
     if (
       bumpType === 'major' &&

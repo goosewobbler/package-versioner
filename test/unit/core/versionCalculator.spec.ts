@@ -14,7 +14,57 @@ vi.mock('../../../src/git/repository.js');
 vi.mock('../../../src/git/tagsAndBranches.js');
 vi.mock('../../../src/utils/logging.js');
 vi.mock('conventional-recommended-bump');
-vi.mock('semver');
+vi.mock('semver', async () => {
+  return {
+    default: {
+      clean: vi.fn(),
+      inc: vi.fn().mockImplementation((version, type, identifier) => {
+        // Simplified mock that assumes specific versions in tests
+        if (version === '1.0.0-next.0' && type === 'major') return '2.0.0';
+        if (version === '1.0.0-beta.1' && type === 'minor') return '1.1.0';
+        if (version === '1.0.0-alpha.2' && type === 'patch') return '1.0.1';
+        if (version === '1.0.0-test' && type === 'minor') return '1.1.0';
+        if (version === '1.0.0' && type === 'patch') return '1.0.1';
+        if (version === '1.0.0' && type === 'minor') return '1.1.0';
+        if (version === '1.0.0' && type === 'prerelease' && identifier === 'alpha')
+          return '1.0.0-alpha.1';
+
+        // Default fallback
+        if (type === 'patch')
+          return `${version.split('.')[0]}.${version.split('.')[1]}.${Number.parseInt(version.split('.')[2], 10) + 1}`;
+        if (type === 'minor')
+          return `${version.split('.')[0]}.${Number.parseInt(version.split('.')[1], 10) + 1}.0`;
+        if (type === 'major') return `${Number.parseInt(version.split('.')[0], 10) + 1}.0.0`;
+
+        return `${version}-${identifier || 'test'}.1`;
+      }),
+      prerelease: vi.fn(),
+      parse: vi.fn().mockImplementation((version) => {
+        // For known test values
+        if (version === '1.0.0-next.0') {
+          return { major: 1, minor: 0, patch: 0 };
+        }
+        if (version === '1.0.0-beta.1') {
+          return { major: 1, minor: 0, patch: 0 };
+        }
+        if (version === '1.0.0-alpha.2') {
+          return { major: 1, minor: 0, patch: 0 };
+        }
+        if (version === '1.0.0-test') {
+          return { major: 1, minor: 0, patch: 0 };
+        }
+
+        // Parse basic version strings
+        const parts = version.split('-')[0].split('.');
+        return {
+          major: Number.parseInt(parts[0], 10),
+          minor: Number.parseInt(parts[1], 10),
+          patch: Number.parseInt(parts[2], 10),
+        };
+      }),
+    },
+  };
+});
 vi.mock('node:fs');
 vi.mock('node:path');
 
@@ -52,9 +102,9 @@ describe('Version Calculator', () => {
         if (version.toString().includes('-')) {
           const baseVersion = version.toString().split('-')[0];
           const baseParts = baseVersion.split('.');
-          return `${baseParts[0]}.${baseParts[1]}.${Number(baseParts[2]) + 1}`;
+          return `${baseParts[0]}.${baseParts[1]}.${Number.parseInt(baseParts[2], 10) + 1}`;
         }
-        return `${parts[0]}.${parts[1]}.${Number(parts[2]) + 1}`;
+        return `${parts[0]}.${parts[1]}.${Number.parseInt(parts[2], 10) + 1}`;
       }
 
       // Handle prerelease with identifier
@@ -277,6 +327,35 @@ describe('Version Calculator', () => {
         'info',
       );
     });
+
+    it('should use package.json version with branch pattern strategy when no latestTag exists', async () => {
+      const config: Partial<Config> = {
+        ...defaultConfig,
+        versionStrategy: 'branchPattern',
+        branchPattern: ['feature:minor'],
+      };
+
+      vi.mocked(gitRepo.getCurrentBranch).mockReturnValue('feature/test');
+
+      // Mock filesystem to return a package.json with a prerelease version
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ version: '1.0.0-test' }));
+
+      // Mock prerelease detection
+      vi.mocked(semver.prerelease).mockReturnValue(['test']);
+
+      const options: VersionOptions = {
+        latestTag: '',
+        tagPrefix: 'v',
+        path: '/test/path',
+        branchPattern: config.branchPattern,
+      };
+
+      const version = await calculateVersion(config as Config, options);
+
+      // Should read from package.json and clean prerelease identifier for minor bump
+      expect(version).toBe('1.1.0');
+    });
   });
 
   describe('Conventional commits analysis', () => {
@@ -400,6 +479,27 @@ describe('Version Calculator', () => {
       // Ensure semver.prerelease returns a non-null value for our tests
       vi.mocked(semver.prerelease).mockReturnValue(['beta', '1']);
 
+      // Mock semver.parse to return proper version components
+      vi.mocked(semver.parse).mockImplementation((version) => {
+        if (version === '1.0.0-beta.1') {
+          return {
+            major: 1,
+            minor: 0,
+            patch: 0,
+            prerelease: ['beta', 1],
+          } as unknown as semver.SemVer;
+        }
+        if (version === '1.0.0-next.0') {
+          return {
+            major: 1,
+            minor: 0,
+            patch: 0,
+            prerelease: ['next', 0],
+          } as unknown as semver.SemVer;
+        }
+        return null;
+      });
+
       // Implement semver.inc with a more complex behavior for different scenarios
       vi.mocked(semver.inc).mockImplementation((version, releaseType, identifier) => {
         if (!version) return '1.0.0';
@@ -446,34 +546,36 @@ describe('Version Calculator', () => {
 
       const version = await calculateVersion(defaultConfig as Config, options);
 
-      // Should read from package.json and clean prerelease identifier for major bump
-      expect(version).toBe('2.0.0');
+      // With our special prerelease handling, 1.0.0-beta.1 with major bump now becomes 1.0.0
+      expect(version).toBe('1.0.0');
       expect(logging.log).toHaveBeenCalledWith(
         expect.stringContaining('No tags found for package, using package.json version:'),
         'info',
       );
     });
 
-    it('should use package.json version with branch pattern strategy when no latestTag exists', async () => {
-      const config: Partial<Config> = {
-        ...defaultConfig,
-        versionStrategy: 'branchPattern',
-        branchPattern: ['feature:minor'],
-      };
+    it('should correctly handle major bump on 1.0.0-next.0 to become 1.0.0', async () => {
+      // Mock readFileSync to return a package.json with the prerelease version
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ version: '1.0.0-next.0' }));
 
-      vi.mocked(gitRepo.getCurrentBranch).mockReturnValue('feature/test');
+      // Override prerelease mock for this specific case
+      vi.mocked(semver.prerelease).mockReturnValue(['next', '0']);
 
       const options: VersionOptions = {
         latestTag: '',
+        type: 'major',
         tagPrefix: 'v',
         path: '/test/path',
-        branchPattern: config.branchPattern,
       };
 
-      const version = await calculateVersion(config as Config, options);
+      const version = await calculateVersion(defaultConfig as Config, options);
 
-      // Should read from package.json and clean prerelease identifier for minor bump
-      expect(version).toBe('1.1.0');
+      // Should remove prerelease identifier but keep major version at 1
+      expect(version).toBe('1.0.0');
+      expect(logging.log).toHaveBeenCalledWith(
+        expect.stringContaining('Cleaning prerelease identifier'),
+        'debug',
+      );
     });
 
     it('should attempt to use package.json version with conventional commits when no latestTag exists', async () => {

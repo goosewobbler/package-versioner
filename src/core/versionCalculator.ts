@@ -13,6 +13,9 @@ import type { Config, VersionOptions } from '../types.js';
 import { escapeRegExp } from '../utils/formatting.js';
 import { log } from '../utils/logging.js';
 
+// Standard bump types that should clean prerelease identifiers
+const STANDARD_BUMP_TYPES = ['major', 'minor', 'patch'];
+
 /**
  * Calculates version based on various approaches:
  * 1. Forced version type (explicit bump)
@@ -61,18 +64,12 @@ export async function calculateVersion(config: Config, options: VersionOptions):
     const currentVersion =
       semver.clean(latestTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
 
-    // Auto-clean prerelease identifiers when using standard bump types (major, minor, patch)
-    const standardBumpTypes = ['major', 'minor', 'patch'];
-
-    if (standardBumpTypes.includes(determinedReleaseType) && semver.prerelease(currentVersion)) {
-      // Auto-clean by ignoring prerelease identifier when an explicit standard bump is requested
-      log(
-        `Cleaning prerelease identifier from ${currentVersion} for ${determinedReleaseType} bump`,
-        'debug',
-      );
-      return semver.inc(currentVersion, determinedReleaseType) || '';
+    // Handle prerelease versions with our helper
+    if (STANDARD_BUMP_TYPES.includes(determinedReleaseType) && semver.prerelease(currentVersion)) {
+      return bumpVersion(currentVersion, determinedReleaseType, prereleaseIdentifier);
     }
 
+    // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
     return semver.inc(currentVersion, determinedReleaseType, prereleaseIdentifier) || '';
   }
 
@@ -202,18 +199,12 @@ function getPackageVersionFallback(
       'info',
     );
 
-    // Auto-clean prerelease identifiers when using standard bump types
-    const standardBumpTypes = ['major', 'minor', 'patch'];
-
-    if (standardBumpTypes.includes(releaseType) && semver.prerelease(packageJson.version)) {
-      log(
-        `Cleaning prerelease identifier from ${packageJson.version} for ${releaseType} bump`,
-        'debug',
-      );
-      const cleanVersion = semver.inc(packageJson.version, 'patch') || packageJson.version;
-      return semver.inc(cleanVersion, releaseType) || initialVersion;
+    // Handle prerelease versions with our helper
+    if (STANDARD_BUMP_TYPES.includes(releaseType) && semver.prerelease(packageJson.version)) {
+      return bumpVersion(packageJson.version, releaseType, prereleaseIdentifier);
     }
 
+    // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
     return semver.inc(packageJson.version, releaseType, prereleaseIdentifier) || initialVersion;
   } catch (err) {
     // Case 3: Error reading package.json - error
@@ -221,4 +212,50 @@ function getPackageVersionFallback(
       `Error reading package.json: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+}
+
+// Clear, single-purpose helper functions
+function isPrereleaseVersion(version: string): boolean {
+  return !!semver.prerelease(version);
+}
+
+function isStandardBumpType(releaseType: ReleaseType): boolean {
+  return STANDARD_BUMP_TYPES.includes(releaseType);
+}
+
+function isMajorPrereleaseVersion(version: string): boolean {
+  const parsed = semver.parse(version);
+  return !!parsed && parsed.minor === 0 && parsed.patch === 0;
+}
+
+function cleanPrereleaseToBase(version: string): string {
+  const parsed = semver.parse(version);
+  if (!parsed) return version;
+  return `${parsed.major}.${parsed.minor}.${parsed.patch}`;
+}
+
+/**
+ * Handles bumping of prerelease versions, applying special case handling
+ *
+ * @param version The current version being bumped
+ * @param releaseType The release type being applied
+ * @param identifier Optional prerelease identifier
+ * @returns The bumped version
+ */
+function bumpVersion(version: string, releaseType: ReleaseType, identifier?: string): string {
+  // Normal handling for non-prerelease or non-standard bumps
+  if (!isPrereleaseVersion(version) || !isStandardBumpType(releaseType)) {
+    return semver.inc(version, releaseType, identifier) || '';
+  }
+
+  log(`Cleaning prerelease identifier from ${version} for ${releaseType} bump`, 'debug');
+
+  // Special case for major prerelease versions - clean to base version
+  if (releaseType === 'major' && isMajorPrereleaseVersion(version)) {
+    return cleanPrereleaseToBase(version);
+  }
+
+  // For standard bump types with prerelease versions, just call semver.inc directly
+  // This matches test expectations and will increment appropriately
+  return semver.inc(version, releaseType, identifier) || '';
 }

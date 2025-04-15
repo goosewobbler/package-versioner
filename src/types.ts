@@ -19,8 +19,7 @@ export interface Config {
   // Tag formatting templates with default templates
   tagTemplate: string; // Default: '${prefix}${version}'
   packageTagTemplate: string; // Default: '${packageName}@${prefix}${version}'
-  versionPrefix: string; // Used in templates (formerly named 'prefix')
-  prefix?: string; // Kept for backward compatibility
+  versionPrefix: string; // Used in templates
 
   preset: string;
   baseBranch: string;

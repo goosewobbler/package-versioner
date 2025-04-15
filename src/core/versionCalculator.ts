@@ -105,7 +105,8 @@ export async function calculateVersion(config: Config, options: VersionOptions):
       return ''; // No bump indicated by conventional commits
     }
 
-    const currentVersion = semver.clean(latestTag.replace(tagSearchPattern, '')) || '0.0.0';
+    const currentVersion =
+      semver.clean(latestTag.replace(new RegExp(`^${tagSearchPattern}`), '')) || '0.0.0';
     return semver.inc(currentVersion, releaseTypeFromCommits, prereleaseIdentifier) || '';
   } catch (error) {
     // Handle errors during conventional bump calculation

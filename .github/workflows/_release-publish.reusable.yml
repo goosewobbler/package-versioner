@@ -197,6 +197,14 @@ jobs:
           TARGET_BRANCH="${{ steps.define.outputs.tagging_branch }}"
           echo "Pushing tag $RELEASE_TAG and branch $TARGET_BRANCH..."
 
+          # Make sure git knows who is making the tag
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # Create the tag explicitly before pushing
+          git tag -a $RELEASE_TAG -m "Release $RELEASE_TAG" || echo "Tag already exists, continuing..."
+          
+          # Now push the tag and branch
           git push origin "$RELEASE_TAG" --no-verify
           # Push the branch where the version commit was made
           git push origin "HEAD:$TARGET_BRANCH" --no-verify

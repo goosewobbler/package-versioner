@@ -66,7 +66,8 @@ export async function calculateVersion(config: Config, options: VersionOptions):
       if (!latestTag) {
         return initialVersion;
       }
-      const currentVersion = semver.clean(latestTag.replace(new RegExp(`^${tagSearchPattern}`), '')) || '0.0.0';
+      const currentVersion =
+        semver.clean(latestTag.replace(new RegExp(`^${tagSearchPattern}`), '')) || '0.0.0';
       return semver.inc(currentVersion, determinedReleaseType, prereleaseIdentifier) || '';
     }
   }

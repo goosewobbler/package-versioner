@@ -23,14 +23,18 @@ export async function calculateVersion(config: Config, options: VersionOptions):
 
   const initialVersion = prereleaseIdentifier ? `0.0.1-${prereleaseIdentifier}` : '0.0.1';
 
-  // Correctly determine tag search pattern using the ORIGINAL prefix
-  const tagSearchPattern = name
-    ? originalPrefix
-      ? `${originalPrefix}${name}@`
-      : `${name}@`
-    : originalPrefix
-      ? `${originalPrefix}v`
-      : 'v';
+  // Determine tag search pattern with a clearer approach
+  function determineTagSearchPattern(packageName: string | undefined, prefix: string): string {
+    if (packageName) {
+      // If we have a package name, use name@ format
+      return prefix ? `${prefix}${packageName}@` : `${packageName}@`;
+    }
+
+    // If no package name, use version-only format
+    return prefix ? `${prefix}v` : 'v';
+  }
+
+  const tagSearchPattern = determineTagSearchPattern(name, originalPrefix);
 
   let determinedReleaseType: ReleaseType | null = type || null;
 

@@ -68,3 +68,33 @@ export async function lastMergeBranchName(
     return null;
   }
 }
+
+/**
+ * Get the latest semver tag for a specific package
+ * @param packageName The name of the package to get tags for
+ * @param tagPrefix Optional tag prefix (e.g., 'v')
+ * @returns The latest tag for the package or empty string if none found
+ */
+export async function getLatestTagForPackage(
+  packageName: string,
+  tagPrefix?: string,
+): Promise<string> {
+  try {
+    // Use the package option to get package-specific tags
+    const tags: string[] = await getSemverTags({
+      package: packageName,
+      tagPrefix,
+    });
+    return tags[0] || ''; // Return the latest tag or empty string
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`Failed to get latest tag for package ${packageName}: ${errorMessage}`, 'error');
+
+    // Check if the error specifically means no tags were found
+    if (error instanceof Error && error.message.includes('No names found')) {
+      log(`No tags found for package ${packageName}.`, 'info');
+    }
+
+    return ''; // Return empty string on error or no tags
+  }
+}

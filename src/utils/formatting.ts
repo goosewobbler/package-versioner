@@ -11,10 +11,18 @@ export function escapeRegExp(string: string): string {
 }
 
 /**
- * Format a version tag with optional prefix
+ * Format a version tag with optional prefix and package name
+ * Format: packageName@tagPrefix or tagPrefix/version if no package name
  */
-export function formatTag(version: string, tagPrefix: string): string {
+export function formatTag(version: string, tagPrefix: string, packageName?: string | null): string {
   if (!tagPrefix) return version;
+
+  // If package name is provided, use packageName@tagPrefix format (e.g., @scope/name@v1.0.0)
+  if (packageName) {
+    return `${packageName}@${tagPrefix}${version}`;
+  }
+
+  // Otherwise just use prefix/version format
   return tagPrefix.endsWith('/') ? `${tagPrefix}${version}` : `${tagPrefix}/${version}`;
 }
 

@@ -4,6 +4,7 @@ import type { Package } from '@manypkg/get-packages';
 import type { ReleaseType } from 'semver';
 import { calculateVersion } from '../core/versionCalculator.js';
 import { createGitTag, gitAdd, gitCommit } from '../git/commands.js';
+import { getLatestTagForPackage } from '../git/tagsAndBranches.js';
 import type { Config } from '../types.js';
 import { formatCommitMessage, formatTag, formatTagPrefix } from '../utils/formatting.js';
 import { addTag, setCommitMessage } from '../utils/jsonOutput.js';
@@ -123,9 +124,18 @@ export class PackageProcessor {
       const name = pkg.packageJson.name;
       const pkgPath = pkg.dir;
       const prefix = formatTagPrefix(tagPrefix);
-      const latestTagResult = await this.getLatestTag(); // Still potentially repo-global
-      // Handle potential null value from getLatestTag
-      const latestTag = latestTagResult || '';
+      // For package-specific tags, we may need to request package-specific version history
+      // Try to get the latest tag specific to this package first
+      let latestTagResult = await getLatestTagForPackage(name, tagPrefix);
+
+      // Fallback to global tag if no package-specific tag exists
+      if (!latestTagResult) {
+        const globalTagResult = await this.getLatestTag();
+        latestTagResult = globalTagResult || '';
+      }
+
+      // At this point, latestTagResult is guaranteed to be a string (possibly empty)
+      const latestTag = latestTagResult;
 
       const nextVersion = await calculateVersion(this.fullConfig, {
         latestTag,
@@ -145,8 +155,8 @@ export class PackageProcessor {
       // Update package.json
       updatePackageVersion(path.join(pkgPath, 'package.json'), nextVersion);
 
-      // Create package-specific tag (using the simple formatTag function)
-      const packageTag = formatTag(nextVersion, tagPrefix);
+      // Create package-specific tag (using the updated formatTag function with package name)
+      const packageTag = formatTag(nextVersion, tagPrefix, name);
       const tagMessage = `chore(release): ${name} ${nextVersion}`;
 
       // Track tag for JSON output

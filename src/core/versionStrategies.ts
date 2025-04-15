@@ -2,13 +2,13 @@
  * Strategy functions for versioning using the higher-order function pattern
  */
 import fs from 'node:fs';
-import path from 'node:path';
+import * as path from 'node:path';
 
 import type { Package } from '@manypkg/get-packages';
 import { GitError } from '../errors/gitError.js';
 import { VersionError, VersionErrorCode, createVersionError } from '../errors/versionError.js';
 import { createGitCommitAndTag } from '../git/commands.js';
-import { getLatestTag } from '../git/tagsAndBranches.js';
+import { getLatestTag, getLatestTagForPackage } from '../git/tagsAndBranches.js';
 import { updatePackageVersion } from '../package/packageManagement.js';
 import { PackageProcessor } from '../package/packageProcessor.js';
 import type { Config } from '../types.js';
@@ -119,7 +119,7 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
       }
 
       // Create tag
-      const nextTag = formatTag(nextVersion, tagPrefix || 'v');
+      const nextTag = formatTag(nextVersion, tagPrefix || 'v', null);
       const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion);
 
       // Use the Git service functions
@@ -166,7 +166,18 @@ export function createSingleStrategy(config: Config): StrategyFunction {
 
       const pkgPath = pkg.dir;
       const prefix = formatTagPrefix(tagPrefix || 'v');
-      const latestTag = await getLatestTag();
+
+      // Try to get the latest tag specific to this package first
+      let latestTagResult = await getLatestTagForPackage(packageName, prefix);
+
+      // Fallback to global tag if no package-specific tag exists
+      if (!latestTagResult) {
+        const globalTagResult = await getLatestTag();
+        latestTagResult = globalTagResult || '';
+      }
+
+      // At this point, latestTagResult is guaranteed to be a string (possibly empty)
+      const latestTag = latestTagResult;
 
       let nextVersion: string | undefined = undefined;
       try {
@@ -195,7 +206,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       log(`Updated package ${packageName} to version ${nextVersion}`, 'success');
 
       // Create tag
-      const nextTag = formatTag(nextVersion, tagPrefix || 'v');
+      const nextTag = formatTag(nextVersion, tagPrefix || 'v', packageName);
       const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion);
 
       // Use the Git service functions

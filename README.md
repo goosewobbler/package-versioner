@@ -87,7 +87,7 @@ Customize behavior by creating a `version.config.json` file in your project root
   "versionPrefix": "v",
   "tagTemplate": "${prefix}${version}",
   "packageTagTemplate": "${packageName}@${prefix}${version}",
-  "commitMessage": "chore(release): {{currentTag}} [skip ci]",
+  "commitMessage": "chore(release): ${version}",
   "monorepo": {
     "synced": true,
     "skip": [
@@ -99,7 +99,10 @@ Customize behavior by creating a `version.config.json` file in your project root
 }
 ```
 
-**Note:** Options like `synced`, `packages`, and `updateInternalDependencies` enable monorepo-specific behaviours. The `tagTemplate` and `packageTagTemplate` allow you to customize how Git tags are formatted for releases.
+**Notes:** 
+- Options like `synced`, `packages`, and `updateInternalDependencies` enable monorepo-specific behaviours.
+- The `tagTemplate` and `packageTagTemplate` allow you to customize how Git tags are formatted for releases.
+- The `commitMessage` template can include CI skip tokens like `[skip ci]` if you want to prevent CI runs after version commits (e.g., `"commitMessage": "chore(release): ${version} [skip ci]"`). See [CI/CD Integration](./docs/CI_CD_INTEGRATION.md) for more details.
 
 ## How Versioning Works
 

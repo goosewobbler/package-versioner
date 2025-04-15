@@ -156,6 +156,24 @@ git push origin "v$NEW_VERSION"
 - `NO_COLOR=1`: Disables colored output in logs (automatically detected in CI environments)
 - `CI=true`: Most CI environments set this automatically, which helps the tool adjust its output behavior
 
+## Skipping CI for Version Commits
+
+If you want to prevent additional CI runs when version commits are made, you can include CI skip flags in your commit message template in `version.config.json`:
+
+```json
+{
+  "commitMessage": "chore(release): ${version} [skip ci]",
+  // other configuration options...
+}
+```
+
+Common CI skip patterns include:
+- `[skip ci]` or `[ci skip]` - Works in GitHub Actions, GitLab CI, CircleCI
+- `[skip-ci]` - Alternative format supported by some CI systems
+- `[no ci]` - Another variant 
+
+Each CI system might have slightly different syntax, so check your CI provider's documentation for the exact skip token to use.
+
 ## Tips for Reliable CI/CD Integration
 
 1. **Always use `--json`** in CI/CD pipelines for consistent output parsing

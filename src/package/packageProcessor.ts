@@ -232,7 +232,6 @@ export class PackageProcessor {
       // Otherwise, use a generic message listing packages and representative version
       commitMessage = `chore(release): ${packageNames} ${representativeVersion}`;
     }
-    commitMessage += ' [skip-ci]'; // Add skip-ci trailer
 
     // Track commit message for JSON output
     setCommitMessage(commitMessage);

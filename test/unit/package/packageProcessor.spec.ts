@@ -9,7 +9,6 @@ import * as packageManagement from '../../../src/package/packageManagement.js';
 import { PackageProcessor } from '../../../src/package/packageProcessor.js';
 import type { Config } from '../../../src/types.js';
 import * as formatting from '../../../src/utils/formatting.js';
-import * as jsonOutput from '../../../src/utils/jsonOutput.js';
 import * as logging from '../../../src/utils/logging.js';
 
 // Mock dependencies
@@ -300,7 +299,7 @@ describe('Package Processor', () => {
 
       // Should create a commit with both packages
       expect(gitCommands.gitCommit).toHaveBeenCalledWith({
-        message: 'chore(release): package-a, package-b 1.1.0 [skip-ci]',
+        message: 'chore(release): package-a, package-b 1.1.0',
         skipHooks: false,
       });
 
@@ -362,7 +361,7 @@ describe('Package Processor', () => {
 
       expect(gitCommands.gitCommit).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: 'release: v1.1.0 of packages [skip-ci]',
+          message: 'release: v1.1.0 of packages',
         }),
       );
     });
@@ -379,7 +378,7 @@ describe('Package Processor', () => {
       // Should use a generic message with package names when multiple packages
       expect(gitCommands.gitCommit).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: 'chore(release): package-a, package-b 1.1.0 [skip-ci]',
+          message: 'chore(release): package-a, package-b 1.1.0',
         }),
       );
     });

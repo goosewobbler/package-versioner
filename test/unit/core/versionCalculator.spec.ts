@@ -179,7 +179,7 @@ describe('Version Calculator', () => {
       vi.mocked(gitRepo.getCurrentBranch).mockReturnValue('docs/update-readme');
 
       // Mock conventional-commits as fallback
-      vi.mocked(gitTags.getCommitsLength).mockResolvedValue(0);
+      vi.mocked(gitTags.getCommitsLength).mockReturnValue(0);
 
       // Execute
       const options: VersionOptions = {
@@ -218,7 +218,7 @@ describe('Version Calculator', () => {
     });
 
     it('should return empty string if no commits since last tag', async () => {
-      vi.mocked(gitTags.getCommitsLength).mockResolvedValue(0);
+      vi.mocked(gitTags.getCommitsLength).mockReturnValue(0);
 
       const options: VersionOptions = {
         latestTag: 'v1.0.0',

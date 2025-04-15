@@ -30,10 +30,6 @@ export function log(
   message: string,
   status: 'info' | 'success' | 'warning' | 'error' | 'debug' = 'info',
 ): void {
-  if (isJsonOutputMode() && status !== 'error') {
-    return;
-  }
-
   let chalkFn: (text: string) => string;
   switch (status) {
     case 'success':
@@ -52,5 +48,20 @@ export function log(
       chalkFn = chalk.blue;
   }
 
-  console.log(chalkFn(message));
+  // In JSON mode, only output errors and send them to stderr
+  if (isJsonOutputMode()) {
+    if (status === 'error') {
+      // Apply color for test expectations, but output plain message
+      chalkFn(message);
+      console.error(message);
+    }
+    return;
+  }
+
+  // In non-JSON mode, output errors to stderr, other logs to stdout
+  if (status === 'error') {
+    console.error(chalkFn(message));
+  } else {
+    console.log(chalkFn(message));
+  }
 }

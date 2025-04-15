@@ -253,11 +253,11 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
   return async (packages: PackagesWithRoot, targets: string[] = []): Promise<void> => {
     try {
       // 1. Set targets for processing
-      const actualTargets = targets.length > 0 ? targets : config.packages || [];
-      packageProcessor.setTargets(actualTargets);
+      const targetPackages = targets.length > 0 ? targets : config.packages || [];
+      packageProcessor.setTargets(targetPackages);
 
-      if (actualTargets.length > 0) {
-        log(`Processing targeted packages: ${actualTargets.join(', ')}`, 'info');
+      if (targetPackages.length > 0) {
+        log(`Processing targeted packages: ${targetPackages.join(', ')}`, 'info');
       } else {
         log('No targets specified, processing all non-skipped packages', 'info');
       }

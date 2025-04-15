@@ -131,12 +131,30 @@ export class PackageProcessor {
       const formattedPrefix = formatTagPrefix(this.versionPrefix);
       // For package-specific tags, we may need to request package-specific version history
       // Try to get the latest tag specific to this package first
-      let latestTagResult = await getLatestTagForPackage(name, this.versionPrefix);
+      let latestTagResult = '';
+      try {
+        latestTagResult = await getLatestTagForPackage(name, this.versionPrefix);
+      } catch (error) {
+        // Log the specific error, but continue with fallback
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        log(
+          `Error getting package-specific tag for ${name}, falling back to global tag: ${errorMessage}`,
+          'warning',
+        );
+      }
 
       // Fallback to global tag if no package-specific tag exists
       if (!latestTagResult) {
-        const globalTagResult = await this.getLatestTag();
-        latestTagResult = globalTagResult || '';
+        try {
+          const globalTagResult = await this.getLatestTag();
+          latestTagResult = globalTagResult || '';
+          if (globalTagResult) {
+            log(`Using global tag ${globalTagResult} as fallback for package ${name}`, 'info');
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          log(`Error getting global tag, using empty tag value: ${errorMessage}`, 'warning');
+        }
       }
 
       // At this point, latestTagResult is guaranteed to be a string (possibly empty)

@@ -26,6 +26,7 @@ describe('Logging Utilities', () => {
     vi.resetAllMocks();
     vi.mocked(jsonOutput.isJsonOutputMode).mockReturnValue(false);
     vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -77,7 +78,7 @@ describe('Logging Utilities', () => {
       log('Error message', 'error');
 
       expect(chalk.red).toHaveBeenCalledWith('Error message');
-      expect(console.log).toHaveBeenCalledWith('RED:Error message');
+      expect(console.error).toHaveBeenCalledWith('RED:Error message');
     });
 
     it('should log debug message with gray color', () => {
@@ -93,6 +94,7 @@ describe('Logging Utilities', () => {
       log('Info message', 'info');
 
       expect(console.log).not.toHaveBeenCalled();
+      expect(console.error).not.toHaveBeenCalled();
     });
 
     it('should log error messages even when in JSON output mode', () => {
@@ -101,7 +103,7 @@ describe('Logging Utilities', () => {
       log('Error message', 'error');
 
       expect(chalk.red).toHaveBeenCalledWith('Error message');
-      expect(console.log).toHaveBeenCalledWith('RED:Error message');
+      expect(console.error).toHaveBeenCalledWith('Error message');
     });
   });
 });

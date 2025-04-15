@@ -39,6 +39,10 @@ npx package-versioner --bump minor
 # Create a prerelease (e.g., alpha)
 npx package-versioner --bump patch --prerelease alpha
 
+# Promote a prerelease to a stable release (automatic cleaning)
+# For example, 1.0.0-beta.1 -> 2.0.0:
+npx package-versioner --bump major
+
 # Target specific packages (only in async/independent mode, comma-separated)
 npx package-versioner -t @scope/package-a,@scope/package-b
 
@@ -70,7 +74,7 @@ When using the `--json` flag, normal console output is suppressed and the tool o
   ],
   "commitMessage": "chore(release): v1.2.3",
   "tags": [
-    "@scope/package-a@v1.2.3"
+    "v@scope/package-a@1.2.3"
   ]
 }
 ```

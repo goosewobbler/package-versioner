@@ -94,3 +94,42 @@ This is the default if the `synced` flag is present and true.
     -   Finally, a **single commit** is created including all the updated `package.json` files, using a summary commit message (e.g., `chore(release): pkg-a, pkg-b 1.2.3 [skip-ci]`).
     -   **Important:** Only package-specific tags are created. The global tag (e.g., `v1.2.3`) is **not** automatically generated in this mode. If your release process (like GitHub Releases) depends on a global tag, you'll need to create it manually in your CI/CD script *after* `package-versioner` completes.
 -   **Use Case:** Releasing specific packages independently while still tagging each released package individually.
+
+## Prerelease Handling
+
+`package-versioner` provides flexible handling for prerelease versions, allowing both creation of prereleases and promotion to stable releases.
+
+### Creating Prereleases
+
+Use the `--prerelease` flag with an identifier to create a prerelease version:
+
+```bash
+# Create a beta prerelease
+npx package-versioner --bump minor --prerelease beta
+# Result: 1.0.0 -> 1.1.0-beta.0
+```
+
+You can also set a default prerelease identifier in your `version.config.json`:
+
+```json
+{
+  "prereleaseIdentifier": "beta"
+}
+```
+
+### Promoting Prereleases to Stable Releases
+
+When using standard bump types (`major`, `minor`, `patch`) with the `--bump` flag on a prerelease version, `package-versioner` will automatically clean the prerelease identifier:
+
+```bash
+# Starting from version 1.0.0-beta.1
+npx package-versioner --bump major
+# Result: 1.0.0-beta.1 -> 2.0.0 (not 2.0.0-beta.0)
+```
+
+This intuitive behavior means you don't need to use an empty prerelease identifier (`--prerelease ""`) to promote a prerelease to a stable version. Simply specify the standard bump type and the tool will automatically produce a clean version number.
+
+This applies to all standard bump types:
+- `--bump major`: 1.0.0-beta.1 -> 2.0.0
+- `--bump minor`: 1.0.0-beta.1 -> 1.1.0 
+- `--bump patch`: 1.0.0-beta.1 -> 1.0.1

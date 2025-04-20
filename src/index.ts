@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import * as fs from 'node:fs';
+import path from 'node:path';
 import { Command } from 'commander';
 import { loadConfig } from './config.js';
 import { VersionEngine } from './core/versionEngine.js';
@@ -6,8 +8,36 @@ import type { Config } from './types.js';
 import { enableJsonOutput, printJsonOutput } from './utils/jsonOutput.js';
 import { log } from './utils/logging.js';
 
-// Main execution function for the CLI
-async function run() {
+/**
+ * Read package version from package.json
+ * @returns The package version or a fallback value
+ */
+function getPackageVersion(): string {
+  try {
+    // Read version from package.json
+    const packageJsonPath = path.resolve(
+      path.dirname(import.meta.url.replace('file:', '')),
+      '../package.json',
+    );
+    const packageJsonContent = fs.readFileSync(packageJsonPath, 'utf-8');
+    const packageJson = JSON.parse(packageJsonContent);
+    return packageJson.version || '0.0.0';
+  } catch (error) {
+    // Fallback in case of any errors
+    console.error('Failed to read package version:', error);
+    return '0.0.0';
+  }
+}
+
+/**
+ * Main execution function for package-versioner
+ */
+export async function run(): Promise<void> {
+  // Add build timestamp and version for debug verification
+  const buildTimestamp = new Date().toISOString();
+  const packageVersion = getPackageVersion();
+  log(`package-versioner v${packageVersion} (Build: ${buildTimestamp})`, 'debug');
+
   const program = new Command();
 
   // Configure the CLI options
@@ -16,7 +46,7 @@ async function run() {
     .description(
       'A lightweight yet powerful CLI tool for automated semantic versioning based on Git history and conventional commits.',
     )
-    .version(process.env.npm_package_version || '0.0.0')
+    .version(packageVersion)
     .option(
       '-c, --config <path>',
       'Path to config file (defaults to version.config.json in current directory)',

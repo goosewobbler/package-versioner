@@ -24,14 +24,26 @@ export function printFiglet(text: string): void {
 }
 
 /**
- * Log a message with color based on status
+ * Log level type
  */
-export function log(
-  message: string,
-  status: 'info' | 'success' | 'warning' | 'error' | 'debug' = 'info',
-): void {
+export type LogLevel = 'info' | 'success' | 'warning' | 'error' | 'debug';
+
+/**
+ * Format and output log messages
+ * @param message Message to log
+ * @param level Log level (info, success, warning, error, debug)
+ */
+export function log(message: string, level: LogLevel = 'info'): void {
+  // Debug messages are only shown when DEBUG env var is set
+  const showDebug = process.env.DEBUG === 'true' || process.env.DEBUG === '1';
+
+  if (level === 'debug' && !showDebug) {
+    return;
+  }
+
   let chalkFn: (text: string) => string;
-  switch (status) {
+
+  switch (level) {
     case 'success':
       chalkFn = chalk.green;
       break;
@@ -42,7 +54,7 @@ export function log(
       chalkFn = chalk.red;
       break;
     case 'debug':
-      chalkFn = chalk.gray;
+      chalkFn = chalk.cyan;
       break;
     default:
       chalkFn = chalk.blue;
@@ -50,7 +62,7 @@ export function log(
 
   // In JSON mode, only output errors and send them to stderr
   if (isJsonOutputMode()) {
-    if (status === 'error') {
+    if (level === 'error') {
       // Apply color for test expectations, but output plain message
       chalkFn(message);
       console.error(message);
@@ -58,10 +70,12 @@ export function log(
     return;
   }
 
+  const formattedMessage = level === 'debug' ? `[DEBUG] ${message}` : message;
+
   // In non-JSON mode, output errors to stderr, other logs to stdout
-  if (status === 'error') {
-    console.error(chalkFn(message));
+  if (level === 'error') {
+    console.error(chalkFn(formattedMessage));
   } else {
-    console.log(chalkFn(message));
+    console.log(chalkFn(formattedMessage));
   }
 }

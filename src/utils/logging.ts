@@ -54,7 +54,7 @@ export function log(message: string, level: LogLevel = 'info'): void {
       chalkFn = chalk.red;
       break;
     case 'debug':
-      chalkFn = chalk.cyan;
+      chalkFn = chalk.gray;
       break;
     default:
       chalkFn = chalk.blue;

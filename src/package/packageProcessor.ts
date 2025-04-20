@@ -2,7 +2,6 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 import { exit } from 'node:process';
 import type { Package } from '@manypkg/get-packages';
-import type { ReleaseType } from 'semver';
 import { calculateVersion } from '../core/versionCalculator.js';
 import { createGitTag, gitAdd, gitCommit } from '../git/commands.js';
 import { getLatestTagForPackage } from '../git/tagsAndBranches.js';

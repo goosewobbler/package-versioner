@@ -80,19 +80,77 @@ export async function getLatestTagForPackage(
   versionPrefix?: string,
 ): Promise<string> {
   try {
+    // Escape @ in package name for regex
+    const escapedPackageName = escapeRegExp(packageName);
+
+    log(
+      `Looking for tags for package ${packageName} with prefix ${versionPrefix || 'none'}`,
+      'debug',
+    );
+
     // Instead of using the package option which requires lerna mode,
     // get all tags and filter manually for the package
     const allTags: string[] = await getSemverTags({
       tagPrefix: versionPrefix,
     });
 
-    // Filter for tags that match this package's format
-    // This supports both packageName@version and prefix+packageName@version formats
-    const packageTagPattern = versionPrefix
-      ? new RegExp(`^${escapeRegExp(versionPrefix)}${escapeRegExp(packageName)}@`)
-      : new RegExp(`^${escapeRegExp(packageName)}@`);
+    log(`Retrieved ${allTags.length} tags: ${allTags.join(', ')}`, 'debug');
 
-    const packageTags = allTags.filter((tag) => packageTagPattern.test(tag));
+    // Filter for tags that match this package's format
+    // Support various common monorepo tag formats:
+    // 1. packageName@versionPrefix+version (e.g., {packageName}@v1.1.0)
+    // 2. versionPrefix+packageName@version (e.g., v{packageName}@1.1.0)
+    // 3. packageName@version (e.g., {packageName}@1.1.0)
+    let packageTags: string[] = [];
+
+    // First try the most common format: packageName@versionPrefix+version
+    if (versionPrefix) {
+      const pattern1 = new RegExp(`^${escapedPackageName}@${escapeRegExp(versionPrefix)}`);
+      packageTags = allTags.filter((tag) => pattern1.test(tag));
+
+      // If we found tags with this pattern, return the first (most recent) one
+      if (packageTags.length > 0) {
+        log(
+          `Found ${packageTags.length} package tags using pattern: packageName@${versionPrefix}...`,
+          'debug',
+        );
+        log(`Using tag: ${packageTags[0]}`, 'debug');
+        return packageTags[0];
+      }
+    }
+
+    // Try the alternative format: versionPrefix+packageName@version
+    if (versionPrefix) {
+      const pattern2 = new RegExp(`^${escapeRegExp(versionPrefix)}${escapedPackageName}@`);
+      packageTags = allTags.filter((tag) => pattern2.test(tag));
+
+      // If we found tags with this pattern, return the first (most recent) one
+      if (packageTags.length > 0) {
+        log(
+          `Found ${packageTags.length} package tags using pattern: ${versionPrefix}packageName@...`,
+          'debug',
+        );
+        log(`Using tag: ${packageTags[0]}`, 'debug');
+        return packageTags[0];
+      }
+    }
+
+    // Fallback to no prefix: packageName@version
+    const pattern3 = new RegExp(`^${escapedPackageName}@`);
+    packageTags = allTags.filter((tag) => pattern3.test(tag));
+
+    // Log all found tags for debugging
+    log(`Found ${packageTags.length} package tags for ${packageName}`, 'debug');
+    if (packageTags.length === 0) {
+      log('No matching tags found for pattern: packageName@version', 'debug');
+      if (allTags.length > 0) {
+        log(`Available tags: ${allTags.join(', ')}`, 'debug');
+      } else {
+        log('No tags available in the repository', 'debug');
+      }
+    } else {
+      log(`Using tag: ${packageTags[0]}`, 'debug');
+    }
 
     return packageTags[0] || ''; // Return the latest tag or empty string
   } catch (error) {

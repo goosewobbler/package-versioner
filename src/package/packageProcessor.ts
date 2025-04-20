@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import path from 'node:path';
 import { exit } from 'node:process';
 import type { Package } from '@manypkg/get-packages';
@@ -136,14 +137,46 @@ export class PackageProcessor {
       // Fallback to global tag if no package-specific tag exists
       if (!latestTagResult) {
         try {
-          const globalTagResult = await this.getLatestTag();
-          latestTagResult = globalTagResult || '';
-          if (globalTagResult) {
-            log(`Using global tag ${globalTagResult} as fallback for package ${name}`, 'info');
+          // First try the package.json version as fallback
+          const packageJsonPath = path.join(pkgPath, 'package.json');
+          let usedPackageJsonFallback = false;
+
+          if (fs.existsSync(packageJsonPath)) {
+            try {
+              const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+              if (packageJson.version) {
+                log(
+                  `Using package.json version ${packageJson.version} for ${name} as no package-specific tags found`,
+                  'info',
+                );
+                log(
+                  'FALLBACK: Using package version from package.json instead of global tag',
+                  'debug',
+                );
+                // We'll create a fake tag with this version to use as base
+                latestTagResult = `${this.versionPrefix || ''}${packageJson.version}`;
+                usedPackageJsonFallback = true;
+              }
+            } catch (packageJsonError) {
+              const errMsg =
+                packageJsonError instanceof Error
+                  ? packageJsonError.message
+                  : String(packageJsonError);
+              log(`Error reading package.json for ${name}: ${errMsg}`, 'warning');
+            }
+          }
+
+          // Only if we couldn't use package.json, try global tag
+          if (!usedPackageJsonFallback) {
+            const globalTagResult = await this.getLatestTag();
+            if (globalTagResult) {
+              latestTagResult = globalTagResult;
+              log(`Using global tag ${globalTagResult} as fallback for package ${name}`, 'info');
+            }
           }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          log(`Error getting global tag, using empty tag value: ${errorMessage}`, 'warning');
+          log(`Error getting fallback version, using empty tag value: ${errorMessage}`, 'warning');
         }
       }
 

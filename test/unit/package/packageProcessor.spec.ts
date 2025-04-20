@@ -70,7 +70,7 @@ describe('Package Processor', () => {
       branchPattern: ['feature/*'],
       baseBranch: 'main',
       prereleaseIdentifier: undefined,
-      forceType: undefined,
+      type: undefined,
     },
     fullConfig: mockConfig,
   };
@@ -90,7 +90,7 @@ describe('Package Processor', () => {
     vi.mocked(gitCommands.gitCommit).mockResolvedValue({ stdout: '', stderr: '' });
 
     // Formatting mocks
-    vi.mocked(formatting.formatTagPrefix).mockReturnValue('v');
+    vi.mocked(formatting.formatVersionPrefix).mockReturnValue('v');
     vi.mocked(formatting.formatTag).mockImplementation((version, prefix) => `${prefix}${version}`);
     vi.mocked(formatting.formatCommitMessage).mockImplementation((template, version) =>
       template.replace('${version}', version),
@@ -220,10 +220,16 @@ describe('Package Processor', () => {
         'info',
       );
       expect(calculator.calculateVersion).toHaveBeenCalledTimes(1);
-      expect(calculator.calculateVersion).toHaveBeenCalledWith(
-        mockConfig,
-        expect.objectContaining({ name: 'package-a' }),
-      );
+      expect(calculator.calculateVersion).toHaveBeenCalledWith(mockConfig, {
+        name: 'package-a',
+        path: expect.any(String),
+        latestTag: expect.any(String),
+        versionPrefix: expect.any(String),
+        branchPattern: expect.any(Array),
+        baseBranch: expect.any(String),
+        prereleaseIdentifier: undefined,
+        type: undefined,
+      });
     });
 
     it('should process all non-skipped packages if no targets specified', async () => {
@@ -438,10 +444,10 @@ describe('Package Processor', () => {
       );
     });
 
-    it('should use forced release type when specified', async () => {
+    it('should use specified release type when provided', async () => {
       const processor = new PackageProcessor({
         getLatestTag: gitTags.getLatestTag,
-        config: { forceType: 'major' },
+        config: { type: 'major' },
         fullConfig: mockConfig,
       });
 

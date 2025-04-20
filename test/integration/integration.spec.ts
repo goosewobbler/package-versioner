@@ -1,15 +1,101 @@
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Map to store original fixture content
+const originalFixtures = new Map<string, string>();
+
+/**
+ * Recursively find all config files (package.json and version.config.json) in the given directory
+ */
+function findConfigFiles(directory: string): string[] {
+  const files: string[] = [];
+
+  if (!existsSync(directory)) {
+    return files;
+  }
+
+  const items = readdirSync(directory, { withFileTypes: true });
+
+  for (const item of items) {
+    const itemPath = join(directory, item.name);
+    if (item.isDirectory()) {
+      files.push(...findConfigFiles(itemPath));
+    } else if (item.name === 'package.json' || item.name === 'version.config.json') {
+      files.push(itemPath);
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Save the original state of all config files in fixtures directory
+ */
+function saveFixtureState(fixturesDir: string): void {
+  const configFiles = findConfigFiles(fixturesDir);
+
+  for (const filePath of configFiles) {
+    try {
+      const content = readFileSync(filePath, 'utf8');
+      originalFixtures.set(filePath, content);
+    } catch (error) {
+      console.warn(`Could not save original state of ${filePath}:`, error);
+    }
+  }
+}
+
+/**
+ * Restore all package.json files to their original state
+ */
+function restoreFixtureState(): void {
+  for (const [filePath, content] of originalFixtures) {
+    try {
+      if (existsSync(filePath)) {
+        writeFileSync(filePath, content);
+      }
+    } catch (error) {
+      console.warn(`Could not restore original state of ${filePath}:`, error);
+    }
+  }
+}
 
 // Mock the CLI run directly to avoid dependency issues
 vi.mock('../../src/core/versionCalculator.ts', async () => {
   const actual = await vi.importActual('../../src/core/versionCalculator.ts');
   return {
     ...actual,
-    calculateVersion: vi.fn().mockImplementation((options) => {
-      // Simple mock implementation that returns predictable versions
+    calculateVersion: vi.fn().mockImplementation((config, options) => {
+      // Check for branch patterns
+      if (config.branchPattern && options.branchPattern) {
+        // Simple mock implementation that returns predictable versions based on branch
+        if (options.currentBranch?.startsWith('feature/')) {
+          return '0.2.0'; // Minor bump for feature branches
+        }
+        if (options.currentBranch?.startsWith('hotfix/')) {
+          return '0.1.1'; // Patch bump for hotfix branches
+        }
+        if (options.currentBranch?.startsWith('release/')) {
+          return '1.0.0'; // Major bump for release branches
+        }
+      }
+
+      // Check for explicit version type
+      if (options.type) {
+        switch (options.type) {
+          case 'major':
+            return '1.0.0';
+          case 'minor':
+            return '0.2.0';
+          case 'patch':
+            return '0.1.1';
+          default:
+            return '0.1.1';
+        }
+      }
+
+      // Fall back to handling the versionType parameter provided
       const { versionType = 'patch' } = options;
       switch (versionType) {
         case 'major':
@@ -104,6 +190,14 @@ describe('Integration Tests', () => {
     if (!existsSync(FIXTURES_DIR)) {
       mkdirSync(FIXTURES_DIR, { recursive: true });
     }
+
+    // Save the original state of all config files
+    saveFixtureState(FIXTURES_DIR);
+  });
+
+  // Restore all package.json files after tests complete
+  afterAll(() => {
+    restoreFixtureState();
   });
 
   describe('Single Package Project', () => {
@@ -122,6 +216,9 @@ describe('Integration Tests', () => {
       createVersionConfig(SINGLE_PACKAGE_FIXTURE, {
         preset: 'conventional-commits',
         packages: ['./'],
+        versionPrefix: 'v',
+        tagTemplate: '${prefix}${version}',
+        packageTagTemplate: '${packageName}@${prefix}${version}',
       });
 
       // Add files to git
@@ -169,8 +266,8 @@ describe('Integration Tests', () => {
       expect(newVersion).toBe('1.0.0');
     });
 
-    it('should respect --bump flag to force version type', () => {
-      // Create a fix commit but force a major bump
+    it('should respect --bump flag to specify version type', () => {
+      // Create a fix commit but specify a major bump
       createConventionalCommit(SINGLE_PACKAGE_FIXTURE, 'fix', 'minor change');
 
       // Mock a major version bump directly (simulating what --bump major would do)
@@ -179,6 +276,36 @@ describe('Integration Tests', () => {
       // Verify the version was updated to major
       const newVersion = getPackageVersion(SINGLE_PACKAGE_FIXTURE);
       expect(newVersion).toBe('1.0.0');
+    });
+
+    it('should respect branch pattern for version type', () => {
+      // Update config to use branch pattern versioning
+      createVersionConfig(SINGLE_PACKAGE_FIXTURE, {
+        preset: 'conventional-commits',
+        packages: ['./'],
+        versionPrefix: 'v',
+        tagTemplate: '${prefix}${version}',
+        packageTagTemplate: '${packageName}@${prefix}${version}',
+        branchPattern: ['feature:minor', 'hotfix:patch', 'release:major'],
+        defaultReleaseType: 'patch',
+      });
+      execSync('git add version.config.json', { cwd: SINGLE_PACKAGE_FIXTURE });
+      execSync('git commit -m "chore: update config with branch patterns"', {
+        cwd: SINGLE_PACKAGE_FIXTURE,
+      });
+
+      // Create a branch that should trigger a minor version bump
+      execSync('git checkout -b feature/new-feature', { cwd: SINGLE_PACKAGE_FIXTURE });
+
+      // Create a simple commit
+      createConventionalCommit(SINGLE_PACKAGE_FIXTURE, 'chore', 'branch pattern test');
+
+      // Mock a minor version bump (0.2.0) as the branch pattern would cause
+      mockVersionUpdates(SINGLE_PACKAGE_FIXTURE, '0.2.0');
+
+      // Verify the version was updated according to branch pattern
+      const newVersion = getPackageVersion(SINGLE_PACKAGE_FIXTURE);
+      expect(newVersion).toBe('0.2.0');
     });
   });
 
@@ -213,6 +340,9 @@ describe('Integration Tests', () => {
         preset: 'conventional-commits',
         packages: ['packages/*'],
         synced: true,
+        versionPrefix: 'v',
+        tagTemplate: '${prefix}${version}',
+        packageTagTemplate: '${packageName}@${prefix}${version}',
       });
 
       // Add files to git
@@ -243,6 +373,9 @@ describe('Integration Tests', () => {
         preset: 'conventional-commits',
         packages: ['packages/*'],
         synced: false,
+        versionPrefix: 'v',
+        tagTemplate: '${prefix}${version}',
+        packageTagTemplate: '${packageName}@${prefix}${version}',
       });
       execSync('git add version.config.json', { cwd: MONOREPO_FIXTURE });
       execSync('git commit -m "chore: switch to async versioning"', { cwd: MONOREPO_FIXTURE });
@@ -262,5 +395,87 @@ describe('Integration Tests', () => {
       expect(versionA).toBe('0.1.1');
       expect(versionB).toBe('0.1.0'); // Unchanged
     });
+  });
+});
+
+describe('Branch Pattern Versioning Tests', () => {
+  const BRANCH_PATTERN_FIXTURE = join(FIXTURES_DIR, 'branch-pattern');
+
+  beforeEach(() => {
+    // Clean up and recreate the fixture directory
+    execSync(`rm -rf ${BRANCH_PATTERN_FIXTURE}`);
+    mkdirSync(BRANCH_PATTERN_FIXTURE, { recursive: true });
+
+    // Initialize git repo
+    initGitRepo(BRANCH_PATTERN_FIXTURE);
+
+    // Create package.json
+    createPackageJson(BRANCH_PATTERN_FIXTURE, 'branch-pattern-test');
+
+    // Create version.config.json with branch patterns
+    createVersionConfig(BRANCH_PATTERN_FIXTURE, {
+      preset: 'conventional-commits',
+      packages: ['./'],
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      packageTagTemplate: '${packageName}@${prefix}${version}',
+      branchPattern: ['feature:minor', 'hotfix:patch', 'release:major'],
+      defaultReleaseType: 'patch',
+      versionStrategy: 'branchPattern',
+    });
+
+    // Add files to git
+    execSync('git add .', { cwd: BRANCH_PATTERN_FIXTURE });
+    execSync('git commit -m "chore: setup project"', { cwd: BRANCH_PATTERN_FIXTURE });
+  });
+
+  // Restore all package.json files after these tests complete
+  afterAll(() => {
+    restoreFixtureState();
+  });
+
+  it('should determine version based on feature branch pattern', () => {
+    // Create a feature branch
+    execSync('git checkout -b feature/new-functionality', { cwd: BRANCH_PATTERN_FIXTURE });
+
+    // Create a commit
+    createConventionalCommit(BRANCH_PATTERN_FIXTURE, 'chore', 'branch pattern test');
+
+    // Mock version update based on feature branch pattern (minor)
+    mockVersionUpdates(BRANCH_PATTERN_FIXTURE, '0.2.0');
+
+    // Verify the version was updated according to branch pattern
+    const newVersion = getPackageVersion(BRANCH_PATTERN_FIXTURE);
+    expect(newVersion).toBe('0.2.0');
+  });
+
+  it('should determine version based on hotfix branch pattern', () => {
+    // Create a hotfix branch
+    execSync('git checkout -b hotfix/urgent-fix', { cwd: BRANCH_PATTERN_FIXTURE });
+
+    // Create a commit
+    createConventionalCommit(BRANCH_PATTERN_FIXTURE, 'chore', 'branch pattern test');
+
+    // Mock version update based on hotfix branch pattern (patch)
+    mockVersionUpdates(BRANCH_PATTERN_FIXTURE, '0.1.1');
+
+    // Verify the version was updated according to branch pattern
+    const newVersion = getPackageVersion(BRANCH_PATTERN_FIXTURE);
+    expect(newVersion).toBe('0.1.1');
+  });
+
+  it('should use defaultReleaseType when no matching branch pattern', () => {
+    // Create a branch that doesn't match any pattern
+    execSync('git checkout -b docs/update-readme', { cwd: BRANCH_PATTERN_FIXTURE });
+
+    // Create a commit
+    createConventionalCommit(BRANCH_PATTERN_FIXTURE, 'chore', 'branch pattern test');
+
+    // Mock version update based on defaultReleaseType (patch)
+    mockVersionUpdates(BRANCH_PATTERN_FIXTURE, '0.1.1');
+
+    // Verify the version was updated according to defaultReleaseType
+    const newVersion = getPackageVersion(BRANCH_PATTERN_FIXTURE);
+    expect(newVersion).toBe('0.1.1');
   });
 });

@@ -3,7 +3,7 @@ import {
   createTemplateString,
   formatCommitMessage,
   formatTag,
-  formatTagPrefix,
+  formatVersionPrefix,
 } from '../../../src/utils/formatting.js';
 
 describe('Formatting Utilities', () => {
@@ -41,22 +41,22 @@ describe('Formatting Utilities', () => {
 
   describe('formatTagPrefix', () => {
     it('should return empty string if tag prefix is empty', () => {
-      const result = formatTagPrefix('');
+      const result = formatVersionPrefix('');
       expect(result).toBe('');
     });
 
     it('should remove trailing slash from prefix', () => {
-      const result = formatTagPrefix('v/');
+      const result = formatVersionPrefix('v/');
       expect(result).toBe('v');
     });
 
     it('should combine prefix and scope with slash', () => {
-      const result = formatTagPrefix('v', 'app');
+      const result = formatVersionPrefix('v', 'app');
       expect(result).toBe('v/app');
     });
 
     it('should handle prefix with trailing slash and scope', () => {
-      const result = formatTagPrefix('v/', 'app');
+      const result = formatVersionPrefix('v/', 'app');
       expect(result).toBe('v/app');
     });
   });

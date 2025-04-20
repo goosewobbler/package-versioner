@@ -73,6 +73,8 @@ describe('Version Calculator', () => {
   const defaultConfig: Partial<Config> = {
     preset: 'conventional-commits',
     versionPrefix: 'v',
+    tagTemplate: '${prefix}${version}',
+    packageTagTemplate: '${packageName}@${prefix}${version}',
     baseBranch: 'main',
   };
 
@@ -127,7 +129,7 @@ describe('Version Calculator', () => {
     vi.restoreAllMocks();
   });
 
-  describe('Forced version type (explicit bump)', () => {
+  describe('Specified version type (explicit bump)', () => {
     it('should return initial version if no latestTag and type provided', async () => {
       const options: VersionOptions = {
         // @ts-expect-error - Testing with null latestTag

@@ -58,6 +58,8 @@ describe('Version Strategies', () => {
   const defaultConfig: Partial<Config> = {
     preset: 'conventional-commits',
     versionPrefix: 'v',
+    tagTemplate: '${prefix}${version}',
+    packageTagTemplate: '${packageName}@${prefix}${version}',
     baseBranch: 'main',
   };
 
@@ -70,7 +72,7 @@ describe('Version Strategies', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(git.getLatestTag).mockResolvedValue('v1.0.0');
     vi.mocked(calculator.calculateVersion).mockResolvedValue('1.1.0');
-    vi.mocked(formatting.formatTagPrefix).mockReturnValue('v');
+    vi.mocked(formatting.formatVersionPrefix).mockReturnValue('v');
     vi.mocked(formatting.formatTag).mockReturnValue('v1.1.0');
     vi.mocked(formatting.formatCommitMessage).mockReturnValue('chore(release): v1.1.0');
 

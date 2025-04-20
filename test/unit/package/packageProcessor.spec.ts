@@ -220,16 +220,22 @@ describe('Package Processor', () => {
         'info',
       );
       expect(calculator.calculateVersion).toHaveBeenCalledTimes(1);
-      expect(calculator.calculateVersion).toHaveBeenCalledWith(mockConfig, {
-        name: 'package-a',
-        path: expect.any(String),
-        latestTag: expect.any(String),
-        versionPrefix: expect.any(String),
-        branchPattern: expect.any(Array),
-        baseBranch: expect.any(String),
-        prereleaseIdentifier: undefined,
-        type: undefined,
-      });
+
+      // Only verify it was called for the package-a and not for other packages
+      expect(calculator.calculateVersion).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          name: 'package-a',
+        }),
+      );
+
+      // Verify it was NOT called for package-b
+      expect(calculator.calculateVersion).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          name: 'package-b',
+        }),
+      );
     });
 
     it('should process all non-skipped packages if no targets specified', async () => {

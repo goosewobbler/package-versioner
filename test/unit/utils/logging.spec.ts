@@ -82,10 +82,17 @@ describe('Logging Utilities', () => {
     });
 
     it('should log debug message with gray color', () => {
+      // Set DEBUG to true to ensure debug messages are shown
+      const originalDebug = process.env.DEBUG;
+      process.env.DEBUG = 'true';
+
       log('Debug message', 'debug');
 
-      expect(chalk.gray).toHaveBeenCalledWith('Debug message');
-      expect(console.log).toHaveBeenCalledWith('GRAY:Debug message');
+      expect(chalk.gray).toHaveBeenCalledWith('[DEBUG] Debug message');
+      expect(console.log).toHaveBeenCalledWith('GRAY:[DEBUG] Debug message');
+
+      // Restore original DEBUG value
+      process.env.DEBUG = originalDebug;
     });
 
     it('should not log non-error messages when in JSON output mode', () => {

@@ -22,9 +22,9 @@ async function run() {
       'Path to config file (defaults to version.config.json in current directory)',
     )
     .option('-d, --dry-run', 'Dry run (no changes made)', false)
-    .option('-b, --bump <type>', 'Force specific bump type (patch|minor|major)')
+    .option('-b, --bump <type>', 'Specify bump type (patch|minor|major)')
     .option('-p, --prerelease [identifier]', 'Create prerelease version')
-    .option('-s, --synced', 'Force synchronized versioning across all packages')
+    .option('-s, --synced', 'Use synchronized versioning across all packages')
     .option('-j, --json', 'Output results as JSON', false)
     .option('-t, --target <packages>', 'Comma-delimited list of package names to target')
     .parse(process.argv);
@@ -44,7 +44,7 @@ async function run() {
     // Override config with CLI options
     if (options.dryRun) config.dryRun = true;
     if (options.synced) config.synced = true; // Allow forcing sync mode
-    if (options.bump) config.forceType = options.bump;
+    if (options.bump) config.type = options.bump;
     if (options.prerelease)
       config.prereleaseIdentifier = options.prerelease === true ? 'rc' : options.prerelease;
 

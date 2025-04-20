@@ -12,7 +12,7 @@ import { getLatestTag, getLatestTagForPackage } from '../git/tagsAndBranches.js'
 import { updatePackageVersion } from '../package/packageManagement.js';
 import { PackageProcessor } from '../package/packageProcessor.js';
 import type { Config } from '../types.js';
-import { formatCommitMessage, formatTag, formatTagPrefix } from '../utils/formatting.js';
+import { formatCommitMessage, formatTag, formatVersionPrefix } from '../utils/formatting.js';
 import { log } from '../utils/logging.js';
 import { calculateVersion } from './versionCalculator.js';
 import type { PackagesWithRoot } from './versionEngine.js';
@@ -65,7 +65,7 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
       } = config;
 
       // Calculate version for root package first
-      const formattedPrefix = formatTagPrefix(versionPrefix || 'v');
+      const formattedPrefix = formatVersionPrefix(versionPrefix || 'v');
       const latestTag = await getLatestTag();
 
       // Calculate the next version
@@ -75,6 +75,7 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
         branchPattern,
         baseBranch,
         prereleaseIdentifier,
+        type: config.type,
       });
 
       if (!nextVersion) {
@@ -168,7 +169,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       }
 
       const pkgPath = pkg.dir;
-      const formattedPrefix = formatTagPrefix(versionPrefix || 'v');
+      const formattedPrefix = formatVersionPrefix(versionPrefix || 'v');
 
       // Try to get the latest tag specific to this package first
       let latestTagResult = await getLatestTagForPackage(packageName, formattedPrefix);
@@ -190,6 +191,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
           versionPrefix: formattedPrefix,
           path: pkgPath,
           name: packageName,
+          type: config.type,
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -262,11 +264,12 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
     skipHooks: config.skipHooks || false,
     getLatestTag: dependencies.getLatestTag,
     fullConfig: config,
+    // Extract common version configuration properties
     config: {
       branchPattern: config.branchPattern || [],
       baseBranch: config.baseBranch || 'main',
       prereleaseIdentifier: config.prereleaseIdentifier,
-      forceType: config.forceType,
+      type: config.type,
     },
   };
 

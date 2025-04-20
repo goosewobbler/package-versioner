@@ -43,7 +43,7 @@ export function formatTag(
 /**
  * Format a tag prefix based on configuration
  */
-export function formatTagPrefix(versionPrefix: string, scope?: string): string {
+export function formatVersionPrefix(versionPrefix: string, scope?: string): string {
   if (!versionPrefix) return '';
 
   const cleanPrefix = versionPrefix.replace(/\/$/, ''); // Remove trailing slash

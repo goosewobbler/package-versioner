@@ -13,33 +13,38 @@ export interface GitInfo {
 }
 
 /**
+ * Common version configuration properties shared between interfaces
+ */
+export interface VersionConfigBase {
+  versionPrefix: string;
+  type?: ReleaseType;
+  prereleaseIdentifier?: string;
+  branchPattern?: string[];
+  baseBranch?: string;
+  path?: string;
+  name?: string;
+}
+
+/**
  * Configuration for the versioner
  */
-export interface Config {
+export interface Config extends VersionConfigBase {
   // Tag formatting templates with default templates
   tagTemplate: string; // Default: '${prefix}${version}'
   packageTagTemplate: string; // Default: '${packageName}@${prefix}${version}'
-  versionPrefix: string; // Used in templates
 
   preset: string;
-  baseBranch: string;
   synced: boolean;
   packages: string[];
   updateInternalDependencies: 'major' | 'minor' | 'patch' | 'no-internal-update';
   skip?: string[];
   commitMessage?: string;
   versionStrategy?: 'branchPattern' | 'commitMessage';
-  branchPattern: string[];
   branchPatterns?: BranchPattern[];
   defaultReleaseType?: ReleaseType;
-  prereleaseIdentifier?: string;
   skipHooks?: boolean;
   dryRun?: boolean;
-  forceType?: ReleaseType;
   latestTag?: string;
-  type?: ReleaseType;
-  path?: string;
-  name?: string;
 }
 
 /**
@@ -84,15 +89,8 @@ export interface TagProps {
 /**
  * Version calculation options
  */
-export interface VersionOptions {
+export interface VersionOptions extends VersionConfigBase {
   latestTag: string;
-  versionPrefix: string;
-  type?: ReleaseType;
-  path?: string;
-  name?: string;
-  branchPattern?: string[];
-  baseBranch?: string;
-  prereleaseIdentifier?: string;
 }
 
 /**

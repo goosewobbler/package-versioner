@@ -16,24 +16,19 @@ const STANDARD_BUMP_TYPES: ReleaseType[] = ['major', 'minor', 'patch'];
 
 /**
  * Calculates version based on various approaches:
- * 1. Forced version type (explicit bump)
+ * 1. Specified version type (explicit bump)
  * 2. Branch pattern matching
  * 3. Conventional commits analysis
  */
-export async function calculateVersion(
-  config: Config,
-  options: VersionOptions,
-  forcedType?: ReleaseType,
-  configPrereleaseIdentifier?: string,
-): Promise<string> {
+export async function calculateVersion(config: Config, options: VersionOptions): Promise<string> {
   const { latestTag, type, path: pkgPath, name, branchPattern } = options;
   const { preset } = config;
 
-  // Get the tagPrefix from the options or config, fallback to 'v'
-  const tagPrefix = options.versionPrefix || config.versionPrefix || 'v';
+  // Get the prefix from the config for pattern matching
+  const originalPrefix = options.versionPrefix || ''; // Default to empty string
 
   // Use the prereleaseIdentifier from options if provided
-  const prereleaseIdentifier = options.prereleaseIdentifier || configPrereleaseIdentifier;
+  const prereleaseIdentifier = options.prereleaseIdentifier || config.prereleaseIdentifier;
 
   const initialVersion = prereleaseIdentifier ? `0.0.1-${prereleaseIdentifier}` : '0.0.1';
 
@@ -52,11 +47,11 @@ export async function calculateVersion(
     return prefix;
   }
 
-  const tagSearchPattern = determineTagSearchPattern(name, tagPrefix);
+  const tagSearchPattern = determineTagSearchPattern(name, originalPrefix);
   const escapedTagPattern = escapeRegExp(tagSearchPattern);
 
-  // 1. Handle specific type if provided (including any forced type passed directly to this function)
-  const specifiedType = forcedType || type;
+  // 1. Handle specific type if provided
+  const specifiedType = type;
 
   if (specifiedType) {
     if (hasNoTags) {

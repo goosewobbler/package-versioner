@@ -72,24 +72,24 @@ export async function lastMergeBranchName(
 /**
  * Get the latest semver tag for a specific package
  * @param packageName The name of the package to get tags for
- * @param tagPrefix Optional tag prefix (e.g., 'v')
+ * @param versionPrefix Optional version prefix (e.g., 'v')
  * @returns The latest tag for the package or empty string if none found
  */
 export async function getLatestTagForPackage(
   packageName: string,
-  tagPrefix?: string,
+  versionPrefix?: string,
 ): Promise<string> {
   try {
     // Instead of using the package option which requires lerna mode,
     // get all tags and filter manually for the package
     const allTags: string[] = await getSemverTags({
-      tagPrefix,
+      tagPrefix: versionPrefix,
     });
 
     // Filter for tags that match this package's format
     // This supports both packageName@version and prefix+packageName@version formats
-    const packageTagPattern = tagPrefix
-      ? new RegExp(`^${escapeRegExp(tagPrefix)}${escapeRegExp(packageName)}@`)
+    const packageTagPattern = versionPrefix
+      ? new RegExp(`^${escapeRegExp(versionPrefix)}${escapeRegExp(packageName)}@`)
       : new RegExp(`^${escapeRegExp(packageName)}@`);
 
     const packageTags = allTags.filter((tag) => packageTagPattern.test(tag));

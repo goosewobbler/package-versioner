@@ -5,8 +5,8 @@ import type { ReleaseType } from 'semver';
 import { calculateVersion } from '../core/versionCalculator.js';
 import { createGitTag, gitAdd, gitCommit } from '../git/commands.js';
 import { getLatestTagForPackage } from '../git/tagsAndBranches.js';
-import type { Config } from '../types.js';
-import { formatCommitMessage, formatTag, formatTagPrefix } from '../utils/formatting.js';
+import type { Config, VersionConfigBase } from '../types.js';
+import { formatCommitMessage, formatTag, formatVersionPrefix } from '../utils/formatting.js';
 import { addTag, setCommitMessage } from '../utils/jsonOutput.js';
 import { log } from '../utils/logging.js';
 import { updatePackageVersion } from './packageManagement.js';
@@ -21,12 +21,7 @@ export interface PackageProcessorOptions {
   dryRun?: boolean;
   skipHooks?: boolean;
   getLatestTag: () => Promise<string | null>;
-  config: {
-    branchPattern?: string[];
-    baseBranch?: string;
-    prereleaseIdentifier?: string;
-    forceType?: ReleaseType;
-  };
+  config: Omit<VersionConfigBase, 'versionPrefix' | 'path' | 'name'>;
   // Config needed for version calculation
   fullConfig: Config;
 }
@@ -51,12 +46,7 @@ export class PackageProcessor {
   private dryRun: boolean;
   private skipHooks: boolean;
   private getLatestTag: () => Promise<string | null>;
-  private config: {
-    branchPattern?: string[];
-    baseBranch?: string;
-    prereleaseIdentifier?: string;
-    forceType?: ReleaseType;
-  };
+  private config: Omit<VersionConfigBase, 'versionPrefix' | 'path' | 'name'>;
   // Config for version calculation
   private fullConfig: Config;
 
@@ -128,7 +118,7 @@ export class PackageProcessor {
     for (const pkg of pkgsToConsider) {
       const name = pkg.packageJson.name;
       const pkgPath = pkg.dir;
-      const formattedPrefix = formatTagPrefix(this.versionPrefix);
+      const formattedPrefix = formatVersionPrefix(this.versionPrefix);
       // For package-specific tags, we may need to request package-specific version history
       // Try to get the latest tag specific to this package first
       let latestTagResult = '';
@@ -168,7 +158,7 @@ export class PackageProcessor {
         branchPattern: this.config.branchPattern,
         baseBranch: this.config.baseBranch,
         prereleaseIdentifier: this.config.prereleaseIdentifier,
-        type: this.config.forceType,
+        type: this.config.type,
       });
 
       if (!nextVersion) {

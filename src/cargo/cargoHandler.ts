@@ -33,7 +33,7 @@ export function getCargoInfo(cargoPath: string): CargoInfo {
 
     if (!cargo.package?.name) {
       log(`Package name not found in: ${cargoPath}`, 'error');
-      process.exit(1);
+      throw new Error(`Package name not found in: ${cargoPath}`);
     }
 
     return {

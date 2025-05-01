@@ -1,7 +1,7 @@
 {
   "name": "package-versioner",
   "description": "A lightweight yet powerful CLI tool for automated semantic versioning based on Git history and conventional commits.",
-  "version": "1.2.0",
+  "version": "0.5.4",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -15,9 +15,18 @@
     "url": "https://github.com/goosewobbler/package-versioner",
     "homepage": "https://github.com/goosewobbler/package-versioner"
   },
-  "keywords": ["version", "semver", "git", "package"],
+  "keywords": [
+    "version",
+    "semver",
+    "git",
+    "package"
+  ],
   "license": "MIT",
-  "files": ["dist/**", "docs/**", "package-versioner.schema.json"],
+  "files": [
+    "dist/**",
+    "docs/**",
+    "package-versioner.schema.json"
+  ],
   "bin": {
     "package-versioner": "./dist/index.js"
   },

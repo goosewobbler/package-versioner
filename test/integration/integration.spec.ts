@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as TOML from 'smol-toml';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -489,7 +489,9 @@ describe('Branch Pattern Versioning Tests', () => {
 describe('Rust Project', () => {
   beforeEach(() => {
     // Clean up and recreate the fixture directory
-    execSync(`rm -rf ${RUST_PACKAGE_FIXTURE}`);
+    if (existsSync(RUST_PACKAGE_FIXTURE)) {
+      rmSync(RUST_PACKAGE_FIXTURE, { recursive: true, force: true });
+    }
     mkdirSync(RUST_PACKAGE_FIXTURE, { recursive: true });
 
     // Create src directory

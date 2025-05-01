@@ -10,6 +10,7 @@ import type { Config, VersionConfigBase } from '../types.js';
 import { formatCommitMessage, formatTag, formatVersionPrefix } from '../utils/formatting.js';
 import { addTag, setCommitMessage } from '../utils/jsonOutput.js';
 import { log } from '../utils/logging.js';
+import { getVersionFromManifests } from '../utils/manifestHelpers.js';
 import { updatePackageVersion } from './packageManagement.js';
 
 export interface PackageProcessorOptions {
@@ -138,62 +139,27 @@ export class PackageProcessor {
       if (!latestTagResult) {
         try {
           // First try the package manifest files as fallback
-          const packageJsonPath = path.join(pkgPath, 'package.json');
-          const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
-          let usedManifestFallback = false;
+          const packageDir = pkgPath;
+          let manifestFallbackUsed = false;
 
-          // Check package.json first
-          if (fs.existsSync(packageJsonPath)) {
-            try {
-              const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-              if (packageJson.version) {
-                log(
-                  `Using package.json version ${packageJson.version} for ${name} as no package-specific tags found`,
-                  'info',
-                );
-                log(
-                  'FALLBACK: Using package version from package.json instead of global tag',
-                  'debug',
-                );
-                // We'll create a fake tag with this version to use as base
-                latestTagResult = `${this.versionPrefix || ''}${packageJson.version}`;
-                usedManifestFallback = true;
-              }
-            } catch (packageJsonError) {
-              const errMsg =
-                packageJsonError instanceof Error
-                  ? packageJsonError.message
-                  : String(packageJsonError);
-              log(`Error reading package.json for ${name}: ${errMsg}`, 'warning');
-            }
-          }
-
-          // If no package.json, try Cargo.toml
-          if (!usedManifestFallback && fs.existsSync(cargoTomlPath)) {
-            try {
-              const cargoInfo = getCargoInfo(cargoTomlPath);
-              if (cargoInfo.version) {
-                log(
-                  `Using Cargo.toml version ${cargoInfo.version} for ${name} as no package-specific tags found`,
-                  'info',
-                );
-                log(
-                  'FALLBACK: Using package version from Cargo.toml instead of global tag',
-                  'debug',
-                );
-                // We'll create a fake tag with this version to use as base
-                latestTagResult = `${this.versionPrefix || ''}${cargoInfo.version}`;
-                usedManifestFallback = true;
-              }
-            } catch (cargoTomlError) {
-              const errMsg =
-                cargoTomlError instanceof Error ? cargoTomlError.message : String(cargoTomlError);
-              log(`Error reading Cargo.toml for ${name}: ${errMsg}`, 'warning');
-            }
+          // Use the centralized helper to check manifests
+          const manifestResult = getVersionFromManifests(packageDir);
+          if (manifestResult.manifestFound && manifestResult.version) {
+            log(
+              `Using ${manifestResult.manifestType} version ${manifestResult.version} for ${name} as no package-specific tags found`,
+              'info',
+            );
+            log(
+              `FALLBACK: Using package version from ${manifestResult.manifestType} instead of global tag`,
+              'debug',
+            );
+            // We'll create a fake tag with this version to use as base
+            latestTagResult = `${this.versionPrefix || ''}${manifestResult.version}`;
+            manifestFallbackUsed = true;
           }
 
           // Only if we couldn't use either manifest file, try global tag
-          if (!usedManifestFallback) {
+          if (!manifestFallbackUsed) {
             const globalTagResult = await this.getLatestTag();
             if (globalTagResult) {
               latestTagResult = globalTagResult;

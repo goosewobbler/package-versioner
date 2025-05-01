@@ -14,6 +14,7 @@ import { getCommitsLength, lastMergeBranchName } from '../git/tagsAndBranches.js
 import type { CargoToml, Config, VersionOptions } from '../types.js';
 import { escapeRegExp } from '../utils/formatting.js';
 import { log } from '../utils/logging.js';
+import { getVersionFromManifests, throwIfNoManifestsFound } from '../utils/manifestHelpers.js';
 import {
   STANDARD_BUMP_TYPES,
   bumpVersion,
@@ -237,89 +238,28 @@ function getPackageVersionFallback(
   initialVersion: string,
 ): string {
   const packageDir = pkgPath || cwd();
-  const packageJsonPath = path.join(packageDir, 'package.json');
-  const cargoTomlPath = path.join(packageDir, 'Cargo.toml');
 
-  // Try package.json first
-  const packageVersion = tryGetPackageJsonVersion(
-    packageJsonPath,
-    name,
-    releaseType,
-    prereleaseIdentifier,
-    initialVersion,
-  );
+  // Use centralized helper to get version from any available manifest
+  const manifestResult = getVersionFromManifests(packageDir);
 
-  if (packageVersion) {
-    return packageVersion;
+  if (manifestResult.manifestFound && manifestResult.version) {
+    log(
+      `No tags found for ${name || 'package'}, using ${manifestResult.manifestType} version: ${manifestResult.version} as base`,
+      'info',
+    );
+
+    return processVersionData(
+      manifestResult.version,
+      manifestResult.manifestType || 'manifest',
+      name,
+      releaseType,
+      prereleaseIdentifier,
+      initialVersion,
+    );
   }
 
-  // Try Cargo.toml as fallback
-  const cargoVersion = tryGetCargoTomlVersion(
-    cargoTomlPath,
-    name,
-    releaseType,
-    prereleaseIdentifier,
-    initialVersion,
-  );
-
-  if (cargoVersion) {
-    return cargoVersion;
-  }
-
-  // If neither package.json nor Cargo.toml exist, throw an error
-  throw new Error(
-    `Neither package.json nor Cargo.toml found at ${packageDir}. Checked paths: ${packageJsonPath}, ${cargoTomlPath}. Cannot determine version.`,
-  );
-}
-
-/**
- * Helper function to try getting version from package.json
- */
-function tryGetPackageJsonVersion(
-  packageJsonPath: string,
-  name: string | undefined,
-  releaseType: ReleaseType,
-  prereleaseIdentifier: string | undefined,
-  initialVersion: string,
-): string | null {
-  const packageJsonResult = getVersionFromPackageJson(packageJsonPath, initialVersion);
-  if (!packageJsonResult.success) {
-    return null;
-  }
-
-  return processVersionData(
-    packageJsonResult.version,
-    'package.json',
-    name,
-    releaseType,
-    prereleaseIdentifier,
-    initialVersion,
-  );
-}
-
-/**
- * Helper function to try getting version from Cargo.toml
- */
-function tryGetCargoTomlVersion(
-  cargoTomlPath: string,
-  name: string | undefined,
-  releaseType: ReleaseType,
-  prereleaseIdentifier: string | undefined,
-  initialVersion: string,
-): string | null {
-  const cargoTomlResult = getVersionFromCargoToml(cargoTomlPath, initialVersion);
-  if (!cargoTomlResult.success) {
-    return null;
-  }
-
-  return processVersionData(
-    cargoTomlResult.version,
-    'Cargo.toml',
-    name,
-    releaseType,
-    prereleaseIdentifier,
-    initialVersion,
-  );
+  // If no manifests found or couldn't extract a version
+  throwIfNoManifestsFound(packageDir);
 }
 
 /**

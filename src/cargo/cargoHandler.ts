@@ -47,8 +47,9 @@ export function getCargoInfo(cargoPath: string): CargoInfo {
     log(`Error reading Cargo.toml: ${cargoPath}`, 'error');
     if (error instanceof Error) {
       log(error.message, 'error');
+      throw error;
     }
-    process.exit(1);
+    throw new Error(`Failed to process Cargo.toml at ${cargoPath}`);
   }
 }
 

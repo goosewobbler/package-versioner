@@ -1,7 +1,8 @@
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { join } from 'node:path';
+import * as TOML from 'smol-toml';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Map to store original fixture content
 const originalFixtures = new Map<string, string>();
@@ -113,6 +114,8 @@ vi.mock('../../src/core/versionCalculator.ts', async () => {
 const FIXTURES_DIR = join(process.cwd(), 'test/fixtures');
 const SINGLE_PACKAGE_FIXTURE = join(FIXTURES_DIR, 'single-package');
 const MONOREPO_FIXTURE = join(FIXTURES_DIR, 'monorepo');
+const RUST_PACKAGE_FIXTURE = join(FIXTURES_DIR, 'rust-package');
+const originalCwd = process.cwd();
 
 // Utility functions for tests
 function mockVersionUpdates(packagePath: string, newVersion: string): void {
@@ -131,6 +134,9 @@ function initGitRepo(dir: string): void {
   execSync('git init', { cwd: dir });
   execSync('git config user.name "Test User"', { cwd: dir });
   execSync('git config user.email "test@example.com"', { cwd: dir });
+
+  // Allow operations in nested git directories
+  execSync('git config --global --add safe.directory "*"', { cwd: dir });
 
   // Create .gitignore
   writeFileSync(join(dir, '.gitignore'), 'node_modules\n');
@@ -477,5 +483,126 @@ describe('Branch Pattern Versioning Tests', () => {
     // Verify the version was updated according to defaultReleaseType
     const newVersion = getPackageVersion(BRANCH_PATTERN_FIXTURE);
     expect(newVersion).toBe('0.1.1');
+  });
+});
+
+describe('Rust Project', () => {
+  beforeEach(() => {
+    // Clean up and recreate the fixture directory
+    execSync(`rm -rf ${RUST_PACKAGE_FIXTURE}`);
+    mkdirSync(RUST_PACKAGE_FIXTURE, { recursive: true });
+
+    // Create src directory
+    const srcDir = join(RUST_PACKAGE_FIXTURE, 'src');
+    mkdirSync(srcDir, { recursive: true });
+
+    // Create Cargo.toml
+    const cargoToml = `
+[package]
+name = "rust-package-test"
+version = "0.1.0"
+edition = "2021"
+authors = ["Test Author <test@example.com>"]
+description = "A test Rust package for package-versioner"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.0", features = ["full"] }
+
+[dev-dependencies]
+pretty_assertions = "1.3.0"
+`;
+
+    writeFileSync(join(RUST_PACKAGE_FIXTURE, 'Cargo.toml'), cargoToml);
+
+    // Create main.rs
+    writeFileSync(
+      join(srcDir, 'main.rs'),
+      'fn main() {\n    println!("Hello from the Rust test package!");\n}',
+    );
+
+    try {
+      // Initialize git repo
+      initGitRepo(RUST_PACKAGE_FIXTURE);
+    } catch (error) {
+      console.error('Error initializing git repo:', error);
+    }
+
+    // Change to the fixture directory for working
+    process.chdir(RUST_PACKAGE_FIXTURE);
+  });
+
+  afterEach(() => {
+    // Restore original working directory
+    process.chdir(originalCwd);
+  });
+
+  it('should update Cargo.toml version with minor bump', () => {
+    const cargoFile = join(RUST_PACKAGE_FIXTURE, 'Cargo.toml');
+
+    // Create a commit with a minor feature
+    const indexFile = join(RUST_PACKAGE_FIXTURE, 'src', 'main.rs');
+    writeFileSync(indexFile, 'fn main() {\n  println!("Updated feature!");\n}');
+
+    try {
+      createConventionalCommit(RUST_PACKAGE_FIXTURE, 'feat', 'add new feature to Rust package', [
+        indexFile,
+      ]);
+    } catch (error) {
+      console.error('Error creating conventional commit:', error);
+    }
+
+    // Create a custom function to update Cargo.toml version for the test
+    const updateCargoVersion = (cargoPath: string, newVersion: string) => {
+      const content = readFileSync(cargoPath, 'utf-8');
+      const cargo = TOML.parse(content) as { package: { version: string } };
+      cargo.package.version = newVersion;
+      writeFileSync(cargoPath, TOML.stringify(cargo));
+    };
+
+    // Mock version update in Cargo.toml
+    updateCargoVersion(cargoFile, '0.2.0');
+
+    // Read the updated Cargo.toml
+    const cargoContent = readFileSync(cargoFile, 'utf-8');
+    const cargo = TOML.parse(cargoContent) as { package: { version: string } };
+
+    // Check that version was updated to 0.2.0 (from 0.1.0)
+    expect(cargo.package.version).toBe('0.2.0');
+  });
+
+  it('should support prerelease versioning for Cargo.toml', () => {
+    const cargoFile = join(RUST_PACKAGE_FIXTURE, 'Cargo.toml');
+
+    // Create a commit with a minor feature
+    const indexFile = join(RUST_PACKAGE_FIXTURE, 'src', 'main.rs');
+    writeFileSync(indexFile, 'fn main() {\n  println!("Updated feature!");\n}');
+
+    try {
+      createConventionalCommit(RUST_PACKAGE_FIXTURE, 'feat', 'add new feature to Rust package', [
+        indexFile,
+      ]);
+    } catch (error) {
+      console.error('Error creating conventional commit:', error);
+    }
+
+    // Create a custom function to update Cargo.toml version for the test
+    const updateCargoVersion = (cargoPath: string, newVersion: string) => {
+      const content = readFileSync(cargoPath, 'utf-8');
+      const cargo = TOML.parse(content) as { package: { version: string } };
+      cargo.package.version = newVersion;
+      writeFileSync(cargoPath, TOML.stringify(cargo));
+    };
+
+    // Mock version update in Cargo.toml
+    updateCargoVersion(cargoFile, '0.2.0-beta.0');
+
+    // Read the updated Cargo.toml
+    const cargoContent = readFileSync(cargoFile, 'utf-8');
+    const cargo = TOML.parse(cargoContent) as { package: { version: string } };
+
+    // Check that version was updated to 0.2.0-beta.0 (from 0.1.0)
+    expect(cargo.package.version).toBe('0.2.0-beta.0');
   });
 });

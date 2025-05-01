@@ -4,6 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { isCargoToml, updateCargoVersion } from '../cargo/cargoHandler.js';
 import type { PkgJson } from '../types.js';
 import { addPackageUpdate } from '../utils/jsonOutput.js';
 import { log } from '../utils/logging.js';
@@ -52,9 +53,16 @@ export function getPackageInfo(pkgPath: string): PackageInfo {
 }
 
 /**
- * Update a package.json file with a new version
+ * Update a package file (package.json or Cargo.toml) with a new version
  */
 export function updatePackageVersion(packagePath: string, version: string): void {
+  // Handle Cargo.toml files separately
+  if (isCargoToml(packagePath)) {
+    updateCargoVersion(packagePath, version);
+    return;
+  }
+
+  // Handle package.json files
   try {
     const packageContent = fs.readFileSync(packagePath, 'utf8');
     const packageJson = JSON.parse(packageContent);

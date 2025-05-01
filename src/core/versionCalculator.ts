@@ -4,10 +4,12 @@ import { cwd } from 'node:process';
 
 import { Bumper } from 'conventional-recommended-bump';
 import semver, { type ReleaseType } from 'semver';
+import * as TOML from 'smol-toml';
 import * as gitRepo from '../git/repository.js';
 import { getCommitsLength } from '../git/tagsAndBranches.js';
 import * as gitTags from '../git/tagsAndBranches.js';
 import type { BranchPattern, Config, GitInfo, VersionOptions } from '../types.js';
+import type { CargoToml } from '../types.js';
 import { escapeRegExp } from '../utils/formatting.js';
 import { log } from '../utils/logging.js';
 
@@ -209,53 +211,96 @@ function getPackageVersionFallback(
 ): string {
   const packageDir = pkgPath || cwd();
   const packageJsonPath = path.join(packageDir, 'package.json');
+  const cargoTomlPath = path.join(packageDir, 'Cargo.toml');
 
-  // Case 1: package.json doesn't exist - error
-  if (!fs.existsSync(packageJsonPath)) {
-    throw new Error(`package.json not found at ${packageJsonPath}. Cannot determine version.`);
-  }
+  // Try package.json first
+  if (fs.existsSync(packageJsonPath)) {
+    try {
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 
-  try {
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+      // Case: package.json exists but has no version property
+      if (!packageJson.version) {
+        log(`No version found in package.json. Using initial version ${initialVersion}`, 'info');
+        return initialVersion;
+      }
 
-    // Case 2: package.json exists but has no version property - return initialVersion
-    if (!packageJson.version) {
-      log(`No version found in package.json. Using initial version ${initialVersion}`, 'info');
-      return initialVersion;
-    }
+      // Normal case: use the package.json version
+      log(
+        `No tags found for ${name || 'package'}, using package.json version: ${packageJson.version} as base`,
+        'info',
+      );
 
-    // Normal case: use the package.json version
-    log(
-      `No tags found for ${name || 'package'}, using package.json version: ${packageJson.version} as base`,
-      'info',
-    );
+      // Handle prerelease versions with our helper
+      if (STANDARD_BUMP_TYPES.includes(releaseType) && semver.prerelease(packageJson.version)) {
+        // Special case for 1.0.0-next.0 to handle the test expectation
+        if (packageJson.version === '1.0.0-next.0' && releaseType === 'major') {
+          log(
+            `Cleaning prerelease identifier from ${packageJson.version} for ${releaseType} bump`,
+            'debug',
+          );
+          return '1.0.0';
+        }
 
-    // Handle prerelease versions with our helper
-    if (STANDARD_BUMP_TYPES.includes(releaseType) && semver.prerelease(packageJson.version)) {
-      // Special case for 1.0.0-next.0 to handle the test expectation
-      if (packageJson.version === '1.0.0-next.0' && releaseType === 'major') {
         log(
           `Cleaning prerelease identifier from ${packageJson.version} for ${releaseType} bump`,
           'debug',
         );
-        return '1.0.0';
+        return bumpVersion(packageJson.version, releaseType, prereleaseIdentifier);
       }
 
+      // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
+      return semver.inc(packageJson.version, releaseType, prereleaseIdentifier) || initialVersion;
+    } catch (error) {
       log(
-        `Cleaning prerelease identifier from ${packageJson.version} for ${releaseType} bump`,
-        'debug',
+        `Error reading package.json: ${error instanceof Error ? error.message : String(error)}`,
+        'error',
       );
-      return bumpVersion(packageJson.version, releaseType, prereleaseIdentifier);
+      // Don't throw yet, try Cargo.toml as fallback
     }
-
-    // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
-    return semver.inc(packageJson.version, releaseType, prereleaseIdentifier) || initialVersion;
-  } catch (err) {
-    // Case 3: Error reading package.json - error
-    throw new Error(
-      `Error reading package.json: ${err instanceof Error ? err.message : String(err)}`,
-    );
   }
+
+  // Try Cargo.toml as fallback
+  if (fs.existsSync(cargoTomlPath)) {
+    try {
+      const cargoContent = fs.readFileSync(cargoTomlPath, 'utf-8');
+      const cargo = TOML.parse(cargoContent) as CargoToml;
+
+      // Check if package section and version field exist
+      if (!cargo.package?.version) {
+        log(`No version found in Cargo.toml. Using initial version ${initialVersion}`, 'info');
+        return initialVersion;
+      }
+
+      // Normal case: use the Cargo.toml version
+      log(
+        `No tags found for ${name || 'package'}, using Cargo.toml version: ${cargo.package.version} as base`,
+        'info',
+      );
+
+      // Handle prerelease versions with our helper
+      if (STANDARD_BUMP_TYPES.includes(releaseType) && semver.prerelease(cargo.package.version)) {
+        log(
+          `Cleaning prerelease identifier from ${cargo.package.version} for ${releaseType} bump`,
+          'debug',
+        );
+        return bumpVersion(cargo.package.version, releaseType, prereleaseIdentifier);
+      }
+
+      // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
+      return semver.inc(cargo.package.version, releaseType, prereleaseIdentifier) || initialVersion;
+    } catch (error) {
+      log(
+        `Error reading Cargo.toml: ${error instanceof Error ? error.message : String(error)}`,
+        'error',
+      );
+      // Now we can throw since both package.json and Cargo.toml failed
+    }
+  }
+
+  // If neither package.json nor Cargo.toml exist, throw an error
+  throw new Error(
+    `Neither package.json nor Cargo.toml found at ${packageDir}. Cannot determine version.`,
+  );
 }
 
 /**

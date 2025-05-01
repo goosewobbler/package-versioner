@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 import { exit } from 'node:process';
 import type { Package } from '@manypkg/get-packages';
+import { getCargoInfo } from '../cargo/cargoHandler.js';
 import { calculateVersion } from '../core/versionCalculator.js';
 import { createGitTag, gitAdd, gitCommit } from '../git/commands.js';
 import { getLatestTagForPackage } from '../git/tagsAndBranches.js';
@@ -136,10 +137,12 @@ export class PackageProcessor {
       // Fallback to global tag if no package-specific tag exists
       if (!latestTagResult) {
         try {
-          // First try the package.json version as fallback
+          // First try the package manifest files as fallback
           const packageJsonPath = path.join(pkgPath, 'package.json');
-          let usedPackageJsonFallback = false;
+          const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
+          let usedManifestFallback = false;
 
+          // Check package.json first
           if (fs.existsSync(packageJsonPath)) {
             try {
               const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
@@ -154,7 +157,7 @@ export class PackageProcessor {
                 );
                 // We'll create a fake tag with this version to use as base
                 latestTagResult = `${this.versionPrefix || ''}${packageJson.version}`;
-                usedPackageJsonFallback = true;
+                usedManifestFallback = true;
               }
             } catch (packageJsonError) {
               const errMsg =
@@ -165,8 +168,32 @@ export class PackageProcessor {
             }
           }
 
-          // Only if we couldn't use package.json, try global tag
-          if (!usedPackageJsonFallback) {
+          // If no package.json, try Cargo.toml
+          if (!usedManifestFallback && fs.existsSync(cargoTomlPath)) {
+            try {
+              const cargoInfo = getCargoInfo(cargoTomlPath);
+              if (cargoInfo.version) {
+                log(
+                  `Using Cargo.toml version ${cargoInfo.version} for ${name} as no package-specific tags found`,
+                  'info',
+                );
+                log(
+                  'FALLBACK: Using package version from Cargo.toml instead of global tag',
+                  'debug',
+                );
+                // We'll create a fake tag with this version to use as base
+                latestTagResult = `${this.versionPrefix || ''}${cargoInfo.version}`;
+                usedManifestFallback = true;
+              }
+            } catch (cargoTomlError) {
+              const errMsg =
+                cargoTomlError instanceof Error ? cargoTomlError.message : String(cargoTomlError);
+              log(`Error reading Cargo.toml for ${name}: ${errMsg}`, 'warning');
+            }
+          }
+
+          // Only if we couldn't use either manifest file, try global tag
+          if (!usedManifestFallback) {
             const globalTagResult = await this.getLatestTag();
             if (globalTagResult) {
               latestTagResult = globalTagResult;
@@ -197,8 +224,17 @@ export class PackageProcessor {
         continue; // No version change calculated for this package
       }
 
-      // Update package.json
-      updatePackageVersion(path.join(pkgPath, 'package.json'), nextVersion);
+      // Update both package.json and Cargo.toml if they exist
+      const packageJsonPath = path.join(pkgPath, 'package.json');
+      const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
+
+      if (fs.existsSync(packageJsonPath)) {
+        updatePackageVersion(packageJsonPath, nextVersion);
+      }
+
+      if (fs.existsSync(cargoTomlPath)) {
+        updatePackageVersion(cargoTomlPath, nextVersion);
+      }
 
       // Create package-specific tag (using the updated formatTag function with package name)
       const packageTag = formatTag(

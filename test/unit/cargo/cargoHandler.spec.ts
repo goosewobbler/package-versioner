@@ -81,46 +81,54 @@ serde = "1.0"
     });
 
     it('should exit if Cargo.toml does not exist', () => {
-      // Mock process.exit
-      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+      // Mock fs.existsSync to return false
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
-      getCargoInfo(mockCargoPath);
+      // Now we expect an error to be thrown instead of process.exit
+      expect(() => getCargoInfo(mockCargoPath)).toThrow(
+        `Cargo.toml file not found at: ${mockCargoPath}`,
+      );
 
+      // Verify fs.existsSync was called
       expect(fs.existsSync).toHaveBeenCalledWith(mockCargoPath);
+
+      // Verify log was called with the error message
       expect(logging.log).toHaveBeenCalledWith(
         expect.stringContaining('Cargo.toml file not found at:'),
         'error',
       );
-      expect(mockExit).toHaveBeenCalledWith(1);
     });
 
     it('should exit if package name not found', () => {
-      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+      // Remove process.exit mock
       vi.mocked(TOML.parse).mockReturnValue({ package: {} });
 
-      getCargoInfo(mockCargoPath);
+      // Expect error to be thrown
+      expect(() => getCargoInfo(mockCargoPath)).toThrow(
+        `Package name not found in: ${mockCargoPath}`,
+      );
 
       expect(logging.log).toHaveBeenCalledWith(
         expect.stringContaining('Package name not found in:'),
         'error',
       );
-      expect(mockExit).toHaveBeenCalledWith(1);
     });
 
     it('should handle errors when reading Cargo.toml', () => {
-      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+      // Remove process.exit mock
+      const mockError = new Error('Read error');
       vi.mocked(fs.readFileSync).mockImplementation(() => {
-        throw new Error('Read error');
+        throw mockError;
       });
 
-      getCargoInfo(mockCargoPath);
+      // Expect error to be thrown
+      expect(() => getCargoInfo(mockCargoPath)).toThrow();
 
       expect(logging.log).toHaveBeenCalledWith(
         expect.stringContaining('Error reading Cargo.toml:'),
         'error',
       );
-      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(logging.log).toHaveBeenCalledWith(mockError.message, 'error');
     });
   });
 

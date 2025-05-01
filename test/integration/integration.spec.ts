@@ -136,7 +136,7 @@ function initGitRepo(dir: string): void {
   execSync('git config user.email "test@example.com"', { cwd: dir });
 
   // Allow operations in nested git directories
-  execSync('git config --global --add safe.directory "*"', { cwd: dir });
+  execSync('git config --local --add safe.directory "*"', { cwd: dir });
 
   // Create .gitignore
   writeFileSync(join(dir, '.gitignore'), 'node_modules\n');

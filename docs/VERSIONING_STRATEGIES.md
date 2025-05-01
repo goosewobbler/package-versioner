@@ -134,6 +134,35 @@ This applies to all standard bump types:
 - `--bump minor`: 1.0.0-beta.1 -> 1.1.0 
 - `--bump patch`: 1.0.0-beta.1 -> 1.0.1
 
+## Package Type Support
+
+`package-versioner` supports both JavaScript/TypeScript projects using `package.json` and Rust projects using `Cargo.toml`:
+
+### JavaScript/TypeScript Projects
+
+For JavaScript/TypeScript projects, the tool looks for and updates the `version` field in `package.json` files according to the versioning strategies described above.
+
+### Rust Projects
+
+For Rust projects, the tool looks for and updates the `package.version` field in `Cargo.toml` files using the same versioning strategies.
+
+When no tags are found for a project, `package-versioner` will:
+1. Look for the `version` in `package.json` if it exists
+2. Look for the `package.version` in `Cargo.toml` if it exists
+3. Fall back to the configured `initialVersion` (default: "0.1.0")
+
+### Mixed Projects with Both Manifests
+
+When both `package.json` and `Cargo.toml` exist in the same directory, `package-versioner` will:
+
+1. Update both manifest files independently with the same calculated version
+2. First check `package.json` for the current version (when no tags exist)
+3. Fall back to checking `Cargo.toml` only if `package.json` doesn't exist or doesn't have a version
+
+This allows you to maintain consistent versioning across JavaScript and Rust components in the same package.
+
+This dual support makes `package-versioner` suitable for both JavaScript/TypeScript and Rust repositories, as well as monorepos or projects containing both types of packages.
+
 ## Tag Templates and Configuration
 
 `package-versioner` provides flexible configuration for how Git tags are formatted, allowing you to customize the tag structure for both single package repositories and monorepos.

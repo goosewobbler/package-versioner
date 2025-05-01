@@ -3,6 +3,7 @@ import { execAsync, execSync } from '../../../src/git/commandExecutor.js';
 import {
   getCommitsLength,
   getLatestTag,
+  getLatestTagForPackage,
   lastMergeBranchName,
 } from '../../../src/git/tagsAndBranches.js';
 import { log } from '../../../src/utils/logging.js';
@@ -124,6 +125,170 @@ describe('tagsAndBranches', () => {
       // Verify
       expect(result).toBe(null);
       expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('getLatestTagForPackage', () => {
+    it('should find tag in format packageName@versionPrefix+version', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([
+        'test-package@v1.0.0',
+        'test-package@v0.9.0',
+        'other-package@v1.2.0',
+      ]);
+
+      // Execute
+      const result = await getLatestTagForPackage('test-package', 'v');
+
+      // Verify
+      expect(result).toBe('test-package@v1.0.0');
+      expect(mockGetSemverTags.getSemverTags).toHaveBeenCalledWith({ tagPrefix: 'v' });
+      expect(log).toHaveBeenCalledWith(
+        'Looking for tags for package test-package with prefix v',
+        'debug',
+      );
+    });
+
+    it('should find tag in format versionPrefix+packageName@version', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([
+        'vtest-package@1.0.0',
+        'vother-package@1.2.0',
+      ]);
+
+      // Execute
+      const result = await getLatestTagForPackage('test-package', 'v');
+
+      // Verify
+      expect(result).toBe('vtest-package@1.0.0');
+
+      // Check for the actual log messages in the correct order
+      expect(log).toHaveBeenCalledWith(
+        'Looking for tags for package test-package with prefix v',
+        'debug',
+      );
+
+      expect(log).toHaveBeenCalledWith(
+        'Retrieved 2 tags: vtest-package@1.0.0, vother-package@1.2.0',
+        'debug',
+      );
+
+      expect(log).toHaveBeenCalledWith(
+        'Found 1 package tags using pattern: vpackageName@...',
+        'debug',
+      );
+
+      expect(log).toHaveBeenCalledWith('Using tag: vtest-package@1.0.0', 'debug');
+    });
+
+    it('should find tag in format packageName@version when no prefix is provided', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([
+        'test-package@1.0.0',
+        'test-package@0.9.0',
+        'other-package@1.2.0',
+      ]);
+
+      // Execute
+      const result = await getLatestTagForPackage('test-package');
+
+      // Verify
+      expect(result).toBe('test-package@1.0.0');
+      expect(mockGetSemverTags.getSemverTags).toHaveBeenCalledWith({ tagPrefix: undefined });
+      expect(log).toHaveBeenCalledWith(
+        'Looking for tags for package test-package with prefix none',
+        'debug',
+      );
+    });
+
+    it('should handle special characters in package name', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([
+        '@scope/test-package@v1.0.0',
+        '@scope/other-package@v1.2.0',
+      ]);
+
+      // Execute
+      const result = await getLatestTagForPackage('@scope/test-package', 'v');
+
+      // Verify
+      expect(result).toBe('@scope/test-package@v1.0.0');
+    });
+
+    it('should return empty string if no tags match packageName pattern', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([
+        'other-package@v1.0.0',
+        'another-package@v0.9.0',
+      ]);
+
+      // Execute
+      const result = await getLatestTagForPackage('test-package', 'v');
+
+      // Verify
+      expect(result).toBe('');
+      expect(log).toHaveBeenCalledWith('Found 0 package tags for test-package', 'debug');
+      expect(log).toHaveBeenCalledWith(
+        'No matching tags found for pattern: packageName@version',
+        'debug',
+      );
+      expect(log).toHaveBeenCalledWith(
+        'Available tags: other-package@v1.0.0, another-package@v0.9.0',
+        'debug',
+      );
+    });
+
+    it('should return empty string if no tags are found at all', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([]);
+
+      // Execute
+      const result = await getLatestTagForPackage('test-package', 'v');
+
+      // Verify
+      expect(result).toBe('');
+      expect(log).toHaveBeenCalledWith('Retrieved 0 tags: ', 'debug');
+      expect(log).toHaveBeenCalledWith('Found 0 package tags for test-package', 'debug');
+      expect(log).toHaveBeenCalledWith('No tags available in the repository', 'debug');
+    });
+
+    it('should log error and return empty string if getSemverTags fails', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags).mockRejectedValue(new Error('No names found'));
+
+      // Execute
+      const result = await getLatestTagForPackage('test-package', 'v');
+
+      // Verify
+      expect(result).toBe('');
+      expect(log).toHaveBeenCalledWith(
+        'Failed to get latest tag for package test-package: No names found',
+        'error',
+      );
+      expect(log).toHaveBeenCalledWith('No tags found for package test-package.', 'info');
+    });
+
+    it('should handle non-standard error without Error instance', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags).mockRejectedValue('String error');
+
+      // Execute
+      const result = await getLatestTagForPackage('test-package');
+
+      // Verify
+      expect(result).toBe('');
+      expect(log).toHaveBeenCalledWith(
+        'Failed to get latest tag for package test-package: String error',
+        'error',
+      );
     });
   });
 });

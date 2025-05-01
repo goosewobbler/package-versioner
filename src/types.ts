@@ -67,6 +67,42 @@ export type PkgJson = {
 };
 
 /**
+ * Cargo.toml structure
+ */
+export interface CargoToml {
+  package?: {
+    name: string;
+    version?: string;
+    authors?: string[];
+    edition?: string;
+    description?: string;
+    repository?: string;
+    license?: string;
+    readme?: string;
+    [key: string]: unknown;
+  };
+  dependencies?: Record<string, string | CargoDepSpec>;
+  dev_dependencies?: Record<string, string | CargoDepSpec>;
+  [key: string]: unknown;
+}
+
+/**
+ * Cargo dependency specification
+ */
+export interface CargoDepSpec {
+  version?: string;
+  path?: string;
+  git?: string;
+  branch?: string;
+  tag?: string;
+  rev?: string;
+  features?: string[];
+  optional?: boolean;
+  default_features?: boolean;
+  [key: string]: unknown;
+}
+
+/**
  * Git tag formatting options
  */
 export interface TagFormat {

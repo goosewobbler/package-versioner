@@ -76,7 +76,7 @@ export async function run(): Promise<void> {
     if (options.synced) config.synced = true; // Allow forcing sync mode
     if (options.bump) config.type = options.bump;
     if (options.prerelease)
-      config.prereleaseIdentifier = options.prerelease === true ? 'rc' : options.prerelease;
+      config.prereleaseIdentifier = options.prerelease === true ? 'next' : options.prerelease;
 
     // Parse targets
     const cliTargets: string[] = options.target

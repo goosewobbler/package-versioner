@@ -84,8 +84,9 @@ export function updateCargoVersion(cargoPath: string, version: string): void {
     }
 
     // Write back to the file, preserving format
-    // Strategy: Use TOML.stringify for the updated content, but try to preserve
-    // comments and whitespace from the original file
+    // Strategy: Use TOML.stringify for the updated content. Note that TOML.stringify
+    // does not preserve the original formatting or comments, so this is a best-effort
+    // approach to update the file while maintaining its structure.
     const updatedContent = TOML.stringify(cargo);
     fs.writeFileSync(cargoPath, updatedContent);
 

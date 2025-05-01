@@ -654,7 +654,9 @@ describe('Version Calculator', () => {
 
       // Set up mock to throw when called
       getPackageVersionFallback.mockImplementationOnce(() => {
-        throw new Error('Neither package.json nor Cargo.toml found');
+        throw new Error(
+          'Neither package.json nor Cargo.toml found. Checked paths: undefined/package.json, undefined/Cargo.toml',
+        );
       });
 
       expect(() => {
@@ -689,7 +691,9 @@ describe('Version Calculator', () => {
 
       // Set up mock to throw when called
       getPackageVersionFallback.mockImplementationOnce(() => {
-        throw new Error('Neither package.json nor Cargo.toml found');
+        throw new Error(
+          'Neither package.json nor Cargo.toml found. Checked paths: undefined/package.json, undefined/Cargo.toml',
+        );
       });
 
       expect(() => {

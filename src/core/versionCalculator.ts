@@ -223,6 +223,11 @@ export async function calculateVersion(config: Config, options: VersionOptions):
 
 /**
  * Helper function to get package version from package.json when no tags are found
+ *
+ * Note: When both package.json and Cargo.toml are present in the same directory,
+ * both manifests will be updated independently with their respective versions.
+ * The package.json is checked first for determining the version, and Cargo.toml
+ * is used as a fallback if package.json is not found or doesn't contain a version.
  */
 function getPackageVersionFallback(
   pkgPath: string | undefined,
@@ -296,6 +301,6 @@ function getPackageVersionFallback(
 
   // If neither package.json nor Cargo.toml exist, throw an error
   throw new Error(
-    `Neither package.json nor Cargo.toml found at ${packageDir}. Cannot determine version.`,
+    `Neither package.json nor Cargo.toml found at ${packageDir}. Checked paths: ${packageJsonPath}, ${cargoTomlPath}. Cannot determine version.`,
   );
 }

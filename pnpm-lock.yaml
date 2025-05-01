@@ -20,6 +20,9 @@ importers:
       conventional-changelog-angular:
         specifier: ^8.0.0
         version: 8.0.0
+      conventional-commits-filter:
+        specifier: ^5.0.0
+        version: 5.0.0
       conventional-recommended-bump:
         specifier: ^11.0.0
         version: 11.0.0

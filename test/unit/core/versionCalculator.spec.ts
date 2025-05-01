@@ -280,7 +280,7 @@ describe('Version Calculator', () => {
       const version = await calculateVersion(defaultConfig as Config, options);
 
       expect(semver.inc).toHaveBeenCalledWith('1.3.0', 'premajor', 'next');
-      expect(version).toBe('1.3.0-next.1');
+      expect(version).toBe('2.0.0-next.0');
     });
   });
 

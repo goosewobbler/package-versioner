@@ -224,7 +224,9 @@ export class PackageProcessor {
         continue; // No version change calculated for this package
       }
 
-      // Update both package.json and Cargo.toml if they exist
+      // Update both package.json and Cargo.toml if they exist.
+      // Note: There is no priority between package.json and Cargo.toml.
+      //       Both files are updated independently if they are present.
       const packageJsonPath = path.join(pkgPath, 'package.json');
       const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
 

@@ -241,66 +241,114 @@ function getPackageVersionFallback(
   const cargoTomlPath = path.join(packageDir, 'Cargo.toml');
 
   // Try package.json first
-  const packageJsonResult = getVersionFromPackageJson(packageJsonPath, initialVersion);
-  if (packageJsonResult.success) {
-    log(
-      `No tags found for ${name || 'package'}, using package.json version: ${packageJsonResult.version} as base`,
-      'info',
-    );
+  const packageVersion = tryGetPackageJsonVersion(
+    packageJsonPath,
+    name,
+    releaseType,
+    prereleaseIdentifier,
+    initialVersion,
+  );
 
-    // Handle prerelease versions with our helper
-    if (
-      STANDARD_BUMP_TYPES.includes(releaseType as 'major' | 'minor' | 'patch') &&
-      semver.prerelease(packageJsonResult.version)
-    ) {
-      // Special case for 1.0.0-next.0 to handle the test expectation
-      if (packageJsonResult.version === '1.0.0-next.0' && releaseType === 'major') {
-        log(
-          `Cleaning prerelease identifier from ${packageJsonResult.version} for ${releaseType} bump`,
-          'debug',
-        );
-        return '1.0.0';
-      }
-
-      log(
-        `Cleaning prerelease identifier from ${packageJsonResult.version} for ${releaseType} bump`,
-        'debug',
-      );
-      return bumpVersion(packageJsonResult.version, releaseType, prereleaseIdentifier);
-    }
-
-    // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
-    return (
-      semver.inc(packageJsonResult.version, releaseType, prereleaseIdentifier) || initialVersion
-    );
+  if (packageVersion) {
+    return packageVersion;
   }
 
   // Try Cargo.toml as fallback
-  const cargoTomlResult = getVersionFromCargoToml(cargoTomlPath, initialVersion);
-  if (cargoTomlResult.success) {
-    log(
-      `No tags found for ${name || 'package'}, using Cargo.toml version: ${cargoTomlResult.version} as base`,
-      'info',
-    );
+  const cargoVersion = tryGetCargoTomlVersion(
+    cargoTomlPath,
+    name,
+    releaseType,
+    prereleaseIdentifier,
+    initialVersion,
+  );
 
-    // Handle prerelease versions with our helper
-    if (
-      STANDARD_BUMP_TYPES.includes(releaseType as 'major' | 'minor' | 'patch') &&
-      semver.prerelease(cargoTomlResult.version)
-    ) {
-      log(
-        `Cleaning prerelease identifier from ${cargoTomlResult.version} for ${releaseType} bump`,
-        'debug',
-      );
-      return bumpVersion(cargoTomlResult.version, releaseType, prereleaseIdentifier);
-    }
-
-    // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
-    return semver.inc(cargoTomlResult.version, releaseType, prereleaseIdentifier) || initialVersion;
+  if (cargoVersion) {
+    return cargoVersion;
   }
 
   // If neither package.json nor Cargo.toml exist, throw an error
   throw new Error(
     `Neither package.json nor Cargo.toml found at ${packageDir}. Checked paths: ${packageJsonPath}, ${cargoTomlPath}. Cannot determine version.`,
   );
+}
+
+/**
+ * Helper function to try getting version from package.json
+ */
+function tryGetPackageJsonVersion(
+  packageJsonPath: string,
+  name: string | undefined,
+  releaseType: ReleaseType,
+  prereleaseIdentifier: string | undefined,
+  initialVersion: string,
+): string | null {
+  const packageJsonResult = getVersionFromPackageJson(packageJsonPath, initialVersion);
+  if (!packageJsonResult.success) {
+    return null;
+  }
+
+  log(
+    `No tags found for ${name || 'package'}, using package.json version: ${packageJsonResult.version} as base`,
+    'info',
+  );
+
+  // Handle prerelease versions with our helper
+  if (
+    STANDARD_BUMP_TYPES.includes(releaseType as 'major' | 'minor' | 'patch') &&
+    semver.prerelease(packageJsonResult.version)
+  ) {
+    // Special case for 1.0.0-next.0 to handle the test expectation
+    if (packageJsonResult.version === '1.0.0-next.0' && releaseType === 'major') {
+      log(
+        `Cleaning prerelease identifier from ${packageJsonResult.version} for ${releaseType} bump`,
+        'debug',
+      );
+      return '1.0.0';
+    }
+
+    log(
+      `Cleaning prerelease identifier from ${packageJsonResult.version} for ${releaseType} bump`,
+      'debug',
+    );
+    return bumpVersion(packageJsonResult.version, releaseType, prereleaseIdentifier);
+  }
+
+  // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
+  return semver.inc(packageJsonResult.version, releaseType, prereleaseIdentifier) || initialVersion;
+}
+
+/**
+ * Helper function to try getting version from Cargo.toml
+ */
+function tryGetCargoTomlVersion(
+  cargoTomlPath: string,
+  name: string | undefined,
+  releaseType: ReleaseType,
+  prereleaseIdentifier: string | undefined,
+  initialVersion: string,
+): string | null {
+  const cargoTomlResult = getVersionFromCargoToml(cargoTomlPath, initialVersion);
+  if (!cargoTomlResult.success) {
+    return null;
+  }
+
+  log(
+    `No tags found for ${name || 'package'}, using Cargo.toml version: ${cargoTomlResult.version} as base`,
+    'info',
+  );
+
+  // Handle prerelease versions with our helper
+  if (
+    STANDARD_BUMP_TYPES.includes(releaseType as 'major' | 'minor' | 'patch') &&
+    semver.prerelease(cargoTomlResult.version)
+  ) {
+    log(
+      `Cleaning prerelease identifier from ${cargoTomlResult.version} for ${releaseType} bump`,
+      'debug',
+    );
+    return bumpVersion(cargoTomlResult.version, releaseType, prereleaseIdentifier);
+  }
+
+  // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
+  return semver.inc(cargoTomlResult.version, releaseType, prereleaseIdentifier) || initialVersion;
 }

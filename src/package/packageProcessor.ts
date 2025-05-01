@@ -193,6 +193,8 @@ export class PackageProcessor {
       // Update both package.json and Cargo.toml if they exist.
       // Note: There is no priority between package.json and Cargo.toml.
       //       Both files are updated independently if they are present.
+      //       Each manifest will receive the same calculated version.
+      //       This ensures consistent versioning across language ecosystems.
       const packageJsonPath = path.join(pkgPath, 'package.json');
       const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
 

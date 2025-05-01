@@ -248,7 +248,7 @@ function getPackageVersionFallback(
       'info',
     );
 
-    return processVersionData(
+    return calculateNextVersion(
       manifestResult.version,
       manifestResult.manifestType || 'manifest',
       name,
@@ -263,9 +263,10 @@ function getPackageVersionFallback(
 }
 
 /**
- * Process version data with common logic for both package.json and Cargo.toml
+ * Calculate the next version based on the current version and bump type
+ * Handles special cases like prerelease versions and specific bump types
  */
-function processVersionData(
+function calculateNextVersion(
   version: string,
   manifestType: string,
   name: string | undefined,

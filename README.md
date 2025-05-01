@@ -12,12 +12,23 @@ A lightweight yet powerful CLI tool for automated semantic versioning based on G
 
 - Automatically determines version bumps based on commit history (using conventional commits)
 - Supports both single package projects and monorepos with minimal configuration
+- Support for both npm (package.json) and Rust (Cargo.toml) projects
 - Flexible versioning strategies (e.g., based on commit types, branch patterns)
 - Integrates with conventional commits presets
 - Customizable through a `version.config.json` file or CLI options
-- Automatically updates `package.json` version
+- Automatically updates `package.json` or `Cargo.toml` version
 - Creates appropriate Git tags for releases
 - CI/CD friendly with JSON output support
+
+## Supporting JavaScript and Rust Projects
+
+`package-versioner` provides version management for both JavaScript/TypeScript (via package.json) and Rust (via Cargo.toml) projects:
+
+- **JavaScript/TypeScript**: Automatically detects and updates version in package.json files
+- **Rust**: Detects and updates version in Cargo.toml files using the same versioning strategies
+- **Mixed Projects**: Supports repositories containing both package.json and Cargo.toml files
+
+When run, the tool will automatically discover and update the appropriate manifest file based on the project structure.
 
 ## Usage
 
@@ -95,6 +106,10 @@ Customize behavior by creating a `version.config.json` file in your project root
       "e2e"
     ],
     "packagePath": "packages"
+  },
+  "cargo": {
+    "enabled": true,
+    "paths": ["src/", "crates/"]
   }
 }
 ```
@@ -103,6 +118,9 @@ Customize behavior by creating a `version.config.json` file in your project root
 - Options like `synced`, `packages`, and `updateInternalDependencies` enable monorepo-specific behaviours.
 - The `tagTemplate` and `packageTagTemplate` allow you to customize how Git tags are formatted for releases.
 - The `commitMessage` template can include CI skip tokens like `[skip ci]` if you want to prevent CI runs after version commits (e.g., `"commitMessage": "chore(release): ${version} [skip ci]"`). See [CI/CD Integration](./docs/CI_CD_INTEGRATION.md) for more details.
+- The `cargo` options can help when working with Rust projects:
+  - `enabled` (default: `true`): Set to `false` to disable Cargo.toml version handling
+  - `paths` (optional): Specify directories to search for Cargo.toml files
 
 ## How Versioning Works
 

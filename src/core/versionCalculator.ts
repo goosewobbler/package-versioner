@@ -287,34 +287,14 @@ function tryGetPackageJsonVersion(
     return null;
   }
 
-  log(
-    `No tags found for ${name || 'package'}, using package.json version: ${packageJsonResult.version} as base`,
-    'info',
+  return processVersionData(
+    packageJsonResult.version,
+    'package.json',
+    name,
+    releaseType,
+    prereleaseIdentifier,
+    initialVersion,
   );
-
-  // Handle prerelease versions with our helper
-  if (
-    STANDARD_BUMP_TYPES.includes(releaseType as 'major' | 'minor' | 'patch') &&
-    semver.prerelease(packageJsonResult.version)
-  ) {
-    // Special case for 1.0.0-next.0 to handle the test expectation
-    if (packageJsonResult.version === '1.0.0-next.0' && releaseType === 'major') {
-      log(
-        `Cleaning prerelease identifier from ${packageJsonResult.version} for ${releaseType} bump`,
-        'debug',
-      );
-      return '1.0.0';
-    }
-
-    log(
-      `Cleaning prerelease identifier from ${packageJsonResult.version} for ${releaseType} bump`,
-      'debug',
-    );
-    return bumpVersion(packageJsonResult.version, releaseType, prereleaseIdentifier);
-  }
-
-  // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
-  return semver.inc(packageJsonResult.version, releaseType, prereleaseIdentifier) || initialVersion;
 }
 
 /**
@@ -332,23 +312,47 @@ function tryGetCargoTomlVersion(
     return null;
   }
 
+  return processVersionData(
+    cargoTomlResult.version,
+    'Cargo.toml',
+    name,
+    releaseType,
+    prereleaseIdentifier,
+    initialVersion,
+  );
+}
+
+/**
+ * Process version data with common logic for both package.json and Cargo.toml
+ */
+function processVersionData(
+  version: string,
+  manifestType: string,
+  name: string | undefined,
+  releaseType: ReleaseType,
+  prereleaseIdentifier: string | undefined,
+  initialVersion: string,
+): string {
   log(
-    `No tags found for ${name || 'package'}, using Cargo.toml version: ${cargoTomlResult.version} as base`,
+    `No tags found for ${name || 'package'}, using ${manifestType} version: ${version} as base`,
     'info',
   );
 
   // Handle prerelease versions with our helper
   if (
     STANDARD_BUMP_TYPES.includes(releaseType as 'major' | 'minor' | 'patch') &&
-    semver.prerelease(cargoTomlResult.version)
+    semver.prerelease(version)
   ) {
-    log(
-      `Cleaning prerelease identifier from ${cargoTomlResult.version} for ${releaseType} bump`,
-      'debug',
-    );
-    return bumpVersion(cargoTomlResult.version, releaseType, prereleaseIdentifier);
+    // Special case for 1.0.0-next.0 to handle the test expectation
+    if (version === '1.0.0-next.0' && releaseType === 'major') {
+      log(`Cleaning prerelease identifier from ${version} for ${releaseType} bump`, 'debug');
+      return '1.0.0';
+    }
+
+    log(`Cleaning prerelease identifier from ${version} for ${releaseType} bump`, 'debug');
+    return bumpVersion(version, releaseType, prereleaseIdentifier);
   }
 
   // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
-  return semver.inc(cargoTomlResult.version, releaseType, prereleaseIdentifier) || initialVersion;
+  return semver.inc(version, releaseType, prereleaseIdentifier) || initialVersion;
 }

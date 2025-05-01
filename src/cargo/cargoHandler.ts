@@ -24,7 +24,7 @@ export interface CargoInfo {
 export function getCargoInfo(cargoPath: string): CargoInfo {
   if (!fs.existsSync(cargoPath)) {
     log(`Cargo.toml file not found at: ${cargoPath}`, 'error');
-    process.exit(1);
+    throw new Error(`Cargo.toml file not found at: ${cargoPath}`);
   }
 
   try {

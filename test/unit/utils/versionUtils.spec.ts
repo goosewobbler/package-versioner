@@ -255,6 +255,17 @@ describe('Version Utils', () => {
           return '2.0.0-alpha.0';
         }
 
+        // New cases for --prerelease flag
+        if (version === '1.3.0' && releaseType === 'premajor' && identifier === 'next') {
+          return '2.0.0-next.0';
+        }
+        if (version === '1.3.0' && releaseType === 'preminor' && identifier === 'next') {
+          return '1.4.0-next.0';
+        }
+        if (version === '1.3.1' && releaseType === 'prepatch' && identifier === 'next') {
+          return '1.3.2-next.0';
+        }
+
         return `${version}.incremented`;
       });
     });
@@ -331,6 +342,42 @@ describe('Version Utils', () => {
       const result = bumpVersion('1.0.0', 'major', 'alpha');
       expect(semver.inc).toHaveBeenCalledWith('1.0.0', 'premajor', 'alpha');
       expect(result).toBe('2.0.0-alpha.0');
+    });
+
+    // New test cases for the specific cases mentioned in the query
+    describe('prerelease with standard bump types', () => {
+      it('should handle --bump major --prerelease correctly (1.3.0 -> 2.0.0-next.0)', () => {
+        // First normalize the boolean flag to 'next'
+        const prereleaseId = normalizePrereleaseIdentifier(true);
+        expect(prereleaseId).toBe('next');
+
+        // Then use the normalized identifier in bumpVersion
+        const result = bumpVersion('1.3.0', 'major', prereleaseId);
+        expect(semver.inc).toHaveBeenCalledWith('1.3.0', 'premajor', 'next');
+        expect(result).toBe('2.0.0-next.0');
+      });
+
+      it('should handle --bump minor --prerelease correctly (1.3.0 -> 1.4.0-next.0)', () => {
+        // First normalize the boolean flag to 'next'
+        const prereleaseId = normalizePrereleaseIdentifier(true);
+        expect(prereleaseId).toBe('next');
+
+        // Then use the normalized identifier in bumpVersion
+        const result = bumpVersion('1.3.0', 'minor', prereleaseId);
+        expect(semver.inc).toHaveBeenCalledWith('1.3.0', 'preminor', 'next');
+        expect(result).toBe('1.4.0-next.0');
+      });
+
+      it('should handle --bump patch --prerelease correctly (1.3.1 -> 1.3.2-next.0)', () => {
+        // First normalize the boolean flag to 'next'
+        const prereleaseId = normalizePrereleaseIdentifier(true);
+        expect(prereleaseId).toBe('next');
+
+        // Then use the normalized identifier in bumpVersion
+        const result = bumpVersion('1.3.1', 'patch', prereleaseId);
+        expect(semver.inc).toHaveBeenCalledWith('1.3.1', 'prepatch', 'next');
+        expect(result).toBe('1.3.2-next.0');
+      });
     });
   });
 });

@@ -87,17 +87,19 @@ export async function calculateVersion(config: Config, options: VersionOptions):
       // Handle prerelease versions with our helper
       if (
         STANDARD_BUMP_TYPES.includes(specifiedType as 'major' | 'minor' | 'patch') &&
-        semver.prerelease(currentVersion)
+        (semver.prerelease(currentVersion) || normalizedPrereleaseId)
       ) {
         log(
-          `Cleaning prerelease identifier from ${currentVersion} for ${specifiedType} bump`,
+          normalizedPrereleaseId
+            ? `Creating prerelease version with identifier '${normalizedPrereleaseId}' using ${specifiedType}`
+            : `Cleaning prerelease identifier from ${currentVersion} for ${specifiedType} bump`,
           'debug',
         );
         return bumpVersion(currentVersion, specifiedType, normalizedPrereleaseId);
       }
 
       // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
-      return semver.inc(currentVersion, specifiedType, normalizedPrereleaseId) || '';
+      return bumpVersion(currentVersion, specifiedType, normalizedPrereleaseId);
     }
 
     // 2. Handle branch pattern versioning (if configured)
@@ -146,7 +148,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
           semver.clean(cleanedTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
 
         log(`Applying ${branchVersionType} bump based on branch pattern`, 'debug');
-        return semver.inc(currentVersion, branchVersionType, undefined) || '';
+        return bumpVersion(currentVersion, branchVersionType, normalizedPrereleaseId);
       }
     }
 
@@ -195,7 +197,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
 
       const currentVersion =
         semver.clean(latestTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
-      return semver.inc(currentVersion, releaseTypeFromCommits, normalizedPrereleaseId) || '';
+      return bumpVersion(currentVersion, releaseTypeFromCommits, normalizedPrereleaseId);
     } catch (error) {
       // Handle errors during conventional bump calculation
       log(`Failed to calculate version for ${name || 'project'}`, 'error');
@@ -286,12 +288,18 @@ function calculateNextVersion(
   // Handle prerelease versions with our helper
   if (
     STANDARD_BUMP_TYPES.includes(releaseType as 'major' | 'minor' | 'patch') &&
-    semver.prerelease(version)
+    (semver.prerelease(version) || prereleaseIdentifier)
   ) {
-    log(`Cleaning prerelease identifier from ${version} for ${releaseType} bump`, 'debug');
+    log(
+      prereleaseIdentifier
+        ? `Creating prerelease version with identifier '${prereleaseIdentifier}' using ${releaseType}`
+        : `Cleaning prerelease identifier from ${version} for ${releaseType} bump`,
+      'debug',
+    );
     return bumpVersion(version, releaseType, prereleaseIdentifier);
   }
 
-  // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
-  return semver.inc(version, releaseType, prereleaseIdentifier) || initialVersion;
+  // For non-prerelease versions without prerelease identifier
+  const result = bumpVersion(version, releaseType, prereleaseIdentifier);
+  return result || initialVersion; // Fallback to initialVersion if result is empty
 }

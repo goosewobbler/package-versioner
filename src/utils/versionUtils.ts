@@ -78,11 +78,42 @@ export function getVersionFromCargoToml(
 }
 
 /**
+ * Normalizes the prerelease identifier based on input and config
+ *
+ * If prereleaseIdentifier is true:
+ * 1. First checks the config for a prereleaseIdentifier value
+ * 2. Falls back to 'next' as the default
+ *
+ * Otherwise returns the original identifier
+ *
+ * @param prereleaseIdentifier The raw prerelease identifier (can be true, string, or undefined)
+ * @param config Optional config that might contain a prereleaseIdentifier
+ * @returns The normalized identifier as a string or undefined
+ */
+export function normalizePrereleaseIdentifier(
+  prereleaseIdentifier?: string | boolean,
+  config?: { prereleaseIdentifier?: string },
+): string | undefined {
+  // If prereleaseIdentifier is true, use config value or 'next' as default
+  if (prereleaseIdentifier === true) {
+    return config?.prereleaseIdentifier || 'next';
+  }
+
+  // For string values, return as is
+  if (typeof prereleaseIdentifier === 'string') {
+    return prereleaseIdentifier;
+  }
+
+  // For false or undefined, return undefined
+  return undefined;
+}
+
+/**
  * Handles bumping of prerelease versions, applying special case handling
  *
  * @param version The current version being bumped
  * @param releaseType The release type being applied
- * @param identifier Optional prerelease identifier
+ * @param identifier Optional prerelease identifier (already normalized)
  * @returns The bumped version
  */
 export function bumpVersion(
@@ -90,30 +121,48 @@ export function bumpVersion(
   bumpType: ReleaseType,
   prereleaseIdentifier?: string,
 ): string {
-  // Handle prerelease versions
+  // Special case: When a prerelease identifier is provided with standard bump types on a stable version,
+  // we need to use a "pre*" type (premajor, preminor, prepatch) instead of a standard type with identifier
+  if (
+    prereleaseIdentifier &&
+    STANDARD_BUMP_TYPES.includes(bumpType as 'major' | 'minor' | 'patch') &&
+    !semver.prerelease(currentVersion)
+  ) {
+    const preBumpType = `pre${bumpType}` as ReleaseType;
+    log(
+      `Creating prerelease version with identifier '${prereleaseIdentifier}' using ${preBumpType}`,
+      'debug',
+    );
+    return semver.inc(currentVersion, preBumpType, prereleaseIdentifier) || '';
+  }
+
+  // Handle existing prerelease versions
   if (
     semver.prerelease(currentVersion) &&
     STANDARD_BUMP_TYPES.includes(bumpType as 'major' | 'minor' | 'patch')
   ) {
-    // Special case for major prerelease versions (1.0.0-next.x) bumping to stable 1.0.0
-    // This handles the edge case where:
-    // 1. We have a version that's already at 1.0.0-x (prerelease of first major)
-    // 2. A major bump is requested on this prerelease
-    // 3. Instead of going to 2.0.0, we want to simply "clean" to 1.0.0 (stable release)
-    // This is a common pattern when preparing for a major stable release
     const parsed = semver.parse(currentVersion);
+    if (!parsed) {
+      return semver.inc(currentVersion, bumpType) || '';
+    }
+
+    // Special case: When bumping a prerelease version using the bump type that matches its level,
+    // we "clean" to the stable version instead of incrementing to the next version
+    // Examples:
+    // - major bump on x.0.0-prerelease -> x.0.0 (not x+1.0.0)
+    // - minor bump on x.y.0-prerelease -> x.y.0 (not x.y+1.0)
+    // - patch bump on x.y.z-prerelease -> x.y.z (not x.y.z+1)
     if (
-      bumpType === 'major' &&
-      parsed?.major === 1 &&
-      parsed.minor === 0 &&
-      parsed.patch === 0 &&
-      semver.prerelease(currentVersion)
+      (bumpType === 'major' && parsed.minor === 0 && parsed.patch === 0) ||
+      (bumpType === 'minor' && parsed.patch === 0) ||
+      bumpType === 'patch'
     ) {
+      log(`Cleaning prerelease identifier from ${currentVersion} for ${bumpType} bump`, 'debug');
       return `${parsed.major}.${parsed.minor}.${parsed.patch}`;
     }
 
-    // For standard bump types with prerelease versions
-    log(`Cleaning prerelease identifier from ${currentVersion} for ${bumpType} bump`, 'debug');
+    // For other cases (e.g., minor bump on a patch prerelease), use standard semver increment
+    log(`Standard increment for ${currentVersion} with ${bumpType} bump`, 'debug');
     return semver.inc(currentVersion, bumpType) || '';
   }
 

@@ -20,6 +20,7 @@ import {
   bumpVersion,
   getVersionFromCargoToml,
   getVersionFromPackageJson,
+  normalizePrereleaseIdentifier,
 } from '../utils/versionUtils.js';
 
 /**
@@ -40,6 +41,9 @@ export async function calculateVersion(config: Config, options: VersionOptions):
   // Get default config values
   const preset = config.preset || 'conventional-commits';
   const initialVersion = '0.1.0'; // Default initial version if not provided elsewhere
+
+  // Normalize prerelease identifier here, once for all usage
+  const normalizedPrereleaseId = normalizePrereleaseIdentifier(prereleaseIdentifier, config);
 
   try {
     // Handle the special case of no tags yet - use package.json version
@@ -69,7 +73,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
           pkgPath,
           name,
           specifiedType,
-          prereleaseIdentifier,
+          normalizedPrereleaseId,
           initialVersion,
         );
       }
@@ -89,11 +93,11 @@ export async function calculateVersion(config: Config, options: VersionOptions):
           `Cleaning prerelease identifier from ${currentVersion} for ${specifiedType} bump`,
           'debug',
         );
-        return bumpVersion(currentVersion, specifiedType, prereleaseIdentifier);
+        return bumpVersion(currentVersion, specifiedType, normalizedPrereleaseId);
       }
 
       // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
-      return semver.inc(currentVersion, specifiedType, prereleaseIdentifier) || '';
+      return semver.inc(currentVersion, specifiedType, normalizedPrereleaseId) || '';
     }
 
     // 2. Handle branch pattern versioning (if configured)
@@ -131,7 +135,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
             pkgPath,
             name,
             branchVersionType,
-            prereleaseIdentifier,
+            normalizedPrereleaseId,
             initialVersion,
           );
         }
@@ -160,7 +164,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
             pkgPath,
             name,
             releaseTypeFromCommits,
-            prereleaseIdentifier,
+            normalizedPrereleaseId,
             initialVersion,
           );
         }
@@ -191,7 +195,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
 
       const currentVersion =
         semver.clean(latestTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
-      return semver.inc(currentVersion, releaseTypeFromCommits, prereleaseIdentifier) || '';
+      return semver.inc(currentVersion, releaseTypeFromCommits, normalizedPrereleaseId) || '';
     } catch (error) {
       // Handle errors during conventional bump calculation
       log(`Failed to calculate version for ${name || 'project'}`, 'error');
@@ -284,17 +288,6 @@ function calculateNextVersion(
     STANDARD_BUMP_TYPES.includes(releaseType as 'major' | 'minor' | 'patch') &&
     semver.prerelease(version)
   ) {
-    // Special case for '1.0.0-next.0' with a 'major' bump:
-    // This case is handled explicitly to meet a specific test expectation where
-    // the prerelease version '1.0.0-next.0' should be cleaned and reset to the
-    // stable version '1.0.0' when a major bump is applied. This ensures that
-    // the versioning logic aligns with the expected behavior for prerelease
-    // versions transitioning to stable releases.
-    if (version === '1.0.0-next.0' && releaseType === 'major') {
-      log(`Cleaning prerelease identifier from ${version} for ${releaseType} bump`, 'debug');
-      return '1.0.0';
-    }
-
     log(`Cleaning prerelease identifier from ${version} for ${releaseType} bump`, 'debug');
     return bumpVersion(version, releaseType, prereleaseIdentifier);
   }

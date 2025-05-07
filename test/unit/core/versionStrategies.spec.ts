@@ -22,7 +22,20 @@ vi.mock('../../../src/utils/logging.js');
 vi.mock('../../../src/core/versionCalculator.js');
 vi.mock('../../../src/package/packageManagement.js');
 vi.mock('../../../src/utils/jsonOutput.js');
-vi.mock('../../../src/utils/formatting.js');
+vi.mock('../../../src/utils/formatting.js', () => ({
+  formatVersionPrefix: vi.fn().mockReturnValue('v'),
+  formatTag: vi
+    .fn()
+    .mockImplementation((version, _prefix, packageName) =>
+      packageName ? `${packageName}@v${version}` : `v${version}`,
+    ),
+  formatCommitMessage: vi.fn().mockImplementation((template, version, packageName) => {
+    if (template === 'chore: release ${packageName}@${version} [skip-ci]') {
+      return `chore: release ${packageName || ''}@${version} [skip-ci]`;
+    }
+    return template.replace(/\$\{version\}/g, version);
+  }),
+}));
 vi.mock('../../../src/package/packageProcessor.js');
 vi.mock('node:fs');
 vi.mock('node:path');
@@ -191,6 +204,27 @@ describe('Version Strategies', () => {
       );
     });
 
+    it('should handle packageName being null in commit message template', async () => {
+      // Setup
+      const config: Partial<Config> = {
+        ...defaultConfig,
+        synced: true,
+        commitMessage: 'chore: release ${packageName}@${version} [skip-ci]',
+      };
+
+      const syncedStrategy = strategies.createSyncedStrategy(config as Config);
+
+      // Execute
+      await syncedStrategy(mockPackages);
+
+      // Verify that formatCommitMessage was called with the right template and only 2 parameters
+      // The synced strategy doesn't pass packageName to formatCommitMessage
+      expect(formatting.formatCommitMessage).toHaveBeenCalledWith(
+        'chore: release ${packageName}@${version} [skip-ci]',
+        '1.1.0',
+      );
+    });
+
     it('should exit early if no version change needed', async () => {
       // Mock calculateVersion to return empty string (no change)
       vi.mocked(calculator.calculateVersion).mockResolvedValue('');
@@ -273,6 +307,27 @@ describe('Version Strategies', () => {
         'chore(release): v1.1.0',
         undefined,
         undefined,
+      );
+    });
+
+    it('should use packageName in commit message template', async () => {
+      // Setup
+      const config: Partial<Config> = {
+        ...defaultConfig,
+        packages: ['package-a'],
+        commitMessage: 'chore: release ${packageName}@${version} [skip-ci]',
+      };
+
+      const singleStrategy = strategies.createSingleStrategy(config as Config);
+
+      // Execute
+      await singleStrategy(mockPackages);
+
+      // Verify that formatCommitMessage was called with the right parameters
+      expect(formatting.formatCommitMessage).toHaveBeenCalledWith(
+        'chore: release ${packageName}@${version} [skip-ci]',
+        '1.1.0',
+        'package-a',
       );
     });
 

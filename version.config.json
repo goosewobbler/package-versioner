@@ -3,5 +3,5 @@
   "versionPrefix": "v",
   "preset": "angular",
   "updateInternalDependencies": "patch",
-  "commitMessage": "chore(release): v${version} [skip-ci]"
+  "commitMessage": "chore: release ${packageName}@${version} [skip-ci]"
 }

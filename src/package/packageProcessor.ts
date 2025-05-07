@@ -253,7 +253,8 @@ export class PackageProcessor {
     let commitMessage = this.commitMessageTemplate || 'chore(release): publish packages';
 
     // Construct commit message: Use template if only one package, otherwise list names.
-    if (updatedPackagesInfo.length === 1 && commitMessage.includes('${')) {
+    const placeholderRegex = /\$\{[^}]+\}/; // Matches placeholders like ${variableName}
+    if (updatedPackagesInfo.length === 1 && placeholderRegex.test(commitMessage)) {
       // If template has any placeholders and only one package, format it with package name
       const packageName = updatedPackagesInfo[0].name;
       commitMessage = formatCommitMessage(commitMessage, representativeVersion, packageName);

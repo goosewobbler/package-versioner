@@ -68,13 +68,37 @@ describe('Formatting Utilities', () => {
     });
 
     it('should replace both version and scope placeholders', () => {
-      const result = formatCommitMessage('Release ${scope} version ${version}', '1.0.0', 'app');
+      const result = formatCommitMessage(
+        'Release ${scope} version ${version}',
+        '1.0.0',
+        null,
+        'app',
+      );
       expect(result).toBe('Release app version 1.0.0');
     });
 
     it('should handle undefined scope', () => {
       const result = formatCommitMessage('Release ${scope} version ${version}', '1.0.0');
       expect(result).toBe('Release ${scope} version 1.0.0');
+    });
+
+    it('should replace packageName placeholder in template', () => {
+      const result = formatCommitMessage(
+        'Release ${packageName}@${version}',
+        '1.0.0',
+        'my-package',
+      );
+      expect(result).toBe('Release my-package@1.0.0');
+    });
+
+    it('should replace all placeholders together', () => {
+      const result = formatCommitMessage(
+        'Release ${packageName}@${version} in ${scope} scope',
+        '1.0.0',
+        'my-package',
+        'app',
+      );
+      expect(result).toBe('Release my-package@1.0.0 in app scope');
     });
   });
 

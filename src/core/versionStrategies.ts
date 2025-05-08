@@ -218,7 +218,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
         tagTemplate,
         packageTagTemplate,
       );
-      const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion);
+      const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion, packageName);
 
       // Use the Git service functions
       await createGitCommitAndTag(

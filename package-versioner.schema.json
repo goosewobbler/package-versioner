@@ -84,7 +84,7 @@
       "type": "string",
       "minLength": 1,
       "default": "chore(release): v${version}",
-      "description": "Template for commit messages"
+      "description": "Template for commit messages. Available variables: ${version}, ${packageName}, ${scope}"
     },
     "prereleaseIdentifier": {
       "type": "string",

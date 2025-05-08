@@ -57,9 +57,24 @@ export function formatVersionPrefix(versionPrefix: string, scope?: string): stri
 
 /**
  * Format a commit message using a template
+ *
+ * @param template The commit message template
+ * @param version The version number to include in the message
+ * @param packageName Optional package name to include in the message
+ * @param scope Optional scope to include in the message
+ * @returns Formatted commit message string
  */
-export function formatCommitMessage(template: string, version: string, scope?: string): string {
-  return createTemplateString(template, { version, scope });
+export function formatCommitMessage(
+  template: string,
+  version: string,
+  packageName?: string | undefined,
+  scope?: string | undefined,
+): string {
+  return createTemplateString(template, {
+    version,
+    scope,
+    packageName: packageName || '',
+  });
 }
 
 /**

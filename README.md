@@ -18,6 +18,7 @@ A lightweight yet powerful CLI tool for automated semantic versioning based on G
 - Customizable through a `version.config.json` file or CLI options
 - Automatically updates `package.json` or `Cargo.toml` version
 - Creates appropriate Git tags for releases
+- Automatically generates and maintains Keep a Changelog compliant changelogs
 - CI/CD friendly with JSON output support
 
 ## Supporting JavaScript and Rust Projects
@@ -99,6 +100,7 @@ Customize behavior by creating a `version.config.json` file in your project root
   "tagTemplate": "${prefix}${version}",
   "packageTagTemplate": "${packageName}@${prefix}${version}",
   "commitMessage": "chore: release ${packageName}@${version} [skip ci]",
+  "updateChangelog": true,
   "monorepo": {
     "synced": true,
     "skip": [
@@ -118,6 +120,7 @@ Customize behavior by creating a `version.config.json` file in your project root
 - Options like `synced`, `packages`, and `updateInternalDependencies` enable monorepo-specific behaviours.
 - The `tagTemplate` and `packageTagTemplate` allow you to customize how Git tags are formatted for releases.
 - The `commitMessage` template can include CI skip tokens like `[skip ci]` if you want to prevent CI runs after version commits (e.g., `"commitMessage": "chore: release ${packageName}@${version} [skip ci]"`). See [CI/CD Integration](./docs/CI_CD_INTEGRATION.md) for more details.
+- The `updateChangelog` option controls whether to automatically generate and update changelogs for each package (default: true).
 - The `cargo` options can help when working with Rust projects:
   - `enabled` (default: `true`): Set to `false` to disable Cargo.toml version handling
   - `paths` (optional): Specify directories to search for Cargo.toml files
@@ -149,3 +152,30 @@ This project was originally forked from and inspired by [`jucian0/turbo-version`
 ## License
 
 MIT
+
+## Changelog Generation
+
+`package-versioner` automatically generates and maintains a [Keep a Changelog](https://keepachangelog.com/) compatible changelog for each package.
+
+### How It Works
+
+1. When a package is versioned, `package-versioner` scans the git history since the last release tag.
+2. It parses conventional commit messages and sorts them into appropriate changelog sections:
+   - `feat` prefixed commits become "Added" entries
+   - `fix` prefixed commits become "Fixed" entries
+   - `deprecate` prefixed commits become "Deprecated" entries
+   - And so on
+
+### Changelog Structure
+
+The generated changelogs follow the Keep a Changelog structure:
+
+- An "Unreleased" section for tracking upcoming changes
+- Version sections with release dates and sorted entries
+- Entries grouped by type (Added, Changed, Fixed, etc.)
+- Automatic linking between versions if repository info is available
+
+### Customization
+
+- Enable or disable changelog generation with `updateChangelog: false` in your config
+- Issue references in commit messages like `Fixes #123` are automatically linked in the changelog

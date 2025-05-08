@@ -98,7 +98,7 @@ Customize behavior by creating a `version.config.json` file in your project root
   "versionPrefix": "v",
   "tagTemplate": "${prefix}${version}",
   "packageTagTemplate": "${packageName}@${prefix}${version}",
-  "commitMessage": "chore(release): ${version}",
+  "commitMessage": "chore: release ${packageName}@${version} [skip ci]",
   "monorepo": {
     "synced": true,
     "skip": [
@@ -117,7 +117,7 @@ Customize behavior by creating a `version.config.json` file in your project root
 **Notes:** 
 - Options like `synced`, `packages`, and `updateInternalDependencies` enable monorepo-specific behaviours.
 - The `tagTemplate` and `packageTagTemplate` allow you to customize how Git tags are formatted for releases.
-- The `commitMessage` template can include CI skip tokens like `[skip ci]` if you want to prevent CI runs after version commits (e.g., `"commitMessage": "chore(release): ${version} [skip ci]"`). See [CI/CD Integration](./docs/CI_CD_INTEGRATION.md) for more details.
+- The `commitMessage` template can include CI skip tokens like `[skip ci]` if you want to prevent CI runs after version commits (e.g., `"commitMessage": "chore: release ${packageName}@${version} [skip ci]"`). See [CI/CD Integration](./docs/CI_CD_INTEGRATION.md) for more details.
 - The `cargo` options can help when working with Rust projects:
   - `enabled` (default: `true`): Set to `false` to disable Cargo.toml version handling
   - `paths` (optional): Specify directories to search for Cargo.toml files

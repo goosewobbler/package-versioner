@@ -2,7 +2,8 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 import { exit } from 'node:process';
 import type { Package } from '@manypkg/get-packages';
-import { getCargoInfo } from '../cargo/cargoHandler.js';
+import { type ChangelogEntry, updateChangelog } from '../changelog/changelogManager.js';
+import { extractChangelogEntriesFromCommits } from '../changelog/commitParser.js';
 import { calculateVersion } from '../core/versionCalculator.js';
 import { createGitTag, gitAdd, gitCommit } from '../git/commands.js';
 import { getLatestTagForPackage } from '../git/tagsAndBranches.js';
@@ -188,6 +189,76 @@ export class PackageProcessor {
 
       if (!nextVersion) {
         continue; // No version change calculated for this package
+      }
+
+      // Generate changelog entries from conventional commits
+      if (this.fullConfig.updateChangelog !== false) {
+        // Extract changelog entries from commit messages
+        let changelogEntries: ChangelogEntry[] = [];
+
+        try {
+          // Extract entries from commits between the latest tag and HEAD
+          changelogEntries = extractChangelogEntriesFromCommits(pkgPath, latestTag);
+
+          // If we have no entries but we're definitely changing versions,
+          // add a minimal entry about the version change
+          if (changelogEntries.length === 0) {
+            changelogEntries = [
+              {
+                type: 'changed',
+                description: `Update version to ${nextVersion}`,
+              },
+            ];
+          }
+        } catch (error) {
+          log(
+            `Error extracting changelog entries: ${error instanceof Error ? error.message : String(error)}`,
+            'warning',
+          );
+          // Fall back to minimal entry
+          changelogEntries = [
+            {
+              type: 'changed',
+              description: `Update version to ${nextVersion}`,
+            },
+          ];
+        }
+
+        // Determine repo URL from package.json or git config
+        let repoUrl: string | undefined;
+        try {
+          const packageJsonPath = path.join(pkgPath, 'package.json');
+          if (fs.existsSync(packageJsonPath)) {
+            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+            if (packageJson.repository) {
+              if (typeof packageJson.repository === 'string') {
+                repoUrl = packageJson.repository;
+              } else if (packageJson.repository.url) {
+                repoUrl = packageJson.repository.url;
+              }
+
+              // Clean up GitHub URL format if needed
+              if (repoUrl?.startsWith('git+') && repoUrl?.endsWith('.git')) {
+                repoUrl = repoUrl.substring(4, repoUrl.length - 4);
+              }
+            }
+          }
+        } catch (error) {
+          log(
+            `Could not determine repository URL for changelog links: ${error instanceof Error ? error.message : String(error)}`,
+            'warning',
+          );
+        }
+
+        // Update the changelog
+        updateChangelog(
+          pkgPath,
+          name,
+          nextVersion,
+          changelogEntries,
+          repoUrl,
+          this.fullConfig.changelogFormat,
+        );
       }
 
       // Update both package.json and Cargo.toml if they exist.

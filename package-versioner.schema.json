@@ -30,6 +30,12 @@
       "default": "angular",
       "description": "The commit message convention preset"
     },
+    "changelogFormat": {
+      "type": "string",
+      "enum": ["keep-a-changelog", "angular"],
+      "default": "keep-a-changelog",
+      "description": "The format to use for generating changelogs"
+    },
     "baseBranch": {
       "type": "string",
       "minLength": 1,

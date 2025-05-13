@@ -4,64 +4,17 @@ import { join } from 'node:path';
 import * as TOML from 'smol-toml';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { updatePackageVersion } from '../../src/package/packageManagement.js';
-
-// Map to store original fixture content
-const originalFixtures = new Map<string, string>();
-
-/**
- * Recursively find all config files (package.json and version.config.json) in the given directory
- */
-function findConfigFiles(directory: string): string[] {
-  const files: string[] = [];
-
-  if (!existsSync(directory)) {
-    return files;
-  }
-
-  const items = readdirSync(directory, { withFileTypes: true });
-
-  for (const item of items) {
-    const itemPath = join(directory, item.name);
-    if (item.isDirectory()) {
-      files.push(...findConfigFiles(itemPath));
-    } else if (item.name === 'package.json' || item.name === 'version.config.json') {
-      files.push(itemPath);
-    }
-  }
-
-  return files;
-}
-
-/**
- * Save the original state of all config files in fixtures directory
- */
-function saveFixtureState(fixturesDir: string): void {
-  const configFiles = findConfigFiles(fixturesDir);
-
-  for (const filePath of configFiles) {
-    try {
-      const content = readFileSync(filePath, 'utf8');
-      originalFixtures.set(filePath, content);
-    } catch (error) {
-      console.warn(`Could not save original state of ${filePath}:`, error);
-    }
-  }
-}
-
-/**
- * Restore all package.json files to their original state
- */
-function restoreFixtureState(): void {
-  for (const [filePath, content] of originalFixtures) {
-    try {
-      if (existsSync(filePath)) {
-        writeFileSync(filePath, content);
-      }
-    } catch (error) {
-      console.warn(`Could not restore original state of ${filePath}:`, error);
-    }
-  }
-}
+import { executeCliCommand } from '../utils/cli.js';
+import { findConfigFiles, restoreFixtureState, saveFixtureState } from '../utils/file.js';
+import { createConventionalCommit, initGitRepo } from '../utils/git.js';
+import {
+  createPackageJson,
+  createVersionConfig,
+  getPackageVersion,
+  mockVersionUpdates,
+  readChangelog,
+  updateCargoVersion,
+} from '../utils/package.js';
 
 // Mock the CLI run directly to avoid dependency issues
 vi.mock('../../src/core/versionCalculator.ts', async () => {
@@ -118,78 +71,6 @@ const MONOREPO_FIXTURE = join(FIXTURES_DIR, 'monorepo');
 const RUST_PACKAGE_FIXTURE = join(FIXTURES_DIR, 'rust-package');
 const HYBRID_PACKAGE_FIXTURE = join(FIXTURES_DIR, 'hybrid-package');
 const originalCwd = process.cwd();
-
-// Utility functions for tests
-function mockVersionUpdates(packagePath: string, newVersion: string): void {
-  // Read the package.json
-  const packageJsonPath = join(packagePath, 'package.json');
-  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-
-  // Update the version
-  packageJson.version = newVersion;
-
-  // Write the updated package.json
-  writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
-}
-
-function initGitRepo(dir: string): void {
-  execSync('git init', { cwd: dir });
-  execSync('git config user.name "Test User"', { cwd: dir });
-  execSync('git config user.email "test@example.com"', { cwd: dir });
-
-  // Allow operations in nested git directories
-  execSync('git config --local --add safe.directory "*"', { cwd: dir });
-
-  // Create .gitignore
-  writeFileSync(join(dir, '.gitignore'), 'node_modules\n');
-
-  // Initial commit
-  execSync('git add .', { cwd: dir });
-  execSync('git commit -m "Initial commit"', { cwd: dir });
-}
-
-function createPackageJson(dir: string, name: string, version = '0.1.0') {
-  const packageJson = {
-    name,
-    version,
-    private: true,
-  };
-
-  writeFileSync(join(dir, 'package.json'), JSON.stringify(packageJson, null, 2));
-}
-
-function createVersionConfig(dir: string, config: Record<string, unknown>) {
-  writeFileSync(join(dir, 'version.config.json'), JSON.stringify(config, null, 2));
-}
-
-function createConventionalCommit(
-  dir: string,
-  type: string,
-  message: string,
-  files: string[] = ['.'],
-): void {
-  // Create or modify some files if none specified
-  if (files.length === 1 && files[0] === '.') {
-    const changeFile = join(dir, 'change.txt');
-    writeFileSync(changeFile, `Change: ${Date.now()}`);
-    execSync(`git add ${changeFile}`, { cwd: dir });
-  } else {
-    for (const file of files) {
-      execSync(`git add ${file}`, { cwd: dir });
-    }
-  }
-
-  execSync(`git commit -m "${type}: ${message}"`, { cwd: dir });
-}
-
-function getPackageVersion(dir: string, pkgName?: string): string {
-  const packageJsonPath = pkgName
-    ? join(dir, 'packages', pkgName, 'package.json')
-    : join(dir, 'package.json');
-
-  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-  return packageJson.version;
-}
 
 /**
  * Helper to get version from Cargo.toml
@@ -388,7 +269,14 @@ describe('Integration Tests', () => {
       // Create a commit that changes package A
       const fileA = join(MONOREPO_FIXTURE, 'packages/package-a/index.js');
       writeFileSync(fileA, 'console.log("Hello from A");');
-      createConventionalCommit(MONOREPO_FIXTURE, 'feat', 'add feature to package A', [fileA]);
+      createConventionalCommit(
+        MONOREPO_FIXTURE,
+        'feat',
+        'add feature to package A',
+        undefined,
+        false,
+        [fileA],
+      );
 
       // Mock version updates for both packages
       mockVersionUpdates(join(MONOREPO_FIXTURE, 'packages/package-a'), '0.2.0');
@@ -417,7 +305,9 @@ describe('Integration Tests', () => {
       // Create a file change
       const fileA = join(MONOREPO_FIXTURE, 'packages/package-a/index.js');
       writeFileSync(fileA, 'console.log("Updated A");');
-      createConventionalCommit(MONOREPO_FIXTURE, 'fix', 'fix bug in package A', [fileA]);
+      createConventionalCommit(MONOREPO_FIXTURE, 'fix', 'fix bug in package A', undefined, false, [
+        fileA,
+      ]);
 
       // Mock only package A getting updated
       mockVersionUpdates(join(MONOREPO_FIXTURE, 'packages/package-a'), '0.1.1');
@@ -576,9 +466,14 @@ pretty_assertions = "1.3.0"
     writeFileSync(indexFile, 'fn main() {\n  println!("Updated feature!");\n}');
 
     try {
-      createConventionalCommit(RUST_PACKAGE_FIXTURE, 'feat', 'add new feature to Rust package', [
-        indexFile,
-      ]);
+      createConventionalCommit(
+        RUST_PACKAGE_FIXTURE,
+        'feat',
+        'add new feature to Rust package',
+        undefined,
+        false,
+        [indexFile],
+      );
     } catch (error) {
       console.error('Error creating conventional commit:', error);
     }
@@ -610,9 +505,14 @@ pretty_assertions = "1.3.0"
     writeFileSync(indexFile, 'fn main() {\n  println!("Updated feature!");\n}');
 
     try {
-      createConventionalCommit(RUST_PACKAGE_FIXTURE, 'feat', 'add new feature to Rust package', [
-        indexFile,
-      ]);
+      createConventionalCommit(
+        RUST_PACKAGE_FIXTURE,
+        'feat',
+        'add new feature to Rust package',
+        undefined,
+        false,
+        [indexFile],
+      );
     } catch (error) {
       console.error('Error creating conventional commit:', error);
     }

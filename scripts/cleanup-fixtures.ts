@@ -12,6 +12,22 @@ import { join } from 'node:path';
 // Define the fixtures directory
 const fixturesDir = join(process.cwd(), 'test/fixtures');
 
+// Check if running as post-test hook or directly
+const isPostTestHook = process.env.npm_lifecycle_event?.startsWith('posttest');
+if (!isPostTestHook) {
+  console.warn('⚠️  WARNING: Running cleanup script directly, not as a post-test hook.');
+  console.warn('   This will reset ALL changes to test fixtures, which may not be what you want.');
+  console.warn('   Press Ctrl+C to cancel or wait 3 seconds to continue...');
+  
+  // Wait 3 seconds to give user time to cancel
+  try {
+    execSync('sleep 3');
+  } catch (_) {
+    // If the command is interrupted, exit
+    process.exit(0);
+  }
+}
+
 if (!existsSync(fixturesDir)) {
   console.error('Fixtures directory not found at', fixturesDir);
   process.exit(1);

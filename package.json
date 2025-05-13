@@ -15,18 +15,9 @@
     "url": "https://github.com/goosewobbler/package-versioner",
     "homepage": "https://github.com/goosewobbler/package-versioner"
   },
-  "keywords": [
-    "version",
-    "semver",
-    "git",
-    "package"
-  ],
+  "keywords": ["version", "semver", "git", "package"],
   "license": "MIT",
-  "files": [
-    "dist/**",
-    "docs/**",
-    "package-versioner.schema.json"
-  ],
+  "files": ["dist/**", "docs/**", "package-versioner.schema.json"],
   "bin": {
     "package-versioner": "./dist/index.js"
   },
@@ -35,7 +26,6 @@
     "dev": "tsup src/index.ts --format esm,cjs --watch --dts",
     "clean": "rm -rf node_modules && rm -rf dist",
     "test": "pnpm run test:unit && pnpm run test:integration",
-    "posttest": "pnpm tsx scripts/cleanup-fixtures.ts",
     "test:watch": "vitest --coverage",
     "test:integration": "vitest --run --dir test/integration",
     "posttest:integration": "pnpm tsx scripts/cleanup-fixtures.ts",
@@ -48,10 +38,7 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{js,ts,jsx,tsx}": [
-      "biome check --write",
-      "biome format --write"
-    ]
+    "*.{js,ts,jsx,tsx}": ["biome check --write", "biome format --write"]
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

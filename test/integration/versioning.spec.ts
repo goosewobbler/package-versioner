@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { join } from 'node:path';
 import * as TOML from 'smol-toml';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { updatePackageVersion } from '../../src/package/packageManagement.js';
 
 // Map to store original fixture content
 const originalFixtures = new Map<string, string>();
@@ -115,6 +116,7 @@ const FIXTURES_DIR = join(process.cwd(), 'test/fixtures');
 const SINGLE_PACKAGE_FIXTURE = join(FIXTURES_DIR, 'single-package');
 const MONOREPO_FIXTURE = join(FIXTURES_DIR, 'monorepo');
 const RUST_PACKAGE_FIXTURE = join(FIXTURES_DIR, 'rust-package');
+const HYBRID_PACKAGE_FIXTURE = join(FIXTURES_DIR, 'hybrid-package');
 const originalCwd = process.cwd();
 
 // Utility functions for tests
@@ -187,6 +189,32 @@ function getPackageVersion(dir: string, pkgName?: string): string {
 
   const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
   return packageJson.version;
+}
+
+/**
+ * Helper to get version from Cargo.toml
+ */
+function getCargoVersion(dir: string): string {
+  const cargoPath = join(dir, 'Cargo.toml');
+  const content = readFileSync(cargoPath, 'utf8');
+  const cargo = TOML.parse(content) as { package: { version: string } };
+  return cargo.package.version;
+}
+
+/**
+ * Helper to update both package files with a version
+ */
+function updateBothManifests(dir: string, version: string): void {
+  const packageJsonPath = join(dir, 'package.json');
+  const cargoTomlPath = join(dir, 'Cargo.toml');
+
+  if (existsSync(packageJsonPath)) {
+    updatePackageVersion(packageJsonPath, version);
+  }
+
+  if (existsSync(cargoTomlPath)) {
+    updatePackageVersion(cargoTomlPath, version);
+  }
 }
 
 describe('Integration Tests', () => {
@@ -606,5 +634,39 @@ pretty_assertions = "1.3.0"
 
     // Check that version was updated to 0.2.0-beta.0 (from 0.1.0)
     expect(cargo.package.version).toBe('0.2.0-beta.0');
+  });
+});
+
+describe('Hybrid Package Tests', () => {
+  beforeEach(() => {
+    // No setup is needed as we're using the existing fixture directly
+  });
+
+  afterEach(() => {
+    // No special cleanup needed
+  });
+
+  it('should update both package.json and Cargo.toml with the same version', () => {
+    // Check initial versions
+    const initialPkgVersion = getPackageVersion(HYBRID_PACKAGE_FIXTURE);
+    const initialCargoVersion = getCargoVersion(HYBRID_PACKAGE_FIXTURE);
+
+    expect(initialPkgVersion).toBe('0.1.0');
+    expect(initialCargoVersion).toBe('0.1.0');
+
+    // Directly update both files with new version
+    const newVersion = '0.1.1';
+    updateBothManifests(HYBRID_PACKAGE_FIXTURE, newVersion);
+
+    // Check package.json version
+    const pkgVersion = getPackageVersion(HYBRID_PACKAGE_FIXTURE);
+    expect(pkgVersion).toBe('0.1.1');
+
+    // Check Cargo.toml version - this is where we expect to see the bug fixed
+    const cargoVersion = getCargoVersion(HYBRID_PACKAGE_FIXTURE);
+    expect(cargoVersion).toBe('0.1.1');
+
+    // Both versions should match
+    expect(pkgVersion).toBe(cargoVersion);
   });
 });

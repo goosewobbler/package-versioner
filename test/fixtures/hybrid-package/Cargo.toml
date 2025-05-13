@@ -1,6 +1,6 @@
 [package]
 name = "hybrid-package-test"
-version = "0.1.1"
+version = "0.1.0"
 description = "A test hybrid package with complex Cargo.toml structure"
 authors = [ "Test Author <test@example.com>" ]
 license = "MIT OR Apache-2.0"

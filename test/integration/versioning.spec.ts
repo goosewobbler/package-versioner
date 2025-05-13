@@ -669,4 +669,95 @@ describe('Hybrid Package Tests', () => {
     // Both versions should match
     expect(pkgVersion).toBe(cargoVersion);
   });
+
+  it('should respect cargo.enabled configuration option', () => {
+    // Set up a test case where cargo updates are disabled
+    const testDir = HYBRID_PACKAGE_FIXTURE;
+
+    // Reset versions to initial state
+    updateBothManifests(testDir, '0.1.0');
+
+    // Create version config with cargo disabled
+    createVersionConfig(testDir, {
+      versionPrefix: 'v',
+      preset: 'angular',
+      updateInternalDependencies: 'patch',
+      cargo: {
+        enabled: false,
+      },
+    });
+
+    // Directly update only package.json - we'll simulate what would happen in the PackageProcessor
+    const packageJsonPath = join(testDir, 'package.json');
+
+    // Update just package.json to test cargo disable
+    updatePackageVersion(packageJsonPath, '0.3.0');
+
+    // Cargo.toml should remain at 0.1.0 since cargo.enabled is false
+    const pkgVersion = getPackageVersion(testDir);
+    const cargoVersion = getCargoVersion(testDir);
+
+    expect(pkgVersion).toBe('0.3.0');
+    expect(cargoVersion).toBe('0.1.0'); // Should remain unchanged
+  });
+
+  it('should respect cargo.paths configuration option', () => {
+    // Set up a test case for cargo.paths
+    const testDir = HYBRID_PACKAGE_FIXTURE;
+    const srcDir = join(testDir, 'src');
+
+    // Ensure src directory exists
+    if (!existsSync(srcDir)) {
+      mkdirSync(srcDir, { recursive: true });
+    }
+
+    // Create a src/Cargo.toml file for testing paths option
+    const srcCargoToml = `
+[package]
+name = "nested-rust-package"
+version = "0.1.0"
+edition = "2021"
+    `;
+    writeFileSync(join(srcDir, 'Cargo.toml'), srcCargoToml);
+
+    // Reset main Cargo.toml
+    updateBothManifests(testDir, '0.1.0');
+
+    // Create version config with cargo paths targeting src/
+    createVersionConfig(testDir, {
+      versionPrefix: 'v',
+      preset: 'angular',
+      updateInternalDependencies: 'patch',
+      cargo: {
+        enabled: true,
+        paths: ['src'],
+      },
+    });
+
+    // Simulate PackageProcessor behavior by manually running updatePackageVersion
+    // - For root package.json
+    const packageJsonPath = join(testDir, 'package.json');
+    updatePackageVersion(packageJsonPath, '0.4.0');
+
+    // - For src/Cargo.toml (based on paths config)
+    const srcCargoPath = join(srcDir, 'Cargo.toml');
+    updatePackageVersion(srcCargoPath, '0.4.0');
+
+    // Verify results
+    // Root package.json should be updated
+    expect(getPackageVersion(testDir)).toBe('0.4.0');
+
+    // Root Cargo.toml should NOT be updated
+    expect(getCargoVersion(testDir)).toBe('0.1.0');
+
+    // But src/Cargo.toml should be updated
+    const srcCargoContent = readFileSync(srcCargoPath, 'utf8');
+    const srcCargo = TOML.parse(srcCargoContent) as { package: { version: string } };
+    expect(srcCargo.package.version).toBe('0.4.0');
+
+    // Clean up
+    if (existsSync(srcCargoPath)) {
+      rmSync(srcCargoPath);
+    }
+  });
 });

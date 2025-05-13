@@ -267,14 +267,34 @@ export class PackageProcessor {
       //       Each manifest will receive the same calculated version.
       //       This ensures consistent versioning across language ecosystems.
       const packageJsonPath = path.join(pkgPath, 'package.json');
-      const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
 
+      // Always update package.json if it exists
       if (fs.existsSync(packageJsonPath)) {
         updatePackageVersion(packageJsonPath, nextVersion);
       }
 
-      if (fs.existsSync(cargoTomlPath)) {
-        updatePackageVersion(cargoTomlPath, nextVersion);
+      // Check if Cargo.toml handling is enabled (default to true if not specified)
+      const cargoEnabled = this.fullConfig.cargo?.enabled !== false;
+
+      if (cargoEnabled) {
+        // Check for cargo paths configuration
+        const cargoPaths = this.fullConfig.cargo?.paths;
+
+        if (cargoPaths && cargoPaths.length > 0) {
+          // If paths are specified, only include those Cargo.toml files
+          for (const cargoPath of cargoPaths) {
+            const resolvedCargoPath = path.resolve(pkgPath, cargoPath, 'Cargo.toml');
+            if (fs.existsSync(resolvedCargoPath)) {
+              updatePackageVersion(resolvedCargoPath, nextVersion);
+            }
+          }
+        } else {
+          // Default behavior: check for Cargo.toml in the root package directory
+          const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
+          if (fs.existsSync(cargoTomlPath)) {
+            updatePackageVersion(cargoTomlPath, nextVersion);
+          }
+        }
       }
 
       // Create package-specific tag (using the updated formatTag function with package name)
@@ -321,14 +341,33 @@ export class PackageProcessor {
     const filesToCommit: string[] = [];
     for (const info of updatedPackagesInfo) {
       const packageJsonPath = path.join(info.path, 'package.json');
-      const cargoTomlPath = path.join(info.path, 'Cargo.toml');
 
       if (fs.existsSync(packageJsonPath)) {
         filesToCommit.push(packageJsonPath);
       }
 
-      if (fs.existsSync(cargoTomlPath)) {
-        filesToCommit.push(cargoTomlPath);
+      // Check if Cargo.toml handling is enabled (default to true if not specified)
+      const cargoEnabled = this.fullConfig.cargo?.enabled !== false;
+
+      if (cargoEnabled) {
+        // Check for cargo paths configuration
+        const cargoPaths = this.fullConfig.cargo?.paths;
+
+        if (cargoPaths && cargoPaths.length > 0) {
+          // If paths are specified, only include those Cargo.toml files
+          for (const cargoPath of cargoPaths) {
+            const resolvedCargoPath = path.resolve(info.path, cargoPath, 'Cargo.toml');
+            if (fs.existsSync(resolvedCargoPath)) {
+              filesToCommit.push(resolvedCargoPath);
+            }
+          }
+        } else {
+          // Default behavior: check for Cargo.toml in the root package directory
+          const cargoTomlPath = path.join(info.path, 'Cargo.toml');
+          if (fs.existsSync(cargoTomlPath)) {
+            filesToCommit.push(cargoTomlPath);
+          }
+        }
       }
     }
 

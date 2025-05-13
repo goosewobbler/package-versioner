@@ -47,6 +47,11 @@ export interface Config extends VersionConfigBase {
   latestTag?: string;
   updateChangelog?: boolean; // Whether to automatically generate and update changelogs
   changelogFormat?: 'keep-a-changelog' | 'angular'; // Format to use for changelogs
+  // Cargo configuration options
+  cargo?: {
+    enabled?: boolean; // Default: true - Set to false to disable Cargo.toml version handling
+    paths?: string[]; // Optional: Specify directories to search for Cargo.toml files
+  };
 }
 
 /**

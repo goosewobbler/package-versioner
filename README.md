@@ -132,12 +132,12 @@ Customize behavior by creating a `version.config.json` file in your project root
 1.  **Conventional Commits:** Analyzes commit messages (like `feat:`, `fix:`, `BREAKING CHANGE:`) since the last tag.
 2.  **Branch Pattern:** Determines the bump based on the current or recently merged branch name matching predefined patterns.
 
-For a detailed explanation of these concepts and monorepo modes (Synced vs. Async), see [Versioning Strategies and Concepts](./docs/VERSIONING_STRATEGIES.md).
+For a detailed explanation of these concepts and monorepo modes (Synced vs. Async), see [Versioning Strategies and Concepts](./docs/versioning.md).
 
 ## Documentation
 
-- [Versioning Strategies and Concepts](./docs/VERSIONING_STRATEGIES.md) - Detailed explanation of versioning approaches
-- [CI/CD Integration](./docs/CI_CD_INTEGRATION.md) - Guide for integrating with CI/CD pipelines
+- [Versioning Strategies and Concepts](./docs/versioning.md) - Detailed explanation of versioning approaches
+- [CI/CD Integration](./docs/ci_cd_integration.md) - Guide for integrating with CI/CD pipelines
 - [Changelog Generation](./docs/changelogs.md) - How changelogs are automatically generated and maintained
 
 For more details on available CLI options, run:

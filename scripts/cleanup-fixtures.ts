@@ -6,7 +6,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Define the fixtures directory
@@ -41,14 +41,17 @@ try {
 
   if (!changes.trim()) {
     console.log('No changes detected in fixtures directory, nothing to reset.');
-    process.exit(0);
+  } else {
+    // Discard all changes in the fixtures directory
+    execSync('git checkout -- test/fixtures', { stdio: 'inherit' });
+    
+    // Clean any untracked files in fixtures directory
+    execSync('git clean -fd test/fixtures', { stdio: 'inherit' });
   }
 
-  // Discard all changes in the fixtures directory
-  execSync('git checkout -- test/fixtures', { stdio: 'inherit' });
-
-  // Clean any untracked files in fixtures directory
-  execSync('git clean -fd test/fixtures', { stdio: 'inherit' });
+  // Remove .git directories from fixtures to prevent Git-related errors in tests
+  console.log('Removing .git directories from test fixtures...');
+  removeGitDirectories(fixturesDir);
 
   console.log('✅ Successfully reset test fixtures to original state.');
 } catch (error) {
@@ -57,4 +60,29 @@ try {
     error instanceof Error ? error.message : String(error),
   );
   process.exit(1);
+}
+
+/**
+ * Recursively remove .git directories from a directory
+ */
+function removeGitDirectories(dir: string): void {
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const entryPath = join(dir, entry.name);
+      
+      if (entry.isDirectory()) {
+        if (entry.name === '.git') {
+          console.log(`Removing ${entryPath}`);
+          rmSync(entryPath, { recursive: true, force: true });
+        } else {
+          // Recurse into other directories
+          removeGitDirectories(entryPath);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not process directory ${dir}:`, error);
+  }
 }

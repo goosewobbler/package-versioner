@@ -317,7 +317,21 @@ export class PackageProcessor {
       return { updatedPackages: [], tags };
     }
 
-    const filesToCommit = updatedPackagesInfo.map((info) => path.join(info.path, 'package.json'));
+    // Collect all files that need to be committed (both package.json and Cargo.toml)
+    const filesToCommit: string[] = [];
+    for (const info of updatedPackagesInfo) {
+      const packageJsonPath = path.join(info.path, 'package.json');
+      const cargoTomlPath = path.join(info.path, 'Cargo.toml');
+
+      if (fs.existsSync(packageJsonPath)) {
+        filesToCommit.push(packageJsonPath);
+      }
+
+      if (fs.existsSync(cargoTomlPath)) {
+        filesToCommit.push(cargoTomlPath);
+      }
+    }
+
     const packageNames = updatedPackagesInfo.map((p) => p.name).join(', ');
     // Use the version from the first updated package as representative
     const representativeVersion = updatedPackagesInfo[0]?.version || 'multiple';

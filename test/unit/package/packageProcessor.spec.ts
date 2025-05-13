@@ -626,6 +626,38 @@ describe('Package Processor', () => {
         expect.arrayContaining([expect.stringContaining('package-a')]),
       );
     });
+
+    it('should include both package.json and Cargo.toml in git commit for hybrid packages', async () => {
+      // Mock fs.existsSync to return true for both package.json and Cargo.toml
+      vi.spyOn(fs, 'existsSync').mockImplementation((_path) => {
+        return true; // Consider all files exist
+      });
+
+      const hybridPackage = {
+        ...mockPackages[0],
+        dir: '/path/to/hybrid-package',
+        packageJson: {
+          name: 'hybrid-package',
+          version: '0.1.0',
+        },
+      };
+
+      const processor = new PackageProcessor({
+        getLatestTag: gitTags.getLatestTag,
+        config: {},
+        fullConfig: mockConfig,
+      });
+
+      await processor.processPackages([hybridPackage]);
+
+      // Both package.json and Cargo.toml should be added to git
+      expect(gitCommands.gitAdd).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          '/path/to/hybrid-package/package.json',
+          '/path/to/hybrid-package/Cargo.toml',
+        ]),
+      );
+    });
   });
 
   describe('Cargo.toml handling', () => {

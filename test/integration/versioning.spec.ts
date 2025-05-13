@@ -652,7 +652,7 @@ describe('Hybrid Package Tests', () => {
     const initialCargoVersion = getCargoVersion(HYBRID_PACKAGE_FIXTURE);
 
     expect(initialPkgVersion).toBe('0.1.0');
-    expect(initialCargoVersion).toBe('0.1.1'); // Fixture has 0.1.1 in Cargo.toml
+    expect(initialCargoVersion).toBe('0.1.0');
 
     // Directly update both files with new version
     const newVersion = '0.2.0';

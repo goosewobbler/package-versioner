@@ -652,19 +652,19 @@ describe('Hybrid Package Tests', () => {
     const initialCargoVersion = getCargoVersion(HYBRID_PACKAGE_FIXTURE);
 
     expect(initialPkgVersion).toBe('0.1.0');
-    expect(initialCargoVersion).toBe('0.1.0');
+    expect(initialCargoVersion).toBe('0.1.1'); // Fixture has 0.1.1 in Cargo.toml
 
     // Directly update both files with new version
-    const newVersion = '0.1.1';
+    const newVersion = '0.2.0';
     updateBothManifests(HYBRID_PACKAGE_FIXTURE, newVersion);
 
     // Check package.json version
     const pkgVersion = getPackageVersion(HYBRID_PACKAGE_FIXTURE);
-    expect(pkgVersion).toBe('0.1.1');
+    expect(pkgVersion).toBe('0.2.0');
 
     // Check Cargo.toml version - this is where we expect to see the bug fixed
     const cargoVersion = getCargoVersion(HYBRID_PACKAGE_FIXTURE);
-    expect(cargoVersion).toBe('0.1.1');
+    expect(cargoVersion).toBe('0.2.0');
 
     // Both versions should match
     expect(pkgVersion).toBe(cargoVersion);

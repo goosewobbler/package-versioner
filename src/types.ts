@@ -45,6 +45,8 @@ export interface Config extends VersionConfigBase {
   skipHooks?: boolean;
   dryRun?: boolean;
   latestTag?: string;
+  updateChangelog?: boolean; // Whether to automatically generate and update changelogs
+  changelogFormat?: 'keep-a-changelog' | 'angular'; // Format to use for changelogs
 }
 
 /**

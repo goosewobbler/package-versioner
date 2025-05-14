@@ -2,7 +2,8 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 import { exit } from 'node:process';
 import type { Package } from '@manypkg/get-packages';
-import { getCargoInfo } from '../cargo/cargoHandler.js';
+import { type ChangelogEntry, updateChangelog } from '../changelog/changelogManager.js';
+import { extractChangelogEntriesFromCommits } from '../changelog/commitParser.js';
 import { calculateVersion } from '../core/versionCalculator.js';
 import { createGitTag, gitAdd, gitCommit } from '../git/commands.js';
 import { getLatestTagForPackage } from '../git/tagsAndBranches.js';
@@ -190,20 +191,110 @@ export class PackageProcessor {
         continue; // No version change calculated for this package
       }
 
+      // Generate changelog entries from conventional commits
+      if (this.fullConfig.updateChangelog !== false) {
+        // Extract changelog entries from commit messages
+        let changelogEntries: ChangelogEntry[] = [];
+
+        try {
+          // Extract entries from commits between the latest tag and HEAD
+          changelogEntries = extractChangelogEntriesFromCommits(pkgPath, latestTag);
+
+          // If we have no entries but we're definitely changing versions,
+          // add a minimal entry about the version change
+          if (changelogEntries.length === 0) {
+            changelogEntries = [
+              {
+                type: 'changed',
+                description: `Update version to ${nextVersion}`,
+              },
+            ];
+          }
+        } catch (error) {
+          log(
+            `Error extracting changelog entries: ${error instanceof Error ? error.message : String(error)}`,
+            'warning',
+          );
+          // Fall back to minimal entry
+          changelogEntries = [
+            {
+              type: 'changed',
+              description: `Update version to ${nextVersion}`,
+            },
+          ];
+        }
+
+        // Determine repo URL from package.json or git config
+        let repoUrl: string | undefined;
+        try {
+          const packageJsonPath = path.join(pkgPath, 'package.json');
+          if (fs.existsSync(packageJsonPath)) {
+            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+            if (packageJson.repository) {
+              if (typeof packageJson.repository === 'string') {
+                repoUrl = packageJson.repository;
+              } else if (packageJson.repository.url) {
+                repoUrl = packageJson.repository.url;
+              }
+
+              // Clean up GitHub URL format if needed
+              if (repoUrl?.startsWith('git+') && repoUrl?.endsWith('.git')) {
+                repoUrl = repoUrl.substring(4, repoUrl.length - 4);
+              }
+            }
+          }
+        } catch (error) {
+          log(
+            `Could not determine repository URL for changelog links: ${error instanceof Error ? error.message : String(error)}`,
+            'warning',
+          );
+        }
+
+        // Update the changelog
+        updateChangelog(
+          pkgPath,
+          name,
+          nextVersion,
+          changelogEntries,
+          repoUrl,
+          this.fullConfig.changelogFormat,
+        );
+      }
+
       // Update both package.json and Cargo.toml if they exist.
       // Note: There is no priority between package.json and Cargo.toml.
       //       Both files are updated independently if they are present.
       //       Each manifest will receive the same calculated version.
       //       This ensures consistent versioning across language ecosystems.
       const packageJsonPath = path.join(pkgPath, 'package.json');
-      const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
 
+      // Always update package.json if it exists
       if (fs.existsSync(packageJsonPath)) {
         updatePackageVersion(packageJsonPath, nextVersion);
       }
 
-      if (fs.existsSync(cargoTomlPath)) {
-        updatePackageVersion(cargoTomlPath, nextVersion);
+      // Check if Cargo.toml handling is enabled (default to true if not specified)
+      const cargoEnabled = this.fullConfig.cargo?.enabled !== false;
+
+      if (cargoEnabled) {
+        // Check for cargo paths configuration
+        const cargoPaths = this.fullConfig.cargo?.paths;
+
+        if (cargoPaths && cargoPaths.length > 0) {
+          // If paths are specified, only include those Cargo.toml files
+          for (const cargoPath of cargoPaths) {
+            const resolvedCargoPath = path.resolve(pkgPath, cargoPath, 'Cargo.toml');
+            if (fs.existsSync(resolvedCargoPath)) {
+              updatePackageVersion(resolvedCargoPath, nextVersion);
+            }
+          }
+        } else {
+          // Default behavior: check for Cargo.toml in the root package directory
+          const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
+          if (fs.existsSync(cargoTomlPath)) {
+            updatePackageVersion(cargoTomlPath, nextVersion);
+          }
+        }
       }
 
       // Create package-specific tag (using the updated formatTag function with package name)
@@ -246,7 +337,40 @@ export class PackageProcessor {
       return { updatedPackages: [], tags };
     }
 
-    const filesToCommit = updatedPackagesInfo.map((info) => path.join(info.path, 'package.json'));
+    // Collect all files that need to be committed (both package.json and Cargo.toml)
+    const filesToCommit: string[] = [];
+    for (const info of updatedPackagesInfo) {
+      const packageJsonPath = path.join(info.path, 'package.json');
+
+      if (fs.existsSync(packageJsonPath)) {
+        filesToCommit.push(packageJsonPath);
+      }
+
+      // Check if Cargo.toml handling is enabled (default to true if not specified)
+      const cargoEnabled = this.fullConfig.cargo?.enabled !== false;
+
+      if (cargoEnabled) {
+        // Check for cargo paths configuration
+        const cargoPaths = this.fullConfig.cargo?.paths;
+
+        if (cargoPaths && cargoPaths.length > 0) {
+          // If paths are specified, only include those Cargo.toml files
+          for (const cargoPath of cargoPaths) {
+            const resolvedCargoPath = path.resolve(info.path, cargoPath, 'Cargo.toml');
+            if (fs.existsSync(resolvedCargoPath)) {
+              filesToCommit.push(resolvedCargoPath);
+            }
+          }
+        } else {
+          // Default behavior: check for Cargo.toml in the root package directory
+          const cargoTomlPath = path.join(info.path, 'Cargo.toml');
+          if (fs.existsSync(cargoTomlPath)) {
+            filesToCommit.push(cargoTomlPath);
+          }
+        }
+      }
+    }
+
     const packageNames = updatedPackagesInfo.map((p) => p.name).join(', ');
     // Use the version from the first updated package as representative
     const representativeVersion = updatedPackagesInfo[0]?.version || 'multiple';

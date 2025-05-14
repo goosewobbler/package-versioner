@@ -11,3 +11,4 @@ dist
 test/fixtures/*/change.txt
 test/fixtures/*/*/index.js
 test/fixtures/monorepo/packages/*/index.js
+.aider*

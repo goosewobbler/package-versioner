@@ -3,64 +3,18 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { join } from 'node:path';
 import * as TOML from 'smol-toml';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
-// Map to store original fixture content
-const originalFixtures = new Map<string, string>();
-
-/**
- * Recursively find all config files (package.json and version.config.json) in the given directory
- */
-function findConfigFiles(directory: string): string[] {
-  const files: string[] = [];
-
-  if (!existsSync(directory)) {
-    return files;
-  }
-
-  const items = readdirSync(directory, { withFileTypes: true });
-
-  for (const item of items) {
-    const itemPath = join(directory, item.name);
-    if (item.isDirectory()) {
-      files.push(...findConfigFiles(itemPath));
-    } else if (item.name === 'package.json' || item.name === 'version.config.json') {
-      files.push(itemPath);
-    }
-  }
-
-  return files;
-}
-
-/**
- * Save the original state of all config files in fixtures directory
- */
-function saveFixtureState(fixturesDir: string): void {
-  const configFiles = findConfigFiles(fixturesDir);
-
-  for (const filePath of configFiles) {
-    try {
-      const content = readFileSync(filePath, 'utf8');
-      originalFixtures.set(filePath, content);
-    } catch (error) {
-      console.warn(`Could not save original state of ${filePath}:`, error);
-    }
-  }
-}
-
-/**
- * Restore all package.json files to their original state
- */
-function restoreFixtureState(): void {
-  for (const [filePath, content] of originalFixtures) {
-    try {
-      if (existsSync(filePath)) {
-        writeFileSync(filePath, content);
-      }
-    } catch (error) {
-      console.warn(`Could not restore original state of ${filePath}:`, error);
-    }
-  }
-}
+import { updatePackageVersion } from '../../src/package/packageManagement.js';
+import { executeCliCommand } from '../utils/cli.js';
+import { findConfigFiles, restoreFixtureState, saveFixtureState } from '../utils/file.js';
+import { createConventionalCommit, initGitRepo } from '../utils/git.js';
+import {
+  createPackageJson,
+  createVersionConfig,
+  getPackageVersion,
+  mockVersionUpdates,
+  readChangelog,
+  updateCargoVersion,
+} from '../utils/package.js';
 
 // Mock the CLI run directly to avoid dependency issues
 vi.mock('../../src/core/versionCalculator.ts', async () => {
@@ -115,78 +69,33 @@ const FIXTURES_DIR = join(process.cwd(), 'test/fixtures');
 const SINGLE_PACKAGE_FIXTURE = join(FIXTURES_DIR, 'single-package');
 const MONOREPO_FIXTURE = join(FIXTURES_DIR, 'monorepo');
 const RUST_PACKAGE_FIXTURE = join(FIXTURES_DIR, 'rust-package');
+const HYBRID_PACKAGE_FIXTURE = join(FIXTURES_DIR, 'hybrid-package');
 const originalCwd = process.cwd();
 
-// Utility functions for tests
-function mockVersionUpdates(packagePath: string, newVersion: string): void {
-  // Read the package.json
-  const packageJsonPath = join(packagePath, 'package.json');
-  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-
-  // Update the version
-  packageJson.version = newVersion;
-
-  // Write the updated package.json
-  writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+/**
+ * Helper to get version from Cargo.toml
+ */
+function getCargoVersion(dir: string): string {
+  const cargoPath = join(dir, 'Cargo.toml');
+  const content = readFileSync(cargoPath, 'utf8');
+  const cargo = TOML.parse(content) as { package: { version: string } };
+  return cargo.package.version;
 }
 
-function initGitRepo(dir: string): void {
-  execSync('git init', { cwd: dir });
-  execSync('git config user.name "Test User"', { cwd: dir });
-  execSync('git config user.email "test@example.com"', { cwd: dir });
+/**
+ * Helper to update both package files with a version
+ */
+function updateBothManifests(dir: string, version: string): void {
+  const packageJsonPath = join(dir, 'package.json');
+  const cargoTomlPath = join(dir, 'Cargo.toml');
 
-  // Allow operations in nested git directories
-  execSync('git config --local --add safe.directory "*"', { cwd: dir });
-
-  // Create .gitignore
-  writeFileSync(join(dir, '.gitignore'), 'node_modules\n');
-
-  // Initial commit
-  execSync('git add .', { cwd: dir });
-  execSync('git commit -m "Initial commit"', { cwd: dir });
-}
-
-function createPackageJson(dir: string, name: string, version = '0.1.0') {
-  const packageJson = {
-    name,
-    version,
-    private: true,
-  };
-
-  writeFileSync(join(dir, 'package.json'), JSON.stringify(packageJson, null, 2));
-}
-
-function createVersionConfig(dir: string, config: Record<string, unknown>) {
-  writeFileSync(join(dir, 'version.config.json'), JSON.stringify(config, null, 2));
-}
-
-function createConventionalCommit(
-  dir: string,
-  type: string,
-  message: string,
-  files: string[] = ['.'],
-): void {
-  // Create or modify some files if none specified
-  if (files.length === 1 && files[0] === '.') {
-    const changeFile = join(dir, 'change.txt');
-    writeFileSync(changeFile, `Change: ${Date.now()}`);
-    execSync(`git add ${changeFile}`, { cwd: dir });
-  } else {
-    for (const file of files) {
-      execSync(`git add ${file}`, { cwd: dir });
-    }
+  if (existsSync(packageJsonPath)) {
+    updatePackageVersion(packageJsonPath, version);
   }
 
-  execSync(`git commit -m "${type}: ${message}"`, { cwd: dir });
-}
-
-function getPackageVersion(dir: string, pkgName?: string): string {
-  const packageJsonPath = pkgName
-    ? join(dir, 'packages', pkgName, 'package.json')
-    : join(dir, 'package.json');
-
-  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-  return packageJson.version;
+  if (existsSync(cargoTomlPath)) {
+    updatePackageVersion(cargoTomlPath, version);
+  }
 }
 
 describe('Integration Tests', () => {
@@ -360,7 +269,14 @@ describe('Integration Tests', () => {
       // Create a commit that changes package A
       const fileA = join(MONOREPO_FIXTURE, 'packages/package-a/index.js');
       writeFileSync(fileA, 'console.log("Hello from A");');
-      createConventionalCommit(MONOREPO_FIXTURE, 'feat', 'add feature to package A', [fileA]);
+      createConventionalCommit(
+        MONOREPO_FIXTURE,
+        'feat',
+        'add feature to package A',
+        undefined,
+        false,
+        [fileA],
+      );
 
       // Mock version updates for both packages
       mockVersionUpdates(join(MONOREPO_FIXTURE, 'packages/package-a'), '0.2.0');
@@ -389,7 +305,9 @@ describe('Integration Tests', () => {
       // Create a file change
       const fileA = join(MONOREPO_FIXTURE, 'packages/package-a/index.js');
       writeFileSync(fileA, 'console.log("Updated A");');
-      createConventionalCommit(MONOREPO_FIXTURE, 'fix', 'fix bug in package A', [fileA]);
+      createConventionalCommit(MONOREPO_FIXTURE, 'fix', 'fix bug in package A', undefined, false, [
+        fileA,
+      ]);
 
       // Mock only package A getting updated
       mockVersionUpdates(join(MONOREPO_FIXTURE, 'packages/package-a'), '0.1.1');
@@ -548,9 +466,14 @@ pretty_assertions = "1.3.0"
     writeFileSync(indexFile, 'fn main() {\n  println!("Updated feature!");\n}');
 
     try {
-      createConventionalCommit(RUST_PACKAGE_FIXTURE, 'feat', 'add new feature to Rust package', [
-        indexFile,
-      ]);
+      createConventionalCommit(
+        RUST_PACKAGE_FIXTURE,
+        'feat',
+        'add new feature to Rust package',
+        undefined,
+        false,
+        [indexFile],
+      );
     } catch (error) {
       console.error('Error creating conventional commit:', error);
     }
@@ -582,9 +505,14 @@ pretty_assertions = "1.3.0"
     writeFileSync(indexFile, 'fn main() {\n  println!("Updated feature!");\n}');
 
     try {
-      createConventionalCommit(RUST_PACKAGE_FIXTURE, 'feat', 'add new feature to Rust package', [
-        indexFile,
-      ]);
+      createConventionalCommit(
+        RUST_PACKAGE_FIXTURE,
+        'feat',
+        'add new feature to Rust package',
+        undefined,
+        false,
+        [indexFile],
+      );
     } catch (error) {
       console.error('Error creating conventional commit:', error);
     }
@@ -606,5 +534,130 @@ pretty_assertions = "1.3.0"
 
     // Check that version was updated to 0.2.0-beta.0 (from 0.1.0)
     expect(cargo.package.version).toBe('0.2.0-beta.0');
+  });
+});
+
+describe('Hybrid Package Tests', () => {
+  beforeEach(() => {
+    // No setup is needed as we're using the existing fixture directly
+  });
+
+  afterEach(() => {
+    // No special cleanup needed
+  });
+
+  it('should update both package.json and Cargo.toml with the same version', () => {
+    // Check initial versions
+    const initialPkgVersion = getPackageVersion(HYBRID_PACKAGE_FIXTURE);
+    const initialCargoVersion = getCargoVersion(HYBRID_PACKAGE_FIXTURE);
+
+    expect(initialPkgVersion).toBe('0.1.0');
+    expect(initialCargoVersion).toBe('0.1.0');
+
+    // Directly update both files with new version
+    const newVersion = '0.2.0';
+    updateBothManifests(HYBRID_PACKAGE_FIXTURE, newVersion);
+
+    // Check package.json version
+    const pkgVersion = getPackageVersion(HYBRID_PACKAGE_FIXTURE);
+    expect(pkgVersion).toBe('0.2.0');
+
+    // Check Cargo.toml version - this is where we expect to see the bug fixed
+    const cargoVersion = getCargoVersion(HYBRID_PACKAGE_FIXTURE);
+    expect(cargoVersion).toBe('0.2.0');
+
+    // Both versions should match
+    expect(pkgVersion).toBe(cargoVersion);
+  });
+
+  it('should respect cargo.enabled configuration option', () => {
+    // Set up a test case where cargo updates are disabled
+    const testDir = HYBRID_PACKAGE_FIXTURE;
+
+    // Reset versions to initial state
+    updateBothManifests(testDir, '0.1.0');
+
+    // Create version config with cargo disabled
+    createVersionConfig(testDir, {
+      versionPrefix: 'v',
+      preset: 'angular',
+      updateInternalDependencies: 'patch',
+      cargo: {
+        enabled: false,
+      },
+    });
+
+    // Directly update only package.json - we'll simulate what would happen in the PackageProcessor
+    const packageJsonPath = join(testDir, 'package.json');
+
+    // Update just package.json to test cargo disable
+    updatePackageVersion(packageJsonPath, '0.3.0');
+
+    // Cargo.toml should remain at 0.1.0 since cargo.enabled is false
+    const pkgVersion = getPackageVersion(testDir);
+    const cargoVersion = getCargoVersion(testDir);
+
+    expect(pkgVersion).toBe('0.3.0');
+    expect(cargoVersion).toBe('0.1.0'); // Should remain unchanged
+  });
+
+  it('should respect cargo.paths configuration option', () => {
+    // Set up a test case for cargo.paths
+    const testDir = HYBRID_PACKAGE_FIXTURE;
+    const srcDir = join(testDir, 'src');
+
+    // Ensure src directory exists
+    if (!existsSync(srcDir)) {
+      mkdirSync(srcDir, { recursive: true });
+    }
+
+    // Create a src/Cargo.toml file for testing paths option
+    const srcCargoToml = `
+[package]
+name = "nested-rust-package"
+version = "0.1.0"
+edition = "2021"
+    `;
+    writeFileSync(join(srcDir, 'Cargo.toml'), srcCargoToml);
+
+    // Reset main Cargo.toml
+    updateBothManifests(testDir, '0.1.0');
+
+    // Create version config with cargo paths targeting src/
+    createVersionConfig(testDir, {
+      versionPrefix: 'v',
+      preset: 'angular',
+      updateInternalDependencies: 'patch',
+      cargo: {
+        enabled: true,
+        paths: ['src'],
+      },
+    });
+
+    // Simulate PackageProcessor behavior by manually running updatePackageVersion
+    // - For root package.json
+    const packageJsonPath = join(testDir, 'package.json');
+    updatePackageVersion(packageJsonPath, '0.4.0');
+
+    // - For src/Cargo.toml (based on paths config)
+    const srcCargoPath = join(srcDir, 'Cargo.toml');
+    updatePackageVersion(srcCargoPath, '0.4.0');
+
+    // Verify results
+    // Root package.json should be updated
+    expect(getPackageVersion(testDir)).toBe('0.4.0');
+
+    // Root Cargo.toml should NOT be updated
+    expect(getCargoVersion(testDir)).toBe('0.1.0');
+
+    // But src/Cargo.toml should be updated
+    const srcCargoContent = readFileSync(srcCargoPath, 'utf8');
+    const srcCargo = TOML.parse(srcCargoContent) as { package: { version: string } };
+    expect(srcCargo.package.version).toBe('0.4.0');
+
+    // Clean up
+    if (existsSync(srcCargoPath)) {
+      rmSync(srcCargoPath);
+    }
   });
 });

@@ -18,6 +18,8 @@ A lightweight yet powerful CLI tool for automated semantic versioning based on G
 - Customizable through a `version.config.json` file or CLI options
 - Automatically updates `package.json` or `Cargo.toml` version
 - Creates appropriate Git tags for releases
+- Automatically generates and maintains changelogs in Keep a Changelog or Angular format
+- Integrates commit messages, breaking changes, and issue references into well-structured changelogs
 - CI/CD friendly with JSON output support
 
 ## Supporting JavaScript and Rust Projects
@@ -99,6 +101,8 @@ Customize behavior by creating a `version.config.json` file in your project root
   "tagTemplate": "${prefix}${version}",
   "packageTagTemplate": "${packageName}@${prefix}${version}",
   "commitMessage": "chore: release ${packageName}@${version} [skip ci]",
+  "updateChangelog": true,
+  "changelogFormat": "keep-a-changelog",
   "monorepo": {
     "synced": true,
     "skip": [
@@ -118,6 +122,8 @@ Customize behavior by creating a `version.config.json` file in your project root
 - Options like `synced`, `packages`, and `updateInternalDependencies` enable monorepo-specific behaviours.
 - The `tagTemplate` and `packageTagTemplate` allow you to customize how Git tags are formatted for releases.
 - The `commitMessage` template can include CI skip tokens like `[skip ci]` if you want to prevent CI runs after version commits (e.g., `"commitMessage": "chore: release ${packageName}@${version} [skip ci]"`). See [CI/CD Integration](./docs/CI_CD_INTEGRATION.md) for more details.
+- The `updateChangelog` option controls whether to automatically generate and update changelogs for each package (default: true).
+- The `changelogFormat` option sets the changelog style to either "keep-a-changelog" (default) or "angular".
 - The `cargo` options can help when working with Rust projects:
   - `enabled` (default: `true`): Set to `false` to disable Cargo.toml version handling
   - `paths` (optional): Specify directories to search for Cargo.toml files
@@ -129,12 +135,13 @@ Customize behavior by creating a `version.config.json` file in your project root
 1.  **Conventional Commits:** Analyzes commit messages (like `feat:`, `fix:`, `BREAKING CHANGE:`) since the last tag.
 2.  **Branch Pattern:** Determines the bump based on the current or recently merged branch name matching predefined patterns.
 
-For a detailed explanation of these concepts and monorepo modes (Synced vs. Async), see [Versioning Strategies and Concepts](./docs/VERSIONING_STRATEGIES.md).
+For a detailed explanation of these concepts and monorepo modes (Synced vs. Async), see [Versioning Strategies and Concepts](./docs/versioning.md).
 
 ## Documentation
 
-- [Versioning Strategies and Concepts](./docs/VERSIONING_STRATEGIES.md) - Detailed explanation of versioning approaches
-- [CI/CD Integration](./docs/CI_CD_INTEGRATION.md) - Guide for integrating with CI/CD pipelines
+- [Versioning Strategies and Concepts](./docs/versioning.md) - Detailed explanation of versioning approaches
+- [CI/CD Integration](./docs/ci_cd_integration.md) - Guide for integrating with CI/CD pipelines
+- [Changelog Generation](./docs/changelogs.md) - How changelogs are automatically generated and maintained
 
 For more details on available CLI options, run:
 

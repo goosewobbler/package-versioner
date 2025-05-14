@@ -213,4 +213,4 @@ This would produce tags like `release-1.2.3` instead of `v1.2.3`.
   "packageTagTemplate": "${packageName}-${prefix}${version}"
 }
 ```
-This would produce package tags like `@scope/package-name-v1.2.3` instead of `@scope/package-name@v1.2.3`.
+This would produce package tags like `@scope/package-name-v1.2.3` instead of `@scope/package-name@v1.2.3`. 

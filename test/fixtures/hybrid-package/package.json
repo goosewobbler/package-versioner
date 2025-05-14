@@ -1,0 +1,13 @@
+{
+  "name": "hybrid-package-test",
+  "version": "0.1.0",
+  "description": "A test hybrid package with both package.json and Cargo.toml",
+  "private": true,
+  "files": ["README.md"],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["test", "hybrid", "package"],
+  "author": "Test Author <test@example.com>",
+  "license": "MIT"
+}

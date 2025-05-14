@@ -30,6 +30,12 @@
       "default": "angular",
       "description": "The commit message convention preset"
     },
+    "changelogFormat": {
+      "type": "string",
+      "enum": ["keep-a-changelog", "angular"],
+      "default": "keep-a-changelog",
+      "description": "The format to use for generating changelogs"
+    },
     "baseBranch": {
       "type": "string",
       "minLength": 1,
@@ -95,6 +101,31 @@
       "type": "boolean",
       "default": false,
       "description": "Whether to skip Git hooks"
+    },
+    "updateChangelog": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to automatically generate and update changelogs"
+    },
+    "cargo": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to enable Cargo.toml version handling"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Specify directories to search for Cargo.toml files"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Configuration options for Rust/Cargo support"
     }
   },
   "required": ["versionPrefix", "preset", "updateInternalDependencies"],

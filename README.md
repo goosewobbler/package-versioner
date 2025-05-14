@@ -18,7 +18,8 @@ A lightweight yet powerful CLI tool for automated semantic versioning based on G
 - Customizable through a `version.config.json` file or CLI options
 - Automatically updates `package.json` or `Cargo.toml` version
 - Creates appropriate Git tags for releases
-- Automatically generates and maintains Keep a Changelog compliant changelogs
+- Automatically generates and maintains changelogs in Keep a Changelog or Angular format
+- Integrates commit messages, breaking changes, and issue references into well-structured changelogs
 - CI/CD friendly with JSON output support
 
 ## Supporting JavaScript and Rust Projects
@@ -101,6 +102,7 @@ Customize behavior by creating a `version.config.json` file in your project root
   "packageTagTemplate": "${packageName}@${prefix}${version}",
   "commitMessage": "chore: release ${packageName}@${version} [skip ci]",
   "updateChangelog": true,
+  "changelogFormat": "keep-a-changelog",
   "monorepo": {
     "synced": true,
     "skip": [
@@ -121,6 +123,7 @@ Customize behavior by creating a `version.config.json` file in your project root
 - The `tagTemplate` and `packageTagTemplate` allow you to customize how Git tags are formatted for releases.
 - The `commitMessage` template can include CI skip tokens like `[skip ci]` if you want to prevent CI runs after version commits (e.g., `"commitMessage": "chore: release ${packageName}@${version} [skip ci]"`). See [CI/CD Integration](./docs/CI_CD_INTEGRATION.md) for more details.
 - The `updateChangelog` option controls whether to automatically generate and update changelogs for each package (default: true).
+- The `changelogFormat` option sets the changelog style to either "keep-a-changelog" (default) or "angular".
 - The `cargo` options can help when working with Rust projects:
   - `enabled` (default: `true`): Set to `false` to disable Cargo.toml version handling
   - `paths` (optional): Specify directories to search for Cargo.toml files

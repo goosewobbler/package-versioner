@@ -99,12 +99,16 @@ export async function regenerateChangelog(options: RegenerateOptions): Promise<s
   }
 
   // Try to determine the version prefix from an existing tag
-  const prefixCommand = `git tag --list | grep -E '^[vV][0-9]' | head -1`;
   let versionPrefix = 'v';
   try {
-    const firstTag = execSync(prefixCommand, { encoding: 'utf8' }).trim();
-    if (firstTag && /^[vV]/.test(firstTag)) {
-      versionPrefix = firstTag.charAt(0);
+    // Cross-platform approach: Get all tags and process with JavaScript
+    const allTags = execSync('git tag --list', { encoding: 'utf8' }).trim().split('\n');
+
+    // Find the first tag that starts with 'v' or 'V' followed by a number
+    const versionTag = allTags.find((tag) => /^[vV][0-9]/.test(tag));
+
+    if (versionTag) {
+      versionPrefix = versionTag.charAt(0);
     }
   } catch {
     // Ignore errors and use default prefix 'v'

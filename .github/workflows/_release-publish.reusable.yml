@@ -103,10 +103,29 @@ jobs:
           # Execute package-versioner (ESM output is index.js due to type: module)
           # Add --synced flag to ensure a single tag is generated for the release workflow
           COMMAND="node ./dist/index.js --synced $BUMP_ARG $PRE_ARG $DRY_RUN_ARG" 
+          
+          # Debug information 
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory: $(ls -la)"
+          echo "Contents of package.json:"
+          cat package.json
+          echo "Version from package.json: $(jq -r '.version' package.json)"
+          
           echo "Running: $COMMAND"
-          OUTPUT=$( $COMMAND 2>&1 || echo "Command failed with exit code $?" ) # Capture stdout/stderr even on failure
+          OUTPUT=$( $COMMAND 2>&1 )
+          CMD_STATUS=$?
           echo "Command Output:"
           echo "$OUTPUT"
+          
+          # Capture versioning status in output variable
+          echo "versioning_success=$CMD_STATUS" >> "$GITHUB_OUTPUT"
+          
+          if [ $CMD_STATUS -ne 0 ]; then
+            echo "::error::Versioning command failed with exit code $CMD_STATUS"
+            echo "new_version=FAILED" >> "$GITHUB_OUTPUT"
+            echo "release_tag=FAILED" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
 
           # Determine new version and tag
           # In dry run, parse output. Otherwise, read package.json and construct tag.
@@ -148,6 +167,7 @@ jobs:
 
       - name: 📢 Publish to NPM
         shell: bash
+        if: ${{ steps.version.outputs.new_version != 'FAILED' }}
         run: |
           NPM_TAG="latest"
           # Determine NPM tag based on version (handle potential missing version in dry run)
@@ -181,6 +201,21 @@ jobs:
 
              # Now publish
              pnpm publish --tag $NPM_TAG --no-git-checks
+             PUBLISH_STATUS=$?
+
+             # Check if failure was due to version already existing
+             if [ $PUBLISH_STATUS -ne 0 ]; then
+                 # Check if error is due to version already existing
+                 if npm view package-versioner version | grep -q "^${VERSION_TO_CHECK}$"; then
+                     echo "Warning: Version ${VERSION_TO_CHECK} already exists in the registry."
+                     echo "This is likely because the package was already published with this version."
+                     # Don't fail the workflow, this is a recoverable situation
+                     echo "Continuing with the workflow..."
+                 else
+                     echo "::error::Failed to publish to NPM. Not related to existing version."
+                     exit 1
+                 fi
+             fi
 
              # Optional: Remove .npmrc after publish for cleanup
              # rm -f .npmrc

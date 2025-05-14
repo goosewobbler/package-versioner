@@ -1,0 +1,2 @@
+# Prevent test fixtures from being treated as submodules
+test/fixtures/* -submodule 

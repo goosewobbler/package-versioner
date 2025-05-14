@@ -95,8 +95,9 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
           files.push(rootPkgPath);
           updatedPackages.push('root');
         }
-      } catch (_error) {
-        log('Failed to update root package.json', 'error');
+      } catch (error) {
+        const errMessage = error instanceof Error ? error.message : String(error);
+        log(`Failed to update root package.json: ${errMessage}`, 'error');
       }
 
       // Update all workspace packages

@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/npm/v/package-versioner" /></a>
 <a href="https://www.npmjs.com/package/package-versioner" alt="NPM Downloads">
   <img src="https://img.shields.io/npm/dw/package-versioner" /></a>
-
+<br/><br/>
 A lightweight yet powerful CLI tool for automated semantic versioning based on Git history and conventional commits. Supports both single package projects and monorepos with flexible versioning strategies.
 
 ## Features

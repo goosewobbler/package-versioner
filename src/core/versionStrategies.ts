@@ -62,19 +62,49 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
         prereleaseIdentifier,
         dryRun,
         skipHooks,
+        mainPackage,
       } = config;
 
       // Calculate version for root package first
       const formattedPrefix = formatVersionPrefix(versionPrefix || 'v');
       const latestTag = await getLatestTag();
 
-      // Calculate the next version
+      // Find the main package if specified
+      let mainPkgPath = packages.root;
+      let mainPkgName: string | undefined;
+
+      if (mainPackage) {
+        const mainPkg = packages.packages.find((p) => p.packageJson.name === mainPackage);
+        if (mainPkg) {
+          mainPkgPath = mainPkg.dir;
+          mainPkgName = mainPkg.packageJson.name;
+          log(`Using ${mainPkgName} as primary package for version determination`, 'info');
+        } else {
+          log(
+            `Main package '${mainPackage}' not found. Using root package for version determination.`,
+            'warning',
+          );
+        }
+      }
+
+      // Make sure we have a valid path for version calculation
+      if (!mainPkgPath) {
+        mainPkgPath = process.cwd();
+        log(
+          `No valid package path found, using current working directory: ${mainPkgPath}`,
+          'warning',
+        );
+      }
+
+      // Calculate the next version using the main package if specified
       const nextVersion = await calculateVersion(config, {
         latestTag,
         versionPrefix: formattedPrefix,
         branchPattern,
         baseBranch,
         prereleaseIdentifier,
+        path: mainPkgPath,
+        name: mainPkgName,
         type: config.type,
       });
 
@@ -88,12 +118,16 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
 
       // Update root package.json if exists
       try {
-        const rootPkgPath = path.join(packages.root, 'package.json');
-        if (fs.existsSync(rootPkgPath)) {
-          updatePackageVersion(rootPkgPath, nextVersion);
-
-          files.push(rootPkgPath);
-          updatedPackages.push('root');
+        // Check if packages.root is defined before joining paths
+        if (packages.root) {
+          const rootPkgPath = path.join(packages.root, 'package.json');
+          if (fs.existsSync(rootPkgPath)) {
+            updatePackageVersion(rootPkgPath, nextVersion);
+            files.push(rootPkgPath);
+            updatedPackages.push('root');
+          }
+        } else {
+          log('Root package path is undefined, skipping root package.json update', 'warning');
         }
       } catch (error) {
         const errMessage = error instanceof Error ? error.message : String(error);
@@ -147,6 +181,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
     try {
       const {
         packages: configPackages,
+        mainPackage,
         versionPrefix,
         tagTemplate,
         packageTagTemplate,
@@ -155,14 +190,20 @@ export function createSingleStrategy(config: Config): StrategyFunction {
         skipHooks,
       } = config;
 
-      if (!configPackages || configPackages.length !== 1) {
+      // Use mainPackage if specified, otherwise use the first package from the packages array
+      let packageName: string | undefined;
+
+      if (mainPackage) {
+        packageName = mainPackage;
+      } else if (configPackages && configPackages.length === 1) {
+        packageName = configPackages[0];
+      } else {
         throw createVersionError(
           VersionErrorCode.INVALID_CONFIG,
-          'Single mode requires exactly one package name',
+          'Single mode requires either mainPackage or exactly one package in the packages array',
         );
       }
 
-      const packageName = configPackages[0];
       const pkg = packages.packages.find((p) => p.packageJson.name === packageName);
 
       if (!pkg) {
@@ -326,7 +367,8 @@ export function createStrategy(config: Config): StrategyFunction {
     return createSyncedStrategy(config);
   }
 
-  if (config.packages?.length === 1) {
+  // If single package specified either via mainPackage or packages
+  if (config.mainPackage || config.packages?.length === 1) {
     return createSingleStrategy(config);
   }
 

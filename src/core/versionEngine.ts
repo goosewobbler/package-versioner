@@ -65,6 +65,15 @@ export class VersionEngine {
         throw createVersionError(VersionErrorCode.PACKAGES_NOT_FOUND);
       }
 
+      // Ensure the root property is set
+      if (!pkgsResult.root) {
+        log(
+          'Root path is undefined in packages result, setting to current working directory',
+          'warning',
+        );
+        pkgsResult.root = cwd();
+      }
+
       // Cache the result for subsequent calls
       this.workspaceCache = pkgsResult;
       return pkgsResult;

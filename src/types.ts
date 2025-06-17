@@ -36,6 +36,7 @@ export interface Config extends VersionConfigBase {
   preset: string;
   synced: boolean;
   packages: string[];
+  mainPackage?: string; // The package to use for version determination
   updateInternalDependencies: 'major' | 'minor' | 'patch' | 'no-internal-update';
   skip?: string[];
   commitMessage?: string;

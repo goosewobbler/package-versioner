@@ -103,14 +103,13 @@ Customize behavior by creating a `version.config.json` file in your project root
   "commitMessage": "chore: release ${packageName}@${version} [skip ci]",
   "updateChangelog": true,
   "changelogFormat": "keep-a-changelog",
-  "monorepo": {
-    "synced": true,
-    "skip": [
-      "docs",
-      "e2e"
-    ],
-    "packagePath": "packages"
-  },
+  "synced": true,
+  "skip": [
+    "docs",
+    "e2e"
+  ],
+  "packages": ["packages/*"],
+  "mainPackage": "primary-package",
   "cargo": {
     "enabled": true,
     "paths": ["src/", "crates/"]
@@ -118,15 +117,28 @@ Customize behavior by creating a `version.config.json` file in your project root
 }
 ```
 
-**Notes:** 
-- Options like `synced`, `packages`, and `updateInternalDependencies` enable monorepo-specific behaviours.
-- The `tagTemplate` and `packageTagTemplate` allow you to customize how Git tags are formatted for releases.
-- The `commitMessage` template can include CI skip tokens like `[skip ci]` if you want to prevent CI runs after version commits (e.g., `"commitMessage": "chore: release ${packageName}@${version} [skip ci]"`). See [CI/CD Integration](./docs/CI_CD_INTEGRATION.md) for more details.
-- The `updateChangelog` option controls whether to automatically generate and update changelogs for each package (default: true).
-- The `changelogFormat` option sets the changelog style to either "keep-a-changelog" (default) or "angular".
-- The `cargo` options can help when working with Rust projects:
-  - `enabled` (default: `true`): Set to `false` to disable Cargo.toml version handling
-  - `paths` (optional): Specify directories to search for Cargo.toml files
+### Configuration Options
+
+#### General Options (All Projects)
+- `preset`: Conventional commits preset to use for version calculation (default: "angular")
+- `versionPrefix`: Prefix for version numbers in tags (default: "v")
+- `tagTemplate`: Template for Git tags (default: "${prefix}${version}")
+- `commitMessage`: Template for commit messages (default: "chore(release): ${version}")
+- `updateChangelog`: Whether to automatically update changelogs (default: true)
+- `changelogFormat`: Format for changelogs - "keep-a-changelog" or "angular" (default: "keep-a-changelog")
+- `cargo`: Options for Rust projects:
+  - `enabled`: Whether to handle Cargo.toml files (default: true)
+  - `paths`: Directories to search for Cargo.toml files (optional)
+
+#### Monorepo-Specific Options
+- `synced`: Whether all packages should be versioned together (default: true)
+- `skip`: Array of package names to exclude from versioning
+- `packages`: Glob patterns for package discovery (e.g., ["packages/*"])
+- `mainPackage`: Package name whose commit history should drive version determination
+- `packageTagTemplate`: Template for package-specific Git tags (default: "${packageName}@${prefix}${version}")
+- `updateInternalDependencies`: How to update internal dependencies ("patch", "minor", "major", or "inherit")
+
+For more details on CI/CD integration and advanced usage, see [CI/CD Integration](./docs/CI_CD_INTEGRATION.md).
 
 ## How Versioning Works
 

@@ -36,7 +36,7 @@ describe('Commit Parser', () => {
       'revert: revert previous commit',
     ].join('---COMMIT_DELIMITER---');
 
-    vi.mocked(execSync).mockReturnValue(mockGitOutput);
+    vi.mocked(execSync, { partial: true }).mockReturnValue(mockGitOutput);
 
     const entries = extractChangelogEntriesFromCommits('/test', 'v1.0.0..v1.1.0');
 
@@ -65,7 +65,7 @@ describe('Commit Parser', () => {
       'fix(api): another fix\n\nBREAKING CHANGE: This breaks the API',
     ].join('---COMMIT_DELIMITER---');
 
-    vi.mocked(execSync).mockReturnValue(mockGitOutput);
+    vi.mocked(execSync, { partial: true }).mockReturnValue(mockGitOutput);
 
     const entries = extractChangelogEntriesFromCommits('/test', 'v1.0.0..v1.1.0');
 
@@ -82,7 +82,7 @@ describe('Commit Parser', () => {
       'feat(ui): add feature\n\nCloses #456\nResolves #789',
     ].join('---COMMIT_DELIMITER---');
 
-    vi.mocked(execSync).mockReturnValue(mockGitOutput);
+    vi.mocked(execSync, { partial: true }).mockReturnValue(mockGitOutput);
 
     const entries = extractChangelogEntriesFromCommits('/test', 'v1.0.0..v1.1.0');
 
@@ -105,7 +105,7 @@ describe('Commit Parser', () => {
       'v1.0.0',
     ].join('---COMMIT_DELIMITER---');
 
-    vi.mocked(execSync).mockReturnValue(mockGitOutput);
+    vi.mocked(execSync, { partial: true }).mockReturnValue(mockGitOutput);
 
     const entries = extractChangelogEntriesFromCommits('/test', 'v1.0.0..v1.1.0');
 
@@ -119,7 +119,7 @@ describe('Commit Parser', () => {
 
   it('handles errors when extracting commits', () => {
     // Mock execSync to throw an error
-    vi.mocked(execSync).mockImplementation(() => {
+    vi.mocked(execSync, { partial: true }).mockImplementation(() => {
       throw new Error('Git command failed');
     });
 

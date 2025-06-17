@@ -40,10 +40,12 @@ describe('Config', () => {
 
     it('should load config from default path when no path is provided', async () => {
       // @ts-expect-error - Mock doesn't match exact fs.readFile signature
-      vi.mocked(fs.readFile).mockImplementationOnce((_path, _encoding, callback) => {
-        if (callback) callback(null, JSON.stringify(mockConfig));
-        return undefined;
-      });
+      vi.mocked(fs.readFile, { partial: true }).mockImplementationOnce(
+        (_path, _encoding, callback) => {
+          if (callback) callback(null, JSON.stringify(mockConfig));
+          return undefined;
+        },
+      );
 
       const config = await loadConfig();
       expect(config).toEqual(mockConfig);
@@ -56,10 +58,12 @@ describe('Config', () => {
 
     it('should load config from custom path when provided', async () => {
       // @ts-expect-error - Mock doesn't match exact fs.readFile signature
-      vi.mocked(fs.readFile).mockImplementationOnce((_path, _encoding, callback) => {
-        if (callback) callback(null, JSON.stringify(mockConfig));
-        return undefined;
-      });
+      vi.mocked(fs.readFile, { partial: true }).mockImplementationOnce(
+        (_path, _encoding, callback) => {
+          if (callback) callback(null, JSON.stringify(mockConfig));
+          return undefined;
+        },
+      );
 
       const customPath = '/custom/path/config.json';
       const config = await loadConfig(customPath);
@@ -72,20 +76,24 @@ describe('Config', () => {
       // Mock implementation for this test
       const fileError = new Error('File not found');
       // @ts-expect-error - Mock doesn't match exact fs.readFile signature
-      vi.mocked(fs.readFile).mockImplementationOnce((_path, _encoding, callback) => {
-        if (callback) callback(fileError);
-        return undefined;
-      });
+      vi.mocked(fs.readFile, { partial: true }).mockImplementationOnce(
+        (_path, _encoding, callback) => {
+          if (callback) callback(fileError);
+          return undefined;
+        },
+      );
 
       await expect(loadConfig()).rejects.toThrow(/Could not locate the config file/);
     });
 
     it('should reject with error when config file is invalid JSON', async () => {
       // @ts-expect-error - Mock doesn't match exact fs.readFile signature
-      vi.mocked(fs.readFile).mockImplementationOnce((_path, _encoding, callback) => {
-        if (callback) callback(null, '{invalid json}');
-        return undefined;
-      });
+      vi.mocked(fs.readFile, { partial: true }).mockImplementationOnce(
+        (_path, _encoding, callback) => {
+          if (callback) callback(null, '{invalid json}');
+          return undefined;
+        },
+      );
 
       await expect(loadConfig()).rejects.toThrow(/Failed to parse config file/);
     });

@@ -40,9 +40,9 @@ serde = "1.0"
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(mockCargoContent);
-    vi.mocked(TOML.parse).mockReturnValue(mockCargoObject);
+    vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+    vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue(mockCargoContent);
+    vi.mocked(TOML.parse, { partial: true }).mockReturnValue(mockCargoObject);
   });
 
   afterEach(() => {
@@ -82,7 +82,7 @@ serde = "1.0"
 
     it('should exit if Cargo.toml does not exist', () => {
       // Mock fs.existsSync to return false
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(false);
 
       // Now we expect an error to be thrown instead of process.exit
       expect(() => getCargoInfo(mockCargoPath)).toThrow(
@@ -101,7 +101,7 @@ serde = "1.0"
 
     it('should exit if package name not found', () => {
       // Remove process.exit mock
-      vi.mocked(TOML.parse).mockReturnValue({ package: {} });
+      vi.mocked(TOML.parse, { partial: true }).mockReturnValue({ package: {} });
 
       // Expect error to be thrown
       expect(() => getCargoInfo(mockCargoPath)).toThrow(
@@ -117,7 +117,7 @@ serde = "1.0"
     it('should handle errors when reading Cargo.toml', () => {
       // Remove process.exit mock
       const mockError = new Error('Read error');
-      vi.mocked(fs.readFileSync).mockImplementation(() => {
+      vi.mocked(fs.readFileSync, { partial: true }).mockImplementation(() => {
         throw mockError;
       });
 
@@ -134,7 +134,7 @@ serde = "1.0"
 
   describe('updateCargoVersion', () => {
     it('should update the version in Cargo.toml', () => {
-      vi.mocked(jsonOutput.addPackageUpdate).mockImplementation(() => {});
+      vi.mocked(jsonOutput.addPackageUpdate, { partial: true }).mockImplementation(() => {});
 
       updateCargoVersion(mockCargoPath, '2.0.0');
 
@@ -166,7 +166,7 @@ serde = "1.0"
     });
 
     it('should handle errors when updating Cargo.toml', () => {
-      vi.mocked(fs.readFileSync).mockImplementation(() => {
+      vi.mocked(fs.readFileSync, { partial: true }).mockImplementation(() => {
         throw new Error('Update error');
       });
 
@@ -179,14 +179,14 @@ serde = "1.0"
     });
 
     it('should throw an error if package name is not found', () => {
-      vi.mocked(TOML.parse).mockReturnValue({ package: { version: '1.0.0' } });
+      vi.mocked(TOML.parse, { partial: true }).mockReturnValue({ package: { version: '1.0.0' } });
 
       expect(() => updateCargoVersion(mockCargoPath, '2.0.0')).toThrow('No package name found in');
     });
 
     it('should create package section if missing', () => {
       const mockCargoWithoutPackage = {};
-      vi.mocked(TOML.parse).mockReturnValue(mockCargoWithoutPackage);
+      vi.mocked(TOML.parse, { partial: true }).mockReturnValue(mockCargoWithoutPackage);
 
       expect(() => updateCargoVersion(mockCargoPath, '2.0.0')).toThrow();
     });

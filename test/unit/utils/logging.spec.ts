@@ -24,7 +24,7 @@ vi.mock('figlet', () => ({
 describe('Logging Utilities', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(jsonOutput.isJsonOutputMode).mockReturnValue(false);
+    vi.mocked(jsonOutput.isJsonOutputMode, { partial: true }).mockReturnValue(false);
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -43,7 +43,7 @@ describe('Logging Utilities', () => {
     });
 
     it('should not print banner when in JSON output mode', () => {
-      vi.mocked(jsonOutput.isJsonOutputMode).mockReturnValue(true);
+      vi.mocked(jsonOutput.isJsonOutputMode, { partial: true }).mockReturnValue(true);
 
       printFiglet('Test Banner');
 
@@ -96,7 +96,7 @@ describe('Logging Utilities', () => {
     });
 
     it('should not log non-error messages when in JSON output mode', () => {
-      vi.mocked(jsonOutput.isJsonOutputMode).mockReturnValue(true);
+      vi.mocked(jsonOutput.isJsonOutputMode, { partial: true }).mockReturnValue(true);
 
       log('Info message', 'info');
 
@@ -105,7 +105,7 @@ describe('Logging Utilities', () => {
     });
 
     it('should log error messages even when in JSON output mode', () => {
-      vi.mocked(jsonOutput.isJsonOutputMode).mockReturnValue(true);
+      vi.mocked(jsonOutput.isJsonOutputMode, { partial: true }).mockReturnValue(true);
 
       log('Error message', 'error');
 

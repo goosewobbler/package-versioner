@@ -51,18 +51,24 @@ describe('Version Engine', () => {
     vi.resetAllMocks();
 
     // Setup strategy mocks
-    vi.mocked(strategyModule.createSyncedStrategy).mockReturnValue(syncedStrategyMock);
-    vi.mocked(strategyModule.createSingleStrategy).mockReturnValue(singleStrategyMock);
-    vi.mocked(strategyModule.createAsyncStrategy).mockReturnValue(asyncStrategyMock);
-    vi.mocked(strategyModule.createStrategy).mockReturnValue(syncedStrategyMock);
-    vi.mocked(strategyModule.createStrategyMap).mockReturnValue({
+    vi.mocked(strategyModule.createSyncedStrategy, { partial: true }).mockReturnValue(
+      syncedStrategyMock,
+    );
+    vi.mocked(strategyModule.createSingleStrategy, { partial: true }).mockReturnValue(
+      singleStrategyMock,
+    );
+    vi.mocked(strategyModule.createAsyncStrategy, { partial: true }).mockReturnValue(
+      asyncStrategyMock,
+    );
+    vi.mocked(strategyModule.createStrategy, { partial: true }).mockReturnValue(syncedStrategyMock);
+    vi.mocked(strategyModule.createStrategyMap, { partial: true }).mockReturnValue({
       synced: syncedStrategyMock,
       single: singleStrategyMock,
       async: asyncStrategyMock,
     });
 
     // Setup getPackagesSync mock
-    vi.mocked(getPackagesSync).mockReturnValue(mockPackages);
+    vi.mocked(getPackagesSync, { partial: true }).mockReturnValue(mockPackages);
   });
 
   afterEach(() => {
@@ -152,7 +158,7 @@ describe('Version Engine', () => {
 
     it('should handle error if getPackagesSync throws', async () => {
       const error = new Error('Failed to get packages');
-      vi.mocked(getPackagesSync).mockImplementation(() => {
+      vi.mocked(getPackagesSync, { partial: true }).mockImplementation(() => {
         throw error;
       });
 

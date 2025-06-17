@@ -77,9 +77,9 @@ describe('CLI Interface', () => {
     global.process = mockProcess as NodeJS.Process;
 
     // Setup mocks
-    vi.mocked(configModule.loadConfig).mockResolvedValue(mockConfig as Config);
-    vi.mocked(VersionEngine.prototype.run).mockResolvedValue(undefined);
-    vi.mocked(VersionEngine.prototype.setStrategy).mockReturnValue(undefined);
+    vi.mocked(configModule.loadConfig, { partial: true }).mockResolvedValue(mockConfig as Config);
+    vi.mocked(VersionEngine.prototype.run, { partial: true }).mockResolvedValue(undefined);
+    vi.mocked(VersionEngine.prototype.setStrategy, { partial: true }).mockReturnValue(undefined);
   });
 
   afterEach(() => {
@@ -95,7 +95,7 @@ describe('CLI Interface', () => {
     await indexModule.run();
 
     // Get the commander instance
-    const commanderInstance = vi.mocked(Command).mock.results[0].value;
+    const commanderInstance = vi.mocked(Command, { partial: true }).mock.results[0].value;
 
     // Check if there's a default command defined
     const defaultCommand = commanderInstance.getDefaultCommand();
@@ -110,7 +110,7 @@ describe('CLI Interface', () => {
     await indexModule.run();
 
     // Get the commander instance
-    const commanderInstance = vi.mocked(Command).mock.results[0].value;
+    const commanderInstance = vi.mocked(Command, { partial: true }).mock.results[0].value;
 
     // Check if parse was called
     expect(commanderInstance.parse).toHaveBeenCalled();
@@ -130,7 +130,7 @@ describe('CLI Interface', () => {
     await indexModule.run();
 
     // Get the commander instance
-    const commanderInstance = vi.mocked(Command).mock.results[0].value;
+    const commanderInstance = vi.mocked(Command, { partial: true }).mock.results[0].value;
 
     // Check if parse was called
     expect(commanderInstance.parse).toHaveBeenCalled();

@@ -28,7 +28,7 @@ describe('Git Commands', () => {
     vi.resetAllMocks();
 
     // Mock repository check to return true by default
-    vi.mocked(repository.isGitRepository).mockReturnValue(true);
+    vi.mocked(repository.isGitRepository, { partial: true }).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -41,7 +41,7 @@ describe('Git Commands', () => {
       const files = ['file1.js', 'file2.js'];
       const mockExecResult = { stdout: 'success', stderr: '' };
 
-      vi.mocked(commandExecutor.execAsync).mockResolvedValue(mockExecResult);
+      vi.mocked(commandExecutor.execAsync, { partial: true }).mockResolvedValue(mockExecResult);
 
       const result = await commands.gitAdd(files);
 
@@ -55,7 +55,10 @@ describe('Git Commands', () => {
         skipHooks: true,
       };
 
-      vi.mocked(commandExecutor.execAsync).mockResolvedValue({ stdout: '', stderr: '' });
+      vi.mocked(commandExecutor.execAsync, { partial: true }).mockResolvedValue({
+        stdout: '',
+        stderr: '',
+      });
 
       await commands.gitCommit(options);
 
@@ -70,7 +73,10 @@ describe('Git Commands', () => {
         message: 'Version 1.0.0',
       };
 
-      vi.mocked(commandExecutor.execAsync).mockResolvedValue({ stdout: '', stderr: '' });
+      vi.mocked(commandExecutor.execAsync, { partial: true }).mockResolvedValue({
+        stdout: '',
+        stderr: '',
+      });
 
       await commands.createGitTag(options);
 
@@ -82,7 +88,7 @@ describe('Git Commands', () => {
 
   describe('gitProcess', () => {
     it('checks for git repository', async () => {
-      vi.mocked(repository.isGitRepository).mockReturnValue(false);
+      vi.mocked(repository.isGitRepository, { partial: true }).mockReturnValue(false);
 
       const options: GitProcessOptions = {
         files: ['file1.js'],

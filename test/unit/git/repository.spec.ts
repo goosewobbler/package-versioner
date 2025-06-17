@@ -27,7 +27,7 @@ describe('repository', () => {
 
     it('should return false if .git directory does not exist', () => {
       // Setup
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(false);
 
       // Execute
       const result = isGitRepository(testDir);
@@ -41,7 +41,7 @@ describe('repository', () => {
 
     it('should return false if .git is not a directory', () => {
       // Setup
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
       const mockStatSync = vi.mocked(fs.statSync);
       mockStatSync.mockImplementation(() => {
         return {
@@ -61,13 +61,13 @@ describe('repository', () => {
 
     it('should return false if git command fails', () => {
       // Setup
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation(() => {
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.statSync, { partial: true }).mockImplementation(() => {
         return {
           isDirectory: () => true,
         } as unknown as fs.Stats;
       });
-      vi.mocked(commandExecutor.execSync).mockImplementation(() => {
+      vi.mocked(commandExecutor.execSync, { partial: true }).mockImplementation(() => {
         throw new Error('git command failed');
       });
 
@@ -85,13 +85,13 @@ describe('repository', () => {
 
     it('should return true if directory is a git repository', () => {
       // Setup
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation(() => {
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.statSync, { partial: true }).mockImplementation(() => {
         return {
           isDirectory: () => true,
         } as unknown as fs.Stats;
       });
-      vi.mocked(commandExecutor.execSync).mockReturnValue(Buffer.from('true'));
+      vi.mocked(commandExecutor.execSync, { partial: true }).mockReturnValue(Buffer.from('true'));
 
       // Execute
       const result = isGitRepository(testDir);
@@ -109,7 +109,7 @@ describe('repository', () => {
   describe('getCurrentBranch', () => {
     it('should return the current branch name', () => {
       // Setup
-      vi.mocked(commandExecutor.execSync).mockReturnValue(Buffer.from('main\n'));
+      vi.mocked(commandExecutor.execSync, { partial: true }).mockReturnValue(Buffer.from('main\n'));
 
       // Execute
       const result = getCurrentBranch();

@@ -62,8 +62,8 @@ describe('Regenerate Changelog Feature', () => {
     );
 
     // Set up common mock responses
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(
+    vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+    vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue(
       JSON.stringify({
         name: 'test-package',
         version: '0.3.0',
@@ -71,7 +71,7 @@ describe('Regenerate Changelog Feature', () => {
       }),
     );
 
-    vi.mocked(execSync).mockImplementation((cmd) => {
+    vi.mocked(execSync, { partial: true }).mockImplementation((cmd) => {
       if (typeof cmd !== 'string') return '';
 
       if (cmd.includes('git tag --list')) {
@@ -149,7 +149,7 @@ describe('Regenerate Changelog Feature', () => {
     };
 
     // Mock git command with since parameter
-    vi.mocked(execSync).mockImplementation((cmd) => {
+    vi.mocked(execSync, { partial: true }).mockImplementation((cmd) => {
       if (typeof cmd !== 'string') return '';
 
       if (cmd.includes('git tag --list') && cmd.includes('--contains v0.2.0')) {
@@ -176,7 +176,7 @@ describe('Regenerate Changelog Feature', () => {
     };
 
     // Mock package.json with repository URL
-    vi.mocked(fs.readFileSync).mockReturnValue(
+    vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue(
       JSON.stringify({
         name: 'test-package',
         repository: {
@@ -207,7 +207,7 @@ describe('Regenerate Changelog Feature', () => {
     };
 
     // Mock empty tag list
-    vi.mocked(execSync).mockImplementation((cmd) => {
+    vi.mocked(execSync, { partial: true }).mockImplementation((cmd) => {
       if (typeof cmd !== 'string') return '';
 
       if (cmd.includes('git tag --list')) {
@@ -228,7 +228,7 @@ describe('Regenerate Changelog Feature', () => {
     };
 
     // Mock package.json missing
-    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(false);
 
     // Set the getDefaultTemplate spy to return a specific value
     vi.spyOn(templates, 'getDefaultTemplate').mockReturnValue('# Changelog\n\n');
@@ -296,7 +296,7 @@ describe('Regenerate Changelog Feature', () => {
     const outputPath = join('/test', 'CHANGELOG.md');
 
     // Mock writeFileSync to throw error
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {
+    vi.mocked(fs.writeFileSync, { partial: true }).mockImplementation(() => {
       throw new Error('Write error');
     });
 

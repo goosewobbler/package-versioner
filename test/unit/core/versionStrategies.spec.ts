@@ -204,6 +204,63 @@ describe('Version Strategies', () => {
       );
     });
 
+    it('should use mainPackage for version calculation when specified', async () => {
+      // Setup with mainPackage
+      const config: Partial<Config> = {
+        ...defaultConfig,
+        synced: true,
+        mainPackage: 'package-b',
+      };
+
+      const syncedStrategy = strategies.createSyncedStrategy(config as Config);
+
+      // Execute
+      await syncedStrategy(mockPackages);
+
+      // Verify that version calculation used package-b
+      expect(calculator.calculateVersion).toHaveBeenCalledWith(
+        config as Config,
+        expect.objectContaining({
+          path: '/test/workspace/packages/b',
+          name: 'package-b',
+        }),
+      );
+
+      // Still updates all packages
+      expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(rootPackagePath, '1.1.0');
+      expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(packageAPath, '1.1.0');
+      expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(packageBPath, '1.1.0');
+    });
+
+    it('should fall back to root package if mainPackage is not found', async () => {
+      // Setup with non-existent mainPackage
+      const config: Partial<Config> = {
+        ...defaultConfig,
+        synced: true,
+        mainPackage: 'package-z',
+      };
+
+      const syncedStrategy = strategies.createSyncedStrategy(config as Config);
+
+      // Execute
+      await syncedStrategy(mockPackages);
+
+      // Verify that version calculation used root package
+      expect(calculator.calculateVersion).toHaveBeenCalledWith(
+        config as Config,
+        expect.objectContaining({
+          path: '/test/workspace',
+          name: undefined,
+        }),
+      );
+
+      // Verify warning was logged
+      expect(logging.log).toHaveBeenCalledWith(
+        "Main package 'package-z' not found. Using root package for version determination.",
+        'warning',
+      );
+    });
+
     it('should handle packageName being null in commit message template', async () => {
       // Setup
       const config: Partial<Config> = {
@@ -347,25 +404,54 @@ describe('Version Strategies', () => {
       const singleStrategy1 = strategies.createSingleStrategy(config1 as Config);
       const singleStrategy2 = strategies.createSingleStrategy(config2 as Config);
 
-      // Execute and verify errors
+      // Execute and verify errors - update the expected error message to match the new implementation
       await expect(singleStrategy1(mockPackages)).rejects.toThrow(
-        'Single mode requires exactly one package name',
+        'Invalid configuration: Single mode requires either mainPackage or exactly one package in the packages array',
       );
       await expect(singleStrategy2(mockPackages)).rejects.toThrow(
-        'Single mode requires exactly one package name',
+        'Invalid configuration: Single mode requires either mainPackage or exactly one package in the packages array',
       );
     });
 
-    it('should throw if specified package is not found', async () => {
-      // Setup with non-existent package
+    it('should use mainPackage instead of packages array when both are provided', async () => {
+      // Setup with both mainPackage and packages array
       const config: Partial<Config> = {
         ...defaultConfig,
-        packages: ['package-z'],
+        mainPackage: 'package-b',
+        packages: ['package-a'],
       };
 
       const singleStrategy = strategies.createSingleStrategy(config as Config);
 
-      // Execute and verify error - updating expectation to match the new error format
+      // Execute
+      await singleStrategy(mockPackages);
+
+      // Verify package-b was used instead of package-a
+      expect(calculator.calculateVersion).toHaveBeenCalledWith(
+        config as Config,
+        expect.objectContaining({
+          path: '/test/workspace/packages/b',
+          name: 'package-b',
+        }),
+      );
+
+      expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(packageBPath, '1.1.0');
+      expect(packageManagement.updatePackageVersion).not.toHaveBeenCalledWith(
+        packageAPath,
+        expect.anything(),
+      );
+    });
+
+    it('should throw if mainPackage is not found', async () => {
+      // Setup with non-existent mainPackage
+      const config: Partial<Config> = {
+        ...defaultConfig,
+        mainPackage: 'package-z',
+      };
+
+      const singleStrategy = strategies.createSingleStrategy(config as Config);
+
+      // Execute and verify error
       await expect(singleStrategy(mockPackages)).rejects.toThrow('Package not found: package-z');
     });
 
@@ -498,6 +584,20 @@ describe('Version Strategies', () => {
       // Since we've already tested the individual strategies, just verify the strategy map exists
       const strategyMap = strategies.createStrategyMap(config as Config);
       expect(strategyMap).toHaveProperty('single');
+    });
+
+    it('should return single strategy when mainPackage is specified', async () => {
+      // We can't directly compare functions, so we'll check if it's the single strategy
+      // by checking if it throws the right error when mainPackage doesn't exist
+      const badConfig: Partial<Config> = {
+        ...defaultConfig,
+        mainPackage: 'non-existent-package',
+      };
+
+      const badStrategy = strategies.createStrategy(badConfig as Config);
+
+      // Execute the bad strategy and expect it to throw the error from single strategy
+      await expect(badStrategy(mockPackages)).rejects.toThrow('Package not found');
     });
 
     it('should return async strategy as default', () => {

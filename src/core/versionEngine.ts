@@ -101,9 +101,25 @@ export class VersionEngine {
     } catch (error) {
       if (error instanceof VersionError || error instanceof GitError) {
         log(`Version engine failed: ${error.message} (${error.code || 'UNKNOWN'})`, 'error');
+
+        // Enhanced error logging for GitError
+        if (error instanceof GitError) {
+          console.error('Git error details:');
+          if (error.message.includes('Command failed:')) {
+            const cmdOutput = error.message.split('Command failed:')[1];
+            if (cmdOutput) {
+              console.error('Command output:', cmdOutput.trim());
+            }
+          }
+        }
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);
         log(`Version engine failed: ${errorMessage}`, 'error');
+
+        if (error instanceof Error && error.stack) {
+          console.error('Error stack trace:');
+          console.error(error.stack);
+        }
       }
       throw error;
     }

@@ -117,6 +117,22 @@ export async function run(): Promise<void> {
           printJsonOutput();
         } catch (error) {
           log(error instanceof Error ? error.message : String(error), 'error');
+
+          // Add more detailed error logging for better debugging in CI
+          if (error instanceof Error) {
+            // Log the full stack trace
+            console.error('Error details:');
+            console.error(error.stack || error.message);
+
+            // If it's a GitError, try to extract and log the underlying command output
+            if (error.message.includes('Command failed:')) {
+              const cmdOutput = error.message.split('Command failed:')[1];
+              if (cmdOutput) {
+                console.error('Command output:', cmdOutput.trim());
+              }
+            }
+          }
+
           process.exit(1);
         }
       });

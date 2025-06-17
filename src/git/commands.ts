@@ -122,6 +122,15 @@ export async function gitProcess(options: GitProcessOptions) {
     }
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
+
+    // Log detailed error information
+    log(`Git process error: ${errorMessage}`, 'error');
+
+    if (err instanceof Error && err.stack) {
+      console.error('Git process stack trace:');
+      console.error(err.stack);
+    }
+
     throw createGitError(GitErrorCode.GIT_PROCESS_ERROR, errorMessage);
   }
 }
@@ -172,10 +181,21 @@ export async function createGitCommitAndTag(
     const errorMessage = error instanceof Error ? error.message : String(error);
     log(`Failed to create git commit and tag: ${errorMessage}`, 'error');
 
+    // Enhanced error logging
     if (error instanceof Error) {
+      // Log the full stack trace for debugging
+      console.error('Git operation error details:');
       console.error(error.stack || error.message);
+
+      // Extract and log command output if available
+      if (errorMessage.includes('Command failed:')) {
+        const cmdOutput = errorMessage.split('Command failed:')[1];
+        if (cmdOutput) {
+          console.error('Git command output:', cmdOutput.trim());
+        }
+      }
     } else {
-      console.error(error);
+      console.error('Unknown git error:', error);
     }
 
     throw new GitError(`Git operation failed: ${errorMessage}`, GitErrorCode.GIT_ERROR);

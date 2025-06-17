@@ -37,9 +37,13 @@ describe('Package Management Module', () => {
     };
 
     // Setup common mocks
-    vi.mocked(path.dirname).mockImplementation((p) => p.replace('/package.json', ''));
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(mockPackageContent));
+    vi.mocked(path.dirname, { partial: true }).mockImplementation((p) =>
+      p.replace('/package.json', ''),
+    );
+    vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+    vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue(
+      JSON.stringify(mockPackageContent),
+    );
   });
 
   afterEach(() => {
@@ -64,7 +68,7 @@ describe('Package Management Module', () => {
     });
 
     it('should exit if package file not found', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(false);
 
       try {
         getPackageInfo(mockPackagePath);
@@ -78,7 +82,9 @@ describe('Package Management Module', () => {
     });
 
     it('should exit if package name not found', () => {
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ version: '1.0.0' }));
+      vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue(
+        JSON.stringify({ version: '1.0.0' }),
+      );
 
       try {
         getPackageInfo(mockPackagePath);
@@ -93,7 +99,7 @@ describe('Package Management Module', () => {
 
     it('should handle read errors', () => {
       const error = new Error('Failed to read file');
-      vi.mocked(fs.readFileSync).mockImplementation(() => {
+      vi.mocked(fs.readFileSync, { partial: true }).mockImplementation(() => {
         throw error;
       });
 
@@ -114,7 +120,9 @@ describe('Package Management Module', () => {
     });
 
     it('should use 0.0.0 as default version if not specified', () => {
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: 'no-version-pkg' }));
+      vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue(
+        JSON.stringify({ name: 'no-version-pkg' }),
+      );
 
       const result = getPackageInfo(mockPackagePath);
       expect(result.version).toBe('0.0.0');
@@ -123,8 +131,8 @@ describe('Package Management Module', () => {
 
   describe('updatePackageVersion', () => {
     beforeEach(() => {
-      vi.mocked(fs.writeFileSync).mockClear();
-      vi.mocked(jsonOutput.addPackageUpdate).mockClear();
+      vi.mocked(fs.writeFileSync, { partial: true }).mockClear();
+      vi.mocked(jsonOutput.addPackageUpdate, { partial: true }).mockClear();
     });
 
     it('should update package version correctly', () => {
@@ -156,7 +164,7 @@ describe('Package Management Module', () => {
       const error = new Error('Failed to write file');
 
       // Mock the write operation to throw an error
-      vi.mocked(fs.writeFileSync).mockImplementation(() => {
+      vi.mocked(fs.writeFileSync, { partial: true }).mockImplementation(() => {
         throw error;
       });
 

@@ -33,8 +33,10 @@ describe('Version Utils', () => {
 
     it('should return the version from package.json', () => {
       // Mock fs functions
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ version: '1.2.3' }));
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue(
+        JSON.stringify({ version: '1.2.3' }),
+      );
 
       const result = getVersionFromPackageJson(mockPackageJsonPath, initialVersion);
 
@@ -44,7 +46,7 @@ describe('Version Utils', () => {
     });
 
     it('should return initialVersion if file does not exist', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(false);
 
       const result = getVersionFromPackageJson(mockPackageJsonPath, initialVersion);
 
@@ -53,8 +55,8 @@ describe('Version Utils', () => {
     });
 
     it('should return initialVersion if package.json has no version', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}));
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue(JSON.stringify({}));
 
       const result = getVersionFromPackageJson(mockPackageJsonPath, initialVersion);
 
@@ -66,8 +68,8 @@ describe('Version Utils', () => {
     });
 
     it('should handle file read errors', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockImplementation(() => {
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.readFileSync, { partial: true }).mockImplementation(() => {
         throw new Error('File read error');
       });
 
@@ -92,9 +94,9 @@ describe('Version Utils', () => {
     };
 
     it('should return the version from Cargo.toml', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('mock cargo content');
-      vi.mocked(TOML.parse).mockReturnValue(mockCargo);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue('mock cargo content');
+      vi.mocked(TOML.parse, { partial: true }).mockReturnValue(mockCargo);
 
       const result = getVersionFromCargoToml(mockCargoPath, initialVersion);
 
@@ -105,7 +107,7 @@ describe('Version Utils', () => {
     });
 
     it('should return initialVersion if file does not exist', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(false);
 
       const result = getVersionFromCargoToml(mockCargoPath, initialVersion);
 
@@ -114,9 +116,11 @@ describe('Version Utils', () => {
     });
 
     it('should return initialVersion if Cargo.toml has no version', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('mock cargo content');
-      vi.mocked(TOML.parse).mockReturnValue({ package: { name: 'test-package' } });
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue('mock cargo content');
+      vi.mocked(TOML.parse, { partial: true }).mockReturnValue({
+        package: { name: 'test-package' },
+      });
 
       const result = getVersionFromCargoToml(mockCargoPath, initialVersion);
 
@@ -128,8 +132,8 @@ describe('Version Utils', () => {
     });
 
     it('should handle file read errors', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockImplementation(() => {
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.readFileSync, { partial: true }).mockImplementation(() => {
         throw new Error('File read error');
       });
 
@@ -180,7 +184,7 @@ describe('Version Utils', () => {
   describe('bumpVersion', () => {
     beforeEach(() => {
       // Setup semver mocks
-      vi.mocked(semver.prerelease).mockImplementation((version) => {
+      vi.mocked(semver.prerelease, { partial: true }).mockImplementation((version) => {
         if (version === '1.0.0-beta.1') return ['beta', 1];
         if (version === '1.0.0-next.0') return ['next', 0];
         if (version === '2.0.0-alpha.3') return ['alpha', 3];
@@ -191,7 +195,7 @@ describe('Version Utils', () => {
         return null;
       });
 
-      vi.mocked(semver.parse).mockImplementation((version) => {
+      vi.mocked(semver.parse, { partial: true }).mockImplementation((version) => {
         if (version === '1.0.0-next.0') {
           return {
             major: 1,
@@ -243,31 +247,33 @@ describe('Version Utils', () => {
         return null;
       });
 
-      vi.mocked(semver.inc).mockImplementation((version, releaseType, identifier) => {
-        if (version === '1.0.0-beta.1' && releaseType === 'major') return '2.0.0';
-        if (version === '1.0.0-beta.1' && releaseType === 'minor') return '1.1.0';
-        if (version === '1.0.0-beta.1' && releaseType === 'patch') return '1.0.1';
-        if (version === '2.1.0-next.4' && releaseType === 'minor') return '2.2.0';
-        if (version === '3.5.0-beta.12' && releaseType === 'minor') return '3.6.0';
-        if (version === '4.0.1-rc.2' && releaseType === 'patch') return '4.0.2';
+      vi.mocked(semver.inc, { partial: true }).mockImplementation(
+        (version, releaseType, identifier) => {
+          if (version === '1.0.0-beta.1' && releaseType === 'major') return '2.0.0';
+          if (version === '1.0.0-beta.1' && releaseType === 'minor') return '1.1.0';
+          if (version === '1.0.0-beta.1' && releaseType === 'patch') return '1.0.1';
+          if (version === '2.1.0-next.4' && releaseType === 'minor') return '2.2.0';
+          if (version === '3.5.0-beta.12' && releaseType === 'minor') return '3.6.0';
+          if (version === '4.0.1-rc.2' && releaseType === 'patch') return '4.0.2';
 
-        if (version === '1.0.0' && releaseType === 'premajor' && identifier === 'alpha') {
-          return '2.0.0-alpha.0';
-        }
+          if (version === '1.0.0' && releaseType === 'premajor' && identifier === 'alpha') {
+            return '2.0.0-alpha.0';
+          }
 
-        // New cases for --prerelease flag
-        if (version === '1.3.0' && releaseType === 'premajor' && identifier === 'next') {
-          return '2.0.0-next.0';
-        }
-        if (version === '1.3.0' && releaseType === 'preminor' && identifier === 'next') {
-          return '1.4.0-next.0';
-        }
-        if (version === '1.3.1' && releaseType === 'prepatch' && identifier === 'next') {
-          return '1.3.2-next.0';
-        }
+          // New cases for --prerelease flag
+          if (version === '1.3.0' && releaseType === 'premajor' && identifier === 'next') {
+            return '2.0.0-next.0';
+          }
+          if (version === '1.3.0' && releaseType === 'preminor' && identifier === 'next') {
+            return '1.4.0-next.0';
+          }
+          if (version === '1.3.1' && releaseType === 'prepatch' && identifier === 'next') {
+            return '1.3.2-next.0';
+          }
 
-        return `${version}.incremented`;
-      });
+          return `${version}.incremented`;
+        },
+      );
     });
 
     it('should clean prerelease identifiers for major bumps', () => {
@@ -326,7 +332,7 @@ describe('Version Utils', () => {
     });
 
     it('should use standard increment for minor bump on 4.0.1-rc.2 (patch prerelease)', () => {
-      vi.mocked(semver.inc).mockClear(); // Clear previous calls
+      vi.mocked(semver.inc, { partial: true }).mockClear(); // Clear previous calls
       const result = bumpVersion('4.0.1-rc.2', 'minor');
       expect(semver.inc).toHaveBeenCalledWith('4.0.1-rc.2', 'minor');
       expect(result).toBe('4.0.1-rc.2.incremented');

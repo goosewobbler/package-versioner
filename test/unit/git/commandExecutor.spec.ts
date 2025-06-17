@@ -20,7 +20,7 @@ describe('commandExecutor', () => {
   describe('execAsync', () => {
     it('should execute a command and return stdout and stderr', async () => {
       // Mock successful execution
-      vi.mocked(cp.exec).mockImplementation(
+      vi.mocked(cp.exec, { partial: true }).mockImplementation(
         (
           _command: string,
           _options: cp.ExecOptions | null | undefined,
@@ -53,7 +53,7 @@ describe('commandExecutor', () => {
         code: 1,
       };
 
-      vi.mocked(cp.exec).mockImplementation(
+      vi.mocked(cp.exec, { partial: true }).mockImplementation(
         (
           _command: string,
           _options: cp.ExecOptions | null | undefined,
@@ -73,7 +73,7 @@ describe('commandExecutor', () => {
 
     it('should pass options to child_process.exec', async () => {
       // Mock successful execution
-      vi.mocked(cp.exec).mockImplementation(
+      vi.mocked(cp.exec, { partial: true }).mockImplementation(
         (
           _command: string,
           _options: cp.ExecOptions | null | undefined,
@@ -105,7 +105,7 @@ describe('commandExecutor', () => {
 
   describe('execSync', () => {
     it('should execute a command synchronously and return result', () => {
-      vi.mocked(cp.execSync).mockReturnValue(Buffer.from('sync output'));
+      vi.mocked(cp.execSync, { partial: true }).mockReturnValue(Buffer.from('sync output'));
 
       const result = execSync('sync command');
 
@@ -117,7 +117,7 @@ describe('commandExecutor', () => {
     });
 
     it('should pass options to child_process.execSync', () => {
-      vi.mocked(cp.execSync).mockReturnValue(Buffer.from(''));
+      vi.mocked(cp.execSync, { partial: true }).mockReturnValue(Buffer.from(''));
 
       execSync('sync command', { cwd: '/custom/path' });
 
@@ -132,7 +132,7 @@ describe('commandExecutor', () => {
 
     it('should throw error when execSync throws', () => {
       const syncError = new Error('Sync command failed');
-      vi.mocked(cp.execSync).mockImplementation(() => {
+      vi.mocked(cp.execSync, { partial: true }).mockImplementation(() => {
         throw syncError;
       });
 

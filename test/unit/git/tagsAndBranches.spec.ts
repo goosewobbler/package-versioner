@@ -27,7 +27,7 @@ describe('tagsAndBranches', () => {
   describe('getCommitsLength', () => {
     it('should return the number of commits since last tag', () => {
       // Setup
-      vi.mocked(execSync).mockReturnValue(Buffer.from('5'));
+      vi.mocked(execSync, { partial: true }).mockReturnValue(Buffer.from('5'));
 
       // Execute
       const result = getCommitsLength('packages/test');
@@ -41,7 +41,7 @@ describe('tagsAndBranches', () => {
 
     it('should return 0 if command fails', () => {
       // Setup
-      vi.mocked(execSync).mockImplementation(() => {
+      vi.mocked(execSync, { partial: true }).mockImplementation(() => {
         throw new Error('Command failed');
       });
 
@@ -61,7 +61,10 @@ describe('tagsAndBranches', () => {
     it('should return the latest semver tag', async () => {
       // Setup
       const mockGetSemverTags = await import('git-semver-tags');
-      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue(['v1.0.0', 'v0.9.0']);
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([
+        'v1.0.0',
+        'v0.9.0',
+      ]);
 
       // Execute
       const result = await getLatestTag();
@@ -74,7 +77,7 @@ describe('tagsAndBranches', () => {
     it('should return empty string if no tags found', async () => {
       // Setup
       const mockGetSemverTags = await import('git-semver-tags');
-      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([]);
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([]);
 
       // Execute
       const result = await getLatestTag();
@@ -86,7 +89,9 @@ describe('tagsAndBranches', () => {
     it('should log error and return empty string if getSemverTags fails', async () => {
       // Setup
       const mockGetSemverTags = await import('git-semver-tags');
-      vi.mocked(mockGetSemverTags.getSemverTags).mockRejectedValue(new Error('No names found'));
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockRejectedValue(
+        new Error('No names found'),
+      );
 
       // Execute
       const result = await getLatestTag();
@@ -101,7 +106,7 @@ describe('tagsAndBranches', () => {
   describe('lastMergeBranchName', () => {
     it('should return the last merged branch name matching patterns', async () => {
       // Setup
-      vi.mocked(execAsync).mockResolvedValue({
+      vi.mocked(execAsync, { partial: true }).mockResolvedValue({
         stdout: 'feature/test-branch',
         stderr: '',
       });
@@ -116,7 +121,7 @@ describe('tagsAndBranches', () => {
 
     it('should return null if command fails', async () => {
       // Setup
-      vi.mocked(execAsync).mockRejectedValue(new Error('Command failed'));
+      vi.mocked(execAsync, { partial: true }).mockRejectedValue(new Error('Command failed'));
       const consoleErrorSpy = vi.spyOn(console, 'error');
 
       // Execute
@@ -132,7 +137,7 @@ describe('tagsAndBranches', () => {
     it('should find tag in format packageName@versionPrefix+version', async () => {
       // Setup
       const mockGetSemverTags = await import('git-semver-tags');
-      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([
         'test-package@v1.0.0',
         'test-package@v0.9.0',
         'other-package@v1.2.0',
@@ -153,7 +158,7 @@ describe('tagsAndBranches', () => {
     it('should find tag in format versionPrefix+packageName@version', async () => {
       // Setup
       const mockGetSemverTags = await import('git-semver-tags');
-      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([
         'vtest-package@1.0.0',
         'vother-package@1.2.0',
       ]);
@@ -186,7 +191,7 @@ describe('tagsAndBranches', () => {
     it('should find tag in format packageName@version when no prefix is provided', async () => {
       // Setup
       const mockGetSemverTags = await import('git-semver-tags');
-      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([
         'test-package@1.0.0',
         'test-package@0.9.0',
         'other-package@1.2.0',
@@ -207,7 +212,7 @@ describe('tagsAndBranches', () => {
     it('should handle special characters in package name', async () => {
       // Setup
       const mockGetSemverTags = await import('git-semver-tags');
-      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([
         '@scope/test-package@v1.0.0',
         '@scope/other-package@v1.2.0',
       ]);
@@ -222,7 +227,7 @@ describe('tagsAndBranches', () => {
     it('should return empty string if no tags match packageName pattern', async () => {
       // Setup
       const mockGetSemverTags = await import('git-semver-tags');
-      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([
         'other-package@v1.0.0',
         'another-package@v0.9.0',
       ]);
@@ -246,7 +251,7 @@ describe('tagsAndBranches', () => {
     it('should return empty string if no tags are found at all', async () => {
       // Setup
       const mockGetSemverTags = await import('git-semver-tags');
-      vi.mocked(mockGetSemverTags.getSemverTags).mockResolvedValue([]);
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([]);
 
       // Execute
       const result = await getLatestTagForPackage('test-package', 'v');
@@ -261,7 +266,9 @@ describe('tagsAndBranches', () => {
     it('should log error and return empty string if getSemverTags fails', async () => {
       // Setup
       const mockGetSemverTags = await import('git-semver-tags');
-      vi.mocked(mockGetSemverTags.getSemverTags).mockRejectedValue(new Error('No names found'));
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockRejectedValue(
+        new Error('No names found'),
+      );
 
       // Execute
       const result = await getLatestTagForPackage('test-package', 'v');
@@ -278,7 +285,9 @@ describe('tagsAndBranches', () => {
     it('should handle non-standard error without Error instance', async () => {
       // Setup
       const mockGetSemverTags = await import('git-semver-tags');
-      vi.mocked(mockGetSemverTags.getSemverTags).mockRejectedValue('String error');
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockRejectedValue(
+        'String error',
+      );
 
       // Execute
       const result = await getLatestTagForPackage('test-package');

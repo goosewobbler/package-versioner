@@ -45,7 +45,7 @@ describe('Changelog Manager', () => {
 
   describe('parseChangelog', () => {
     it('returns null when changelog file does not exist', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(false);
 
       const result = changelogManager.parseChangelog('/path/to/changelog.md');
 
@@ -54,8 +54,8 @@ describe('Changelog Manager', () => {
     });
 
     it('returns basic structure when file exists but parsing is stubbed', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('# Changelog content');
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue('# Changelog content');
 
       const filePath = '/path/to/package/CHANGELOG.md';
       const result = changelogManager.parseChangelog(filePath);
@@ -69,8 +69,8 @@ describe('Changelog Manager', () => {
     });
 
     it('returns null and logs error when parsing fails', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockImplementation(() => {
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.readFileSync, { partial: true }).mockImplementation(() => {
         throw new Error('Read error');
       });
 
@@ -320,7 +320,7 @@ describe('Changelog Manager', () => {
     });
 
     it('creates new changelog when file does not exist', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(false);
 
       changelogManager.updateChangelog(packagePath, packageName, '', entries);
 
@@ -335,7 +335,7 @@ describe('Changelog Manager', () => {
     });
 
     it('adds entries to unreleased section when no version is specified', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
 
       changelogManager.updateChangelog(packagePath, packageName, '', entries);
 
@@ -353,7 +353,7 @@ describe('Changelog Manager', () => {
     });
 
     it('creates a new version and clears unreleased when version is specified', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
 
       const version = '1.1.0';
       changelogManager.updateChangelog(packagePath, packageName, version, entries);
@@ -382,7 +382,7 @@ describe('Changelog Manager', () => {
     });
 
     it('uses specified repository URL and format', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
 
       const repoUrl = 'https://github.com/user/repo';
       const format = 'angular' as const;
@@ -393,7 +393,7 @@ describe('Changelog Manager', () => {
     });
 
     it('handles errors during update', () => {
-      vi.mocked(fs.existsSync).mockImplementation(() => {
+      vi.mocked(fs.existsSync, { partial: true }).mockImplementation(() => {
         throw new Error('Test error');
       });
 

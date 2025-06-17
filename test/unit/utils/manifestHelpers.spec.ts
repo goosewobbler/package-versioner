@@ -23,11 +23,11 @@ describe('Manifest Helpers', () => {
     vi.clearAllMocks();
 
     // Setup default path.join mock
-    vi.mocked(path.join).mockImplementation((...segments) => segments.join('/'));
+    vi.mocked(path.join, { partial: true }).mockImplementation((...segments) => segments.join('/'));
 
     // Default mock: no files exist
-    vi.mocked(fs.existsSync).mockReturnValue(false);
-    vi.mocked(fs.readFileSync).mockReturnValue('');
+    vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(false);
+    vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue('');
   });
 
   afterEach(() => {
@@ -37,8 +37,12 @@ describe('Manifest Helpers', () => {
   describe('getVersionFromManifests', () => {
     it('should return package.json version when it exists and has a version', () => {
       // Setup
-      vi.mocked(fs.existsSync).mockImplementation((filePath) => filePath === mockPackageJsonPath);
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ version: '1.0.0' }));
+      vi.mocked(fs.existsSync, { partial: true }).mockImplementation(
+        (filePath) => filePath === mockPackageJsonPath,
+      );
+      vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue(
+        JSON.stringify({ version: '1.0.0' }),
+      );
 
       // Execute
       const result = getVersionFromManifests(mockPackageDir);
@@ -56,8 +60,10 @@ describe('Manifest Helpers', () => {
 
     it("should fall back to Cargo.toml when package.json doesn't exist", () => {
       // Setup
-      vi.mocked(fs.existsSync).mockImplementation((filePath) => filePath === mockCargoTomlPath);
-      vi.mocked(getCargoInfo).mockReturnValue({
+      vi.mocked(fs.existsSync, { partial: true }).mockImplementation(
+        (filePath) => filePath === mockCargoTomlPath,
+      );
+      vi.mocked(getCargoInfo, { partial: true }).mockReturnValue({
         name: 'test-package',
         version: '2.0.0',
         path: mockCargoTomlPath,
@@ -83,16 +89,16 @@ describe('Manifest Helpers', () => {
 
     it('should fall back to Cargo.toml when package.json exists but has no version', () => {
       // Setup - package.json exists but has no version
-      vi.mocked(fs.existsSync).mockImplementation(
+      vi.mocked(fs.existsSync, { partial: true }).mockImplementation(
         (filePath) => filePath === mockPackageJsonPath || filePath === mockCargoTomlPath,
       );
-      vi.mocked(fs.readFileSync).mockImplementation((filePath) => {
+      vi.mocked(fs.readFileSync, { partial: true }).mockImplementation((filePath) => {
         if (filePath === mockPackageJsonPath) {
           return JSON.stringify({ name: 'test-package' }); // No version
         }
         return '';
       });
-      vi.mocked(getCargoInfo).mockReturnValue({
+      vi.mocked(getCargoInfo, { partial: true }).mockReturnValue({
         name: 'test-package',
         version: '2.0.0',
         path: mockCargoTomlPath,
@@ -115,14 +121,14 @@ describe('Manifest Helpers', () => {
 
     it('should handle package.json parse errors and fall back to Cargo.toml', () => {
       // Setup - package.json exists but is invalid JSON
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockImplementation((filePath) => {
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.readFileSync, { partial: true }).mockImplementation((filePath) => {
         if (filePath === mockPackageJsonPath) {
           return 'invalid json';
         }
         return '';
       });
-      vi.mocked(getCargoInfo).mockReturnValue({
+      vi.mocked(getCargoInfo, { partial: true }).mockReturnValue({
         name: 'test-package',
         version: '2.0.0',
         path: mockCargoTomlPath,
@@ -148,9 +154,11 @@ describe('Manifest Helpers', () => {
 
     it('should handle Cargo.toml errors', () => {
       // Setup - Cargo.toml exists but fails to load
-      vi.mocked(fs.existsSync).mockImplementation((filePath) => filePath === mockCargoTomlPath);
+      vi.mocked(fs.existsSync, { partial: true }).mockImplementation(
+        (filePath) => filePath === mockCargoTomlPath,
+      );
       const mockError = new Error('Cargo.toml error');
-      vi.mocked(getCargoInfo).mockImplementation(() => {
+      vi.mocked(getCargoInfo, { partial: true }).mockImplementation(() => {
         throw mockError;
       });
 
@@ -187,9 +195,11 @@ describe('Manifest Helpers', () => {
 
     it('should return null when both manifests exist but neither has a version', () => {
       // Setup - both files exist but neither has a version
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: 'test-package' })); // No version
-      vi.mocked(getCargoInfo).mockReturnValue({
+      vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+      vi.mocked(fs.readFileSync, { partial: true }).mockReturnValue(
+        JSON.stringify({ name: 'test-package' }),
+      ); // No version
+      vi.mocked(getCargoInfo, { partial: true }).mockReturnValue({
         name: 'test-package',
         version: '', // No version
         path: mockCargoTomlPath,

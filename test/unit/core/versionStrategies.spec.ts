@@ -81,23 +81,27 @@ describe('Version Strategies', () => {
     vi.resetAllMocks();
 
     // Setup common mocks
-    vi.mocked(path.join).mockImplementation((...args) => args.join('/'));
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(git.getLatestTag).mockResolvedValue('v1.0.0');
-    vi.mocked(calculator.calculateVersion).mockResolvedValue('1.1.0');
-    vi.mocked(formatting.formatVersionPrefix).mockReturnValue('v');
-    vi.mocked(formatting.formatTag).mockReturnValue('v1.1.0');
-    vi.mocked(formatting.formatCommitMessage).mockReturnValue('chore(release): v1.1.0');
+    vi.mocked(path.join, { partial: true }).mockImplementation((...args) => args.join('/'));
+    vi.mocked(fs.existsSync, { partial: true }).mockReturnValue(true);
+    vi.mocked(git.getLatestTag, { partial: true }).mockResolvedValue('v1.0.0');
+    vi.mocked(calculator.calculateVersion, { partial: true }).mockResolvedValue('1.1.0');
+    vi.mocked(formatting.formatVersionPrefix, { partial: true }).mockReturnValue('v');
+    vi.mocked(formatting.formatTag, { partial: true }).mockReturnValue('v1.1.0');
+    vi.mocked(formatting.formatCommitMessage, { partial: true }).mockReturnValue(
+      'chore(release): v1.1.0',
+    );
 
     // Setup PackageProcessor mock
-    vi.mocked(PackageProcessor.prototype.processPackages).mockResolvedValue({
+    vi.mocked(PackageProcessor.prototype.processPackages, { partial: true }).mockResolvedValue({
       updatedPackages: [
         { name: 'package-a', version: '1.1.0', path: '/test/workspace/packages/a' },
       ],
       tags: ['v1.1.0'],
       commitMessage: 'chore(release): v1.1.0',
     });
-    vi.mocked(PackageProcessor.prototype.setTargets).mockImplementation(() => undefined);
+    vi.mocked(PackageProcessor.prototype.setTargets, { partial: true }).mockImplementation(
+      () => undefined,
+    );
   });
 
   afterEach(() => {
@@ -284,7 +288,7 @@ describe('Version Strategies', () => {
 
     it('should exit early if no version change needed', async () => {
       // Mock calculateVersion to return empty string (no change)
-      vi.mocked(calculator.calculateVersion).mockResolvedValue('');
+      vi.mocked(calculator.calculateVersion, { partial: true }).mockResolvedValue('');
 
       const config: Partial<Config> = {
         ...defaultConfig,
@@ -457,7 +461,7 @@ describe('Version Strategies', () => {
 
     it('should exit early if no version change needed', async () => {
       // Mock calculateVersion to return empty string (no change)
-      vi.mocked(calculator.calculateVersion).mockResolvedValue('');
+      vi.mocked(calculator.calculateVersion, { partial: true }).mockResolvedValue('');
 
       const config: Partial<Config> = {
         ...defaultConfig,
@@ -544,7 +548,7 @@ describe('Version Strategies', () => {
 
     it('should handle case when no packages were updated', async () => {
       // Mock PackageProcessor to return no updates
-      vi.mocked(PackageProcessor.prototype.processPackages).mockResolvedValue({
+      vi.mocked(PackageProcessor.prototype.processPackages, { partial: true }).mockResolvedValue({
         updatedPackages: [],
         tags: [],
       });

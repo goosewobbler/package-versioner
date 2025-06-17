@@ -46,7 +46,8 @@ const { getPackageVersionFallback } = vi.hoisted(() => ({
 describe('Version Calculator', () => {
   // Default config for tests
   const defaultConfig: Partial<Config> = {
-    preset: 'conventional-commits',
+    type: 'patch',
+    preset: 'angular',
     versionPrefix: 'v',
     tagTemplate: '${prefix}${version}',
     packageTagTemplate: '${packageName}@${prefix}${version}',
@@ -576,7 +577,7 @@ describe('Version Calculator', () => {
       const version = await calculateVersion(defaultConfig as Config, options);
 
       // Verify
-      expect(Bumper.prototype.loadPreset).toHaveBeenCalledWith('conventional-commits');
+      expect(Bumper.prototype.loadPreset).toHaveBeenCalledWith('angular');
       expect(Bumper.prototype.bump).toHaveBeenCalled();
       expect(versionUtils.bumpVersion).toHaveBeenCalledWith('1.0.0', 'patch', undefined);
       expect(version).toBe('1.0.1');

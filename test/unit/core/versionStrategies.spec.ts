@@ -72,7 +72,6 @@ describe('Version Strategies', () => {
     preset: 'conventional-commits',
     versionPrefix: 'v',
     tagTemplate: '${prefix}${version}',
-    packageTagTemplate: '${packageName}@${prefix}${version}',
     baseBranch: 'main',
   };
 
@@ -278,11 +277,13 @@ describe('Version Strategies', () => {
       // Execute
       await syncedStrategy(mockPackages);
 
-      // Verify that formatCommitMessage was called with the right template and only 2 parameters
-      // The synced strategy doesn't pass packageName to formatCommitMessage
+      // Verify that formatCommitMessage was called with the right template and parameters
+      // The synced strategy no longer suppresses warnings by default
       expect(formatting.formatCommitMessage).toHaveBeenCalledWith(
         'chore: release ${packageName}@${version} [skip-ci]',
         '1.1.0',
+        undefined,
+        undefined,
       );
     });
 

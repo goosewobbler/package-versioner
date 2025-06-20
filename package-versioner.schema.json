@@ -53,7 +53,7 @@
         "minLength": 1
       },
       "default": [],
-      "description": "List of packages to include in versioning"
+      "description": "Array of package names or patterns to target for versioning. Supports exact names (e.g., '@scope/package-a'), scope wildcards (e.g., '@scope/*'), and global wildcards (e.g., '*')"
     },
     "mainPackage": {
       "type": "string",

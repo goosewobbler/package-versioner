@@ -14,6 +14,7 @@ import { PackageProcessor } from '../package/packageProcessor.js';
 import type { Config } from '../types.js';
 import { formatCommitMessage, formatTag, formatVersionPrefix } from '../utils/formatting.js';
 import { log } from '../utils/logging.js';
+import { shouldProcessPackage as shouldProcessPackageUtil } from '../utils/packageMatching.js';
 import { calculateVersion } from './versionCalculator.js';
 import type { PackagesWithRoot } from './versionEngine.js';
 
@@ -32,19 +33,7 @@ export type StrategyFunction = (packages: PackagesWithRoot, targets?: string[]) 
  */
 function shouldProcessPackage(pkg: Package, config: Config, targets: string[] = []): boolean {
   const pkgName = pkg.packageJson.name;
-
-  // Skip packages explicitly excluded
-  if (config.skip?.includes(pkgName)) {
-    return false;
-  }
-
-  // If no targets specified, process all non-skipped packages
-  if (!targets || targets.length === 0) {
-    return true;
-  }
-
-  // Otherwise, only process packages in targets list
-  return targets.includes(pkgName);
+  return shouldProcessPackageUtil(pkgName, targets, config.skip);
 }
 
 /**

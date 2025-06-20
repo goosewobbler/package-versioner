@@ -12,6 +12,7 @@ import { formatCommitMessage, formatTag, formatVersionPrefix } from '../utils/fo
 import { addTag, setCommitMessage } from '../utils/jsonOutput.js';
 import { log } from '../utils/logging.js';
 import { getVersionFromManifests } from '../utils/manifestHelpers.js';
+import { shouldProcessPackage } from '../utils/packageMatching.js';
 import { updatePackageVersion } from './packageManagement.js';
 
 export interface PackageProcessorOptions {
@@ -87,24 +88,17 @@ export class PackageProcessor {
     // 2. Apply filtering to determine which packages to process
     const pkgsToConsider = packages.filter((pkg) => {
       const pkgName = pkg.packageJson.name;
+      const shouldProcess = shouldProcessPackage(pkgName, this.targets, this.skip);
 
-      // Skip packages explicitly excluded
-      if (this.skip?.includes(pkgName)) {
-        log(`Skipping package ${pkgName} as it's in the skip list.`, 'info');
-        return false;
+      if (!shouldProcess) {
+        if (this.skip?.includes(pkgName)) {
+          log(`Skipping package ${pkgName} as it's in the skip list.`, 'info');
+        } else {
+          log(`Package ${pkgName} not in target list, skipping.`, 'info');
+        }
       }
 
-      // If targets is empty, process all non-skipped packages
-      if (!this.targets || this.targets.length === 0) {
-        return true;
-      }
-
-      // Otherwise, only process packages explicitly targeted
-      const isTargeted = this.targets.includes(pkgName);
-      if (!isTargeted) {
-        log(`Package ${pkgName} not in target list, skipping.`, 'info');
-      }
-      return isTargeted;
+      return shouldProcess;
     });
 
     log(`Found ${pkgsToConsider.length} targeted package(s) to process after filtering.`, 'info');

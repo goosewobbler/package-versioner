@@ -156,7 +156,13 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
       }
 
       // Create tag using the template
-      const nextTag = formatTag(nextVersion, formattedPrefix, null, tagTemplate);
+      const nextTag = formatTag(
+        nextVersion,
+        formattedPrefix,
+        null,
+        tagTemplate,
+        config.packageSpecificTags,
+      );
       const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion);
 
       // Use the Git service functions
@@ -184,7 +190,6 @@ export function createSingleStrategy(config: Config): StrategyFunction {
         mainPackage,
         versionPrefix,
         tagTemplate,
-        packageTagTemplate,
         commitMessage = 'chore(release): ${version}',
         dryRun,
         skipHooks,
@@ -214,7 +219,10 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       const formattedPrefix = formatVersionPrefix(versionPrefix || 'v');
 
       // Try to get the latest tag specific to this package first
-      let latestTagResult = await getLatestTagForPackage(packageName, formattedPrefix);
+      let latestTagResult = await getLatestTagForPackage(packageName, formattedPrefix, {
+        tagTemplate,
+        packageSpecificTags: config.packageSpecificTags,
+      });
 
       // Fallback to global tag if no package-specific tag exists
       if (!latestTagResult) {
@@ -258,7 +266,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
         formattedPrefix,
         packageName,
         tagTemplate,
-        packageTagTemplate,
+        config.packageSpecificTags,
       );
       const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion, packageName);
 
@@ -300,7 +308,6 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
     targets: config.packages || [],
     versionPrefix: config.versionPrefix || 'v',
     tagTemplate: config.tagTemplate,
-    packageTagTemplate: config.packageTagTemplate,
     commitMessageTemplate: config.commitMessage || '',
     dryRun: config.dryRun || false,
     skipHooks: config.skipHooks || false,

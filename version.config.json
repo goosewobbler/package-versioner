@@ -5,7 +5,10 @@
   "updateInternalDependencies": "patch",
   "commitMessage": "chore: release ${packageName}@${version} [skip-ci]",
   "updateChangelog": true,
+  "tagTemplate": "${packageName}@${prefix}${version}",
+  "packageSpecificTags": true,
   "cargo": {
     "enabled": true
-  }
+  },
+  "packages": ["packages/*", "!packages/middleware", "packages/middleware/node"]
 }

@@ -19,7 +19,6 @@ export interface PackageProcessorOptions {
   targets?: string[];
   versionPrefix?: string;
   tagTemplate?: string;
-  packageTagTemplate?: string;
   commitMessageTemplate?: string;
   dryRun?: boolean;
   skipHooks?: boolean;
@@ -44,7 +43,6 @@ export class PackageProcessor {
   private targets: string[];
   private versionPrefix: string;
   private tagTemplate?: string;
-  private packageTagTemplate?: string;
   private commitMessageTemplate: string;
   private dryRun: boolean;
   private skipHooks: boolean;
@@ -58,7 +56,6 @@ export class PackageProcessor {
     this.targets = options.targets || [];
     this.versionPrefix = options.versionPrefix || 'v';
     this.tagTemplate = options.tagTemplate;
-    this.packageTagTemplate = options.packageTagTemplate;
     this.commitMessageTemplate = options.commitMessageTemplate || '';
     this.dryRun = options.dryRun || false;
     this.skipHooks = options.skipHooks || false;
@@ -126,7 +123,10 @@ export class PackageProcessor {
       // Try to get the latest tag specific to this package first
       let latestTagResult = '';
       try {
-        latestTagResult = await getLatestTagForPackage(name, this.versionPrefix);
+        latestTagResult = await getLatestTagForPackage(name, this.versionPrefix, {
+          tagTemplate: this.tagTemplate,
+          packageSpecificTags: this.fullConfig.packageSpecificTags,
+        });
       } catch (error) {
         // Log the specific error, but continue with fallback
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -303,7 +303,7 @@ export class PackageProcessor {
         this.versionPrefix,
         name,
         this.tagTemplate,
-        this.packageTagTemplate,
+        this.fullConfig.packageSpecificTags,
       );
       const tagMessage = `chore(release): ${name} ${nextVersion}`;
 

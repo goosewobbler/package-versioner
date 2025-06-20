@@ -2,6 +2,8 @@
  * Formatting utilities for package-versioner
  */
 
+import { log } from './logging.js';
+
 /**
  * Escapes special characters in a string to be used in a RegExp safely
  * Prevents regex injection when using user-provided strings in RegExp constructors
@@ -11,13 +13,13 @@ export function escapeRegExp(string: string): string {
 }
 
 /**
- * Format a version tag with optional prefix and package name based on templates
+ * Format a version tag with optional prefix and package name based on template
  *
  * @param version The version number
  * @param versionPrefix The prefix to use in the template
  * @param packageName Optional package name
- * @param tagTemplate Template for non-package tags
- * @param packageTagTemplate Template for package-specific tags
+ * @param tagTemplate Template for formatting tags
+ * @param packageSpecificTags Whether to use package-specific tagging
  * @returns Formatted tag string
  */
 export function formatTag(
@@ -25,19 +27,26 @@ export function formatTag(
   versionPrefix: string,
   packageName?: string | null,
   tagTemplate = '${prefix}${version}',
-  packageTagTemplate = '${packageName}@${prefix}${version}',
+  packageSpecificTags = false,
 ): string {
+  // Check for potential configuration issues
+  if (tagTemplate.includes('${packageName}') && !packageSpecificTags) {
+    log(
+      'Warning: tagTemplate contains ${packageName} but packageSpecificTags is not enabled. ' +
+        'This will result in an empty package name in tags. ' +
+        'Set packageSpecificTags: true in your configuration to enable package-specific tagging.',
+      'warning',
+    );
+  }
+
   // Variables available for templates
   const variables = {
     version,
     prefix: versionPrefix || '',
-    packageName: packageName || '',
+    packageName: packageSpecificTags && packageName ? packageName : '',
   };
 
-  // Use the appropriate template based on whether a package name is provided
-  const template = packageName ? packageTagTemplate : tagTemplate;
-
-  return createTemplateString(template, variables);
+  return createTemplateString(tagTemplate, variables);
 }
 
 /**
@@ -70,6 +79,15 @@ export function formatCommitMessage(
   packageName?: string | undefined,
   scope?: string | undefined,
 ): string {
+  // Check for potential configuration issues
+  if (template.includes('${packageName}') && !packageName) {
+    log(
+      'Warning: commitMessage template contains ${packageName} but no package name was provided. ' +
+        'This will result in an empty package name in commit messages.',
+      'warning',
+    );
+  }
+
   return createTemplateString(template, {
     version,
     scope,

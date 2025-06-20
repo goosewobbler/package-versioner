@@ -18,11 +18,10 @@
       "default": "${prefix}${version}",
       "description": "Template for formatting Git tags"
     },
-    "packageTagTemplate": {
-      "type": "string",
-      "minLength": 1,
-      "default": "${packageName}@${prefix}${version}",
-      "description": "Template for formatting package-specific Git tags"
+    "packageSpecificTags": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to enable package-specific tagging behavior"
     },
     "preset": {
       "type": "string",

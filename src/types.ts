@@ -29,9 +29,9 @@ export interface VersionConfigBase {
  * Configuration for the versioner
  */
 export interface Config extends VersionConfigBase {
-  // Tag formatting templates with default templates
+  // Tag formatting template
   tagTemplate: string; // Default: '${prefix}${version}'
-  packageTagTemplate: string; // Default: '${packageName}@${prefix}${version}'
+  packageSpecificTags?: boolean; // Default: false - Set to true to enable package-specific tagging
 
   preset: string;
   synced: boolean;
@@ -115,7 +115,6 @@ export interface CargoDepSpec {
  */
 export interface TagFormat {
   tagTemplate?: string;
-  packageTagTemplate?: string;
   prefix?: string;
   name?: string;
   synced: boolean;

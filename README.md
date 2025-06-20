@@ -108,7 +108,7 @@ Customize behavior by creating a `version.config.json` file in your project root
     "docs",
     "e2e"
   ],
-  "packages": ["packages/*"],
+  "packages": ["@mycompany/*"],
   "mainPackage": "primary-package",
   "cargo": {
     "enabled": true,
@@ -133,12 +133,49 @@ Customize behavior by creating a `version.config.json` file in your project root
 #### Monorepo-Specific Options
 - `synced`: Whether all packages should be versioned together (default: true)
 - `skip`: Array of package names to exclude from versioning
-- `packages`: Glob patterns for package discovery (e.g., ["packages/*"])
+- `packages`: Array of package names or patterns to target for versioning. Supports exact names, scope wildcards, and global wildcards (e.g., ["@scope/package-a", "@scope/*", "*"])
 - `mainPackage`: Package name whose commit history should drive version determination
 - `packageSpecificTags`: Whether to enable package-specific tagging behaviour (default: false)
 - `updateInternalDependencies`: How to update internal dependencies ("patch", "minor", "major", or "inherit")
 
 For more details on CI/CD integration and advanced usage, see [CI/CD Integration](./docs/CI_CD_INTEGRATION.md).
+
+### Package Targeting
+
+The `packages` configuration option allows you to specify which packages should be processed for versioning. It supports several pattern types:
+
+#### Exact Package Names
+```json
+{
+  "packages": ["@mycompany/core", "@mycompany/utils", "standalone-package"]
+}
+```
+
+#### Scope Wildcards
+Target all packages within a specific scope:
+```json
+{
+  "packages": ["@mycompany/*"]
+}
+```
+
+#### Global Wildcard
+Target all packages in the workspace:
+```json
+{
+  "packages": ["*"]
+}
+```
+
+#### Mixed Patterns
+Combine different pattern types:
+```json
+{
+  "packages": ["@mycompany/*", "@utils/logger", "legacy-package"]
+}
+```
+
+**Note**: Package discovery is handled by your workspace configuration (pnpm-workspace.yaml, package.json workspaces, etc.). The `packages` option only filters which discovered packages to process.
 
 ### Package-Specific Tagging
 

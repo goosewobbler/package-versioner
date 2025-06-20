@@ -38,7 +38,29 @@ export function extractChangelogEntriesFromCommits(
       .map((commit) => parseCommitMessage(commit))
       .filter((entry): entry is ChangelogEntry => entry !== null);
   } catch (error) {
-    log(`Error extracting commits: ${error}`, 'error');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Provide more helpful error messages for common git issues
+    if (errorMessage.includes('ambiguous argument') && errorMessage.includes('unknown revision')) {
+      // This is likely a tag that doesn't exist
+      const tagName = revisionRange.split('..')[0] || revisionRange;
+
+      // Check if it might be a package-specific tag format issue
+      if (tagName.startsWith('v') && !tagName.includes('@')) {
+        log(
+          `Error: Tag "${tagName}" not found. If you're using package-specific tags (like "package-name@v1.0.0"), you may need to configure "tagTemplate" in your version.config.json to use: \${packageName}@\${prefix}\${version}`,
+          'error',
+        );
+      } else {
+        log(
+          `Error: Tag or revision "${tagName}" not found in the repository. Please check if this tag exists or if you need to fetch it from the remote.`,
+          'error',
+        );
+      }
+    } else {
+      log(`Error extracting commits: ${errorMessage}`, 'error');
+    }
+
     return [];
   }
 }

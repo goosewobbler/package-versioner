@@ -1,12 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createTemplateString,
   formatCommitMessage,
   formatTag,
   formatVersionPrefix,
 } from '../../../src/utils/formatting.js';
+import * as logging from '../../../src/utils/logging.js';
 
 describe('Formatting Utilities', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(logging, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('formatTag', () => {
     it('should use default template when no templates provided', () => {
       const result = formatTag('1.0.0', 'v');
@@ -14,28 +25,69 @@ describe('Formatting Utilities', () => {
     });
 
     it('should format package tags using package template', () => {
-      const result = formatTag('1.0.0', 'v', 'my-package');
+      const result = formatTag(
+        '1.0.0',
+        'v',
+        'my-package',
+        '${packageName}@${prefix}${version}',
+        true,
+      );
       expect(result).toBe('my-package@v1.0.0');
     });
 
     it('should support custom non-package tag templates', () => {
-      const result = formatTag('1.0.0', 'v', null, 'version-${version}');
+      const result = formatTag('1.0.0', 'v', undefined, 'version-${version}', false);
       expect(result).toBe('version-1.0.0');
     });
 
     it('should support custom package tag templates', () => {
-      const result = formatTag('1.0.0', 'v', 'my-package', undefined, '${packageName}-${version}');
+      const result = formatTag('1.0.0', 'v', 'my-package', '${packageName}-${version}', true);
       expect(result).toBe('my-package-1.0.0');
     });
 
     it('should handle complex templates', () => {
-      const result = formatTag('1.0.0', 'v', null, '[${prefix}] ${version}');
+      const result = formatTag('1.0.0', 'v', undefined, '[${prefix}] ${version}', false);
       expect(result).toBe('[v] 1.0.0');
     });
 
     it('should handle empty prefix', () => {
       const result = formatTag('1.0.0', '');
       expect(result).toBe('1.0.0');
+    });
+
+    it('should warn when using ${packageName} without packageSpecificTags', () => {
+      const result = formatTag(
+        '1.0.0',
+        'v',
+        'my-package',
+        '${packageName}@${prefix}${version}',
+        false,
+      );
+      expect(result).toBe('@v1.0.0'); // packageName is empty
+      expect(logSpy).toHaveBeenCalledWith(
+        'Warning: tagTemplate contains ${packageName} but packageSpecificTags is not enabled. ' +
+          'This will result in an empty package name in tags. ' +
+          'Set packageSpecificTags: true in your configuration to enable package-specific tagging.',
+        'warning',
+      );
+    });
+
+    it('should not warn when using ${packageName} with packageSpecificTags enabled', () => {
+      const result = formatTag(
+        '1.0.0',
+        'v',
+        'my-package',
+        '${packageName}@${prefix}${version}',
+        true,
+      );
+      expect(result).toBe('my-package@v1.0.0');
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it('should not warn when not using ${packageName} regardless of packageSpecificTags', () => {
+      const result = formatTag('1.0.0', 'v', 'my-package', '${prefix}${version}', false);
+      expect(result).toBe('v1.0.0');
+      expect(logSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -71,7 +123,7 @@ describe('Formatting Utilities', () => {
       const result = formatCommitMessage(
         'Release ${scope} version ${version}',
         '1.0.0',
-        null,
+        undefined,
         'app',
       );
       expect(result).toBe('Release app version 1.0.0');
@@ -99,6 +151,32 @@ describe('Formatting Utilities', () => {
         'app',
       );
       expect(result).toBe('Release my-package@1.0.0 in app scope');
+    });
+
+    it('should warn when using ${packageName} without providing packageName', () => {
+      const result = formatCommitMessage('Release ${packageName}@${version}', '1.0.0');
+      expect(result).toBe('Release @1.0.0'); // packageName is empty
+      expect(logSpy).toHaveBeenCalledWith(
+        'Warning: commitMessage template contains ${packageName} but no package name was provided. ' +
+          'This will result in an empty package name in commit messages.',
+        'warning',
+      );
+    });
+
+    it('should not warn when using ${packageName} with packageName provided', () => {
+      const result = formatCommitMessage(
+        'Release ${packageName}@${version}',
+        '1.0.0',
+        'my-package',
+      );
+      expect(result).toBe('Release my-package@1.0.0');
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it('should not warn when not using ${packageName} in template', () => {
+      const result = formatCommitMessage('Release version ${version}', '1.0.0');
+      expect(result).toBe('Release version 1.0.0');
+      expect(logSpy).not.toHaveBeenCalled();
     });
   });
 

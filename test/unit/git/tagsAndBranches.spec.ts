@@ -144,13 +144,15 @@ describe('tagsAndBranches', () => {
       ]);
 
       // Execute
-      const result = await getLatestTagForPackage('test-package', 'v');
+      const result = await getLatestTagForPackage('test-package', 'v', {
+        packageSpecificTags: true,
+      });
 
       // Verify
       expect(result).toBe('test-package@v1.0.0');
       expect(mockGetSemverTags.getSemverTags).toHaveBeenCalledWith({ tagPrefix: 'v' });
       expect(log).toHaveBeenCalledWith(
-        'Looking for tags for package test-package with prefix v',
+        'Looking for tags for package test-package with prefix v, packageSpecificTags: true',
         'debug',
       );
     });
@@ -164,14 +166,16 @@ describe('tagsAndBranches', () => {
       ]);
 
       // Execute
-      const result = await getLatestTagForPackage('test-package', 'v');
+      const result = await getLatestTagForPackage('test-package', 'v', {
+        packageSpecificTags: true,
+      });
 
       // Verify
       expect(result).toBe('vtest-package@1.0.0');
 
       // Check for the actual log messages in the correct order
       expect(log).toHaveBeenCalledWith(
-        'Looking for tags for package test-package with prefix v',
+        'Looking for tags for package test-package with prefix v, packageSpecificTags: true',
         'debug',
       );
 
@@ -198,13 +202,15 @@ describe('tagsAndBranches', () => {
       ]);
 
       // Execute
-      const result = await getLatestTagForPackage('test-package');
+      const result = await getLatestTagForPackage('test-package', undefined, {
+        packageSpecificTags: true,
+      });
 
       // Verify
       expect(result).toBe('test-package@1.0.0');
       expect(mockGetSemverTags.getSemverTags).toHaveBeenCalledWith({ tagPrefix: undefined });
       expect(log).toHaveBeenCalledWith(
-        'Looking for tags for package test-package with prefix none',
+        'Looking for tags for package test-package with prefix none, packageSpecificTags: true',
         'debug',
       );
     });
@@ -218,7 +224,9 @@ describe('tagsAndBranches', () => {
       ]);
 
       // Execute
-      const result = await getLatestTagForPackage('@scope/test-package', 'v');
+      const result = await getLatestTagForPackage('@scope/test-package', 'v', {
+        packageSpecificTags: true,
+      });
 
       // Verify
       expect(result).toBe('@scope/test-package@v1.0.0');
@@ -233,10 +241,20 @@ describe('tagsAndBranches', () => {
       ]);
 
       // Execute
-      const result = await getLatestTagForPackage('test-package', 'v');
+      const result = await getLatestTagForPackage('test-package', 'v', {
+        packageSpecificTags: true,
+      });
 
       // Verify
       expect(result).toBe('');
+      expect(log).toHaveBeenCalledWith(
+        'Looking for tags for package test-package with prefix v, packageSpecificTags: true',
+        'debug',
+      );
+      expect(log).toHaveBeenCalledWith(
+        'Retrieved 2 tags: other-package@v1.0.0, another-package@v0.9.0',
+        'debug',
+      );
       expect(log).toHaveBeenCalledWith('Found 0 package tags for test-package', 'debug');
       expect(log).toHaveBeenCalledWith(
         'No matching tags found for pattern: packageName@version',
@@ -254,10 +272,16 @@ describe('tagsAndBranches', () => {
       vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([]);
 
       // Execute
-      const result = await getLatestTagForPackage('test-package', 'v');
+      const result = await getLatestTagForPackage('test-package', 'v', {
+        packageSpecificTags: true,
+      });
 
       // Verify
       expect(result).toBe('');
+      expect(log).toHaveBeenCalledWith(
+        'Looking for tags for package test-package with prefix v, packageSpecificTags: true',
+        'debug',
+      );
       expect(log).toHaveBeenCalledWith('Retrieved 0 tags: ', 'debug');
       expect(log).toHaveBeenCalledWith('Found 0 package tags for test-package', 'debug');
       expect(log).toHaveBeenCalledWith('No tags available in the repository', 'debug');

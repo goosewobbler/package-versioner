@@ -116,7 +116,6 @@ describe('Package Processor', () => {
     preset: 'conventional',
     versionPrefix: 'v',
     tagTemplate: '${prefix}${version}',
-    packageTagTemplate: '${packageName}@${prefix}${version}',
     baseBranch: 'main',
     packages: [],
     branchPattern: ['feature/*'],
@@ -984,7 +983,14 @@ describe('Package Processor', () => {
       await processor.processPackages([packageA]);
 
       // Should use package-specific tag
-      expect(gitTags.getLatestTagForPackage).toHaveBeenCalledWith('package-a', expect.anything());
+      expect(gitTags.getLatestTagForPackage).toHaveBeenCalledWith(
+        'package-a',
+        'v',
+        expect.objectContaining({
+          packageSpecificTags: undefined,
+          tagTemplate: undefined,
+        }),
+      );
       // Global tag getter should not be called
       expect(mockGetLatestTagFn).not.toHaveBeenCalled();
     });
@@ -1018,7 +1024,14 @@ describe('Package Processor', () => {
       await processor.processPackages([packageA]);
 
       // Verify that package was processed successfully
-      expect(gitTags.getLatestTagForPackage).toHaveBeenCalledWith('package-a', expect.anything());
+      expect(gitTags.getLatestTagForPackage).toHaveBeenCalledWith(
+        'package-a',
+        'v',
+        expect.objectContaining({
+          packageSpecificTags: undefined,
+          tagTemplate: undefined,
+        }),
+      );
       expect(manifestSpy).toHaveBeenCalled();
       // Verify that a tag was created, indicating successful processing
       expect(gitCommands.createGitTag).toHaveBeenCalled();
@@ -1047,7 +1060,14 @@ describe('Package Processor', () => {
       await processor.processPackages([packageA]);
 
       // Verify that the package was processed successfully
-      expect(gitTags.getLatestTagForPackage).toHaveBeenCalledWith('package-a', expect.anything());
+      expect(gitTags.getLatestTagForPackage).toHaveBeenCalledWith(
+        'package-a',
+        'v',
+        expect.objectContaining({
+          packageSpecificTags: undefined,
+          tagTemplate: undefined,
+        }),
+      );
       // Verify that a tag was created, indicating successful processing
       expect(gitCommands.createGitTag).toHaveBeenCalled();
     });
@@ -1081,7 +1101,14 @@ describe('Package Processor', () => {
       await processor.processPackages([packageA]);
 
       // Verify that the package was processed and no errors were thrown
-      expect(gitTags.getLatestTagForPackage).toHaveBeenCalledWith('package-a', expect.anything());
+      expect(gitTags.getLatestTagForPackage).toHaveBeenCalledWith(
+        'package-a',
+        'v',
+        expect.objectContaining({
+          packageSpecificTags: undefined,
+          tagTemplate: undefined,
+        }),
+      );
       expect(manifestHelpers.getVersionFromManifests).toHaveBeenCalled();
       // Verify that a tag was created, indicating successful processing
       expect(gitCommands.createGitTag).toHaveBeenCalled();
@@ -1197,7 +1224,7 @@ describe('Package Processor', () => {
       });
     });
 
-    it('should use custom packageTagTemplate for package-specific tags', async () => {
+    it('should use custom tagTemplate for package-specific tags', async () => {
       // Setup a custom package tag format
       vi.spyOn(formatting, 'formatTag').mockImplementation(
         (version, _prefix, packageName) => `${packageName}/v${version}`,
@@ -1208,7 +1235,8 @@ describe('Package Processor', () => {
         config: {},
         fullConfig: {
           ...mockConfig,
-          packageTagTemplate: '${packageName}/v${version}',
+          tagTemplate: '${packageName}/v${version}',
+          packageSpecificTags: true,
         },
       });
 

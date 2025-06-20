@@ -13,100 +13,112 @@ export function escapeRegExp(string: string): string {
 }
 
 /**
- * Format a version tag with optional prefix and package name based on template
- *
- * @param version The version number
- * @param versionPrefix The prefix to use in the template
- * @param packageName Optional package name
- * @param tagTemplate Template for formatting tags
- * @param packageSpecificTags Whether to use package-specific tagging
- * @returns Formatted tag string
+ * Format a version prefix by ensuring it doesn't end with a slash
+ */
+export function formatVersionPrefix(prefix: string): string {
+  return prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+}
+
+/**
+ * Format a tag based on the provided parameters
  */
 export function formatTag(
   version: string,
-  versionPrefix: string,
+  prefix: string,
   packageName?: string | null,
-  tagTemplate = '${prefix}${version}',
-  packageSpecificTags = false,
+  template?: string,
+  packageSpecificTags?: boolean,
 ): string {
-  // Check for potential configuration issues
-  if (tagTemplate.includes('${packageName}') && !packageSpecificTags) {
+  // Show context-specific warning if template uses packageName but no package name is available
+  if (template?.includes('${packageName}') && !packageName) {
     log(
-      'Warning: tagTemplate contains ${packageName} but packageSpecificTags is not enabled. ' +
-        'This will result in an empty package name in tags. ' +
-        'Set packageSpecificTags: true in your configuration to enable package-specific tagging.',
+      'Warning: Your tagTemplate contains ${packageName} but no package name is available.\n' +
+        'This will result in an empty package name in the tag (e.g., "@v1.0.0" instead of "my-package@v1.0.0").\n\n' +
+        'To fix this:\n' +
+        '• If using synced mode: Set "packageSpecificTags": true in your config to enable package names in tags\n' +
+        '• If you want global tags: Remove ${packageName} from your tagTemplate (e.g., use "${prefix}${version}")\n' +
+        '• If using single/async mode: Ensure your package.json has a valid "name" field',
       'warning',
     );
   }
 
-  // Variables available for templates
-  const variables = {
-    version,
-    prefix: versionPrefix || '',
-    packageName: packageSpecificTags && packageName ? packageName : '',
-  };
-
-  return createTemplateString(tagTemplate, variables);
-}
-
-/**
- * Format a tag prefix based on configuration
- */
-export function formatVersionPrefix(versionPrefix: string, scope?: string): string {
-  if (!versionPrefix) return '';
-
-  const cleanPrefix = versionPrefix.replace(/\/$/, ''); // Remove trailing slash
-
-  if (scope) {
-    return `${cleanPrefix}/${scope}`;
+  if (template) {
+    return template
+      .replace(/\$\{version\}/g, version)
+      .replace(/\$\{prefix\}/g, prefix)
+      .replace(/\$\{packageName\}/g, packageName || '');
   }
 
-  return cleanPrefix;
+  // Default template logic
+  if (packageSpecificTags && packageName) {
+    return `${packageName}@${prefix}${version}`;
+  }
+
+  return `${prefix}${version}`;
 }
 
 /**
- * Format a commit message using a template
- *
- * @param template The commit message template
- * @param version The version number to include in the message
- * @param packageName Optional package name to include in the message
- * @param scope Optional scope to include in the message
- * @returns Formatted commit message string
+ * Format a commit message based on the provided parameters
  */
 export function formatCommitMessage(
   template: string,
   version: string,
-  packageName?: string | undefined,
-  scope?: string | undefined,
+  packageName?: string | null,
+  additionalContext?: Record<string, string>,
 ): string {
-  // Check for potential configuration issues
+  // Show context-specific warning if template uses packageName but no package name is available
   if (template.includes('${packageName}') && !packageName) {
     log(
-      'Warning: commitMessage template contains ${packageName} but no package name was provided. ' +
-        'This will result in an empty package name in commit messages.',
+      'Warning: Your commitMessage template contains ${packageName} but no package name is available.\n' +
+        'This will result in an empty package name in the commit message (e.g., "Release @v1.0.0").\n\n' +
+        'To fix this:\n' +
+        '• If using synced mode: Set "packageSpecificTags": true to enable package names in commits\n' +
+        '• If you want generic commit messages: Remove ${packageName} from your commitMessage template\n' +
+        '• If using single/async mode: Ensure your package.json has a valid "name" field',
       'warning',
     );
   }
 
-  return createTemplateString(template, {
-    version,
-    scope,
-    packageName: packageName || '',
-  });
+  let result = template
+    .replace(/\$\{version\}/g, version)
+    .replace(/\$\{packageName\}/g, packageName || '');
+
+  // Apply additional context if provided
+  if (additionalContext) {
+    for (const [key, value] of Object.entries(additionalContext)) {
+      const placeholder = `\${${key}}`;
+      result = result.replace(
+        new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+        value,
+      );
+    }
+  }
+
+  return result;
 }
 
 /**
- * Create a string from a template with variables
+ * Format a tag prefix for git tag searching
  */
-export function createTemplateString(
-  template: string,
-  variables: Record<string, string | undefined>,
+export function formatTagPrefix(
+  prefix: string,
+  packageName?: string,
+  template?: string,
+  packageSpecificTags?: boolean,
 ): string {
-  return Object.entries(variables).reduce((result, [key, value]) => {
-    if (value === undefined) {
-      return result;
-    }
-    const regex = new RegExp(`\\$\\{${key}\\}`, 'g');
-    return result.replace(regex, value);
-  }, template);
+  if (template) {
+    // For template-based tags, we need to create a prefix pattern
+    // Replace version with * and packageName with actual name or *
+    return template
+      .replace(/\$\{version\}/g, '*')
+      .replace(/\$\{prefix\}/g, prefix)
+      .replace(/\$\{packageName\}/g, packageName || '*');
+  }
+
+  // Default prefix logic
+  if (packageSpecificTags && packageName) {
+    return `${packageName}@${prefix}`;
+  }
+
+  return prefix;
 }

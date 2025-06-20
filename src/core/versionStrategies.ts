@@ -104,6 +104,7 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
 
       const files: string[] = [];
       const updatedPackages: string[] = [];
+      const processedPaths = new Set<string>(); // Track processed paths to avoid duplicates
 
       // Update root package.json if exists
       try {
@@ -114,6 +115,7 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
             updatePackageVersion(rootPkgPath, nextVersion);
             files.push(rootPkgPath);
             updatedPackages.push('root');
+            processedPaths.add(rootPkgPath);
           }
         } else {
           log('Root package path is undefined, skipping root package.json update', 'warning');
@@ -130,10 +132,16 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
         }
 
         const packageJsonPath = path.join(pkg.dir, 'package.json');
-        updatePackageVersion(packageJsonPath, nextVersion);
 
+        // Skip if we've already processed this path (avoids duplicates in single-package repos)
+        if (processedPaths.has(packageJsonPath)) {
+          continue;
+        }
+
+        updatePackageVersion(packageJsonPath, nextVersion);
         files.push(packageJsonPath);
         updatedPackages.push(pkg.packageJson.name);
+        processedPaths.add(packageJsonPath);
       }
 
       // Log updated packages
@@ -145,14 +153,29 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
       }
 
       // Create tag using the template
+      // In synced mode with single package, respect packageSpecificTags setting
+      let tagPackageName: string | null = null;
+      let commitPackageName: string | undefined = undefined;
+
+      // If packageSpecificTags is enabled and we have exactly one package, use its name
+      if (config.packageSpecificTags && packages.packages.length === 1) {
+        tagPackageName = packages.packages[0].packageJson.name;
+        commitPackageName = packages.packages[0].packageJson.name;
+      }
+
       const nextTag = formatTag(
         nextVersion,
         formattedPrefix,
-        null,
+        tagPackageName,
         tagTemplate,
-        config.packageSpecificTags,
+        config.packageSpecificTags || false,
       );
-      const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion);
+      const formattedCommitMessage = formatCommitMessage(
+        commitMessage,
+        nextVersion,
+        commitPackageName,
+        undefined,
+      );
 
       // Use the Git service functions
       await createGitCommitAndTag(files, nextTag, formattedCommitMessage, skipHooks, dryRun);

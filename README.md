@@ -98,8 +98,8 @@ Customize behavior by creating a `version.config.json` file in your project root
 {
   "preset": "angular",
   "versionPrefix": "v",
-  "tagTemplate": "${prefix}${version}",
-  "packageTagTemplate": "${packageName}@${prefix}${version}",
+  "tagTemplate": "${packageName}@${prefix}${version}",
+  "packageSpecificTags": true,
   "commitMessage": "chore: release ${packageName}@${version} [skip ci]",
   "updateChangelog": true,
   "changelogFormat": "keep-a-changelog",
@@ -135,10 +135,37 @@ Customize behavior by creating a `version.config.json` file in your project root
 - `skip`: Array of package names to exclude from versioning
 - `packages`: Glob patterns for package discovery (e.g., ["packages/*"])
 - `mainPackage`: Package name whose commit history should drive version determination
-- `packageTagTemplate`: Template for package-specific Git tags (default: "${packageName}@${prefix}${version}")
+- `packageSpecificTags`: Whether to enable package-specific tagging behaviour (default: false)
 - `updateInternalDependencies`: How to update internal dependencies ("patch", "minor", "major", or "inherit")
 
 For more details on CI/CD integration and advanced usage, see [CI/CD Integration](./docs/CI_CD_INTEGRATION.md).
+
+### Package-Specific Tagging
+
+The `packageSpecificTags` option controls whether the tool creates and searches for package-specific Git tags in monorepo environments:
+
+- **When `false` (default)**: Creates global tags like `v1.2.3` and searches for the latest global tag
+- **When `true`**: Creates package-specific tags like `@scope/package-a@v1.2.3` and searches for package-specific tags
+
+This option works in conjunction with `tagTemplate` to control tag formatting:
+- When `packageSpecificTags` is `false`: Only `${version}` and `${prefix}` variables are used
+- When `packageSpecificTags` is `true`: All variables including `${packageName}` are available
+
+**Example:**
+```json
+{
+  "packageSpecificTags": true,
+  "tagTemplate": "${packageName}@${prefix}${version}"
+}
+```
+
+- **Without package-specific tags** (`tagTemplate: "${prefix}${version}"`): Creates tags like `v1.2.3`
+- **With package-specific tags** (`tagTemplate: "${packageName}@${prefix}${version}"`): Creates tags like `@scope/package-a@v1.2.3`
+
+With package-specific tagging enabled, the tool will:
+1. Look for existing tags matching the configured pattern for each package
+2. Create new tags using the same pattern when releasing
+3. Fall back to global tag lookup if no package-specific tags are found
 
 ## How Versioning Works
 

@@ -3,12 +3,11 @@
   "versionPrefix": "v",
   "preset": "angular",
   "updateInternalDependencies": "patch",
-  "commitMessage": "chore: release ${packageName}@${version} [skip-ci]",
+  "commitMessage": "chore: release ${version} [skip-ci]",
   "updateChangelog": true,
-  "tagTemplate": "${packageName}@${prefix}${version}",
-  "packageSpecificTags": true,
+  "tagTemplate": "${prefix}${version}",
+  "packageSpecificTags": false,
   "cargo": {
     "enabled": true
-  },
-  "packages": ["packages/*", "!packages/middleware", "packages/middleware/node"]
+  }
 }

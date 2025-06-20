@@ -73,20 +73,23 @@ While primarily used for single packages now, `package-versioner` retains option
 
 This is the default if the `synced` flag is present and true.
 
--   **Behavior:** The tool calculates **one** version bump based on the overall history (or branch pattern). This single new version is applied to **all** packages within the repository (or just the root `package.json` if not a structured monorepo). A single Git tag is created (e.g., `v1.2.3`).
+-   **Behaviour:** The tool calculates **one** version bump based on the overall history (or branch pattern). This single new version is applied to **all** packages within the repository (or just the root `package.json` if not a structured monorepo). A single Git tag is created.
+-   **Tag Behaviour:** 
+    - In **multi-package monorepos**: Creates global tags like `v1.2.3` regardless of `packageSpecificTags` setting
+    - In **single-package repositories**: Respects the `packageSpecificTags` setting - can create either `v1.2.3` or `package-name@v1.2.3`
 -   **Use Case:** Suitable for monorepos where all packages are tightly coupled and released together with the same version number. Also the effective mode for single-package repositories.
 
 ### Async Mode (`synced: false`)
 
 *(Note: This mode relies heavily on monorepo tooling and structure, like `pnpm workspaces` and correctly configured package dependencies.)*
 
--   **Behavior (Default - No `-t` flag):** The tool analyzes commits to determine which specific packages within the monorepo have changed since the last relevant commit/tag.
+-   **Behaviour (Default - No `-t` flag):** The tool analyzes commits to determine which specific packages within the monorepo have changed since the last relevant commit/tag.
     -   It calculates an appropriate version bump **independently for each changed package** based on the commits affecting that package.
     -   Only the `package.json` files of the changed packages are updated.
     -   A **single commit** is created grouping all the version bumps, using the commit message template. **No Git tags are created** in this mode.
 -   **Use Case:** Suitable for monorepos where packages are versioned independently, but a single commit represents the batch of updates for traceability.
 
--   **Behavior (Targeted - With `-t` flag):** When using the `-t, --target <targets>` flag:
+-   **Behaviour (Targeted - With `-t` flag):** When using the `-t, --target <targets>` flag:
     -   Only the specified packages (respecting the `skip` list) are considered for versioning.
     -   It calculates an appropriate version bump **independently for each targeted package** based on its commit history.
     -   The `package.json` file of each successfully updated targeted package is modified.
@@ -127,7 +130,7 @@ npx package-versioner --bump major
 # Result: 1.0.0-beta.1 -> 2.0.0 (not 2.0.0-beta.0)
 ```
 
-This intuitive behavior means you don't need to use an empty prerelease identifier (`--prerelease ""`) to promote a prerelease to a stable version. Simply specify the standard bump type and the tool will automatically produce a clean version number.
+This intuitive behaviour means you don't need to use an empty prerelease identifier (`--prerelease ""`) to promote a prerelease to a stable version. Simply specify the standard bump type and the tool will automatically produce a clean version number.
 
 This applies to all standard bump types:
 - `--bump major`: 1.0.0-beta.1 -> 2.0.0
@@ -163,6 +166,64 @@ This allows you to maintain consistent versioning across JavaScript and Rust com
 
 This dual support makes `package-versioner` suitable for both JavaScript/TypeScript and Rust repositories, as well as monorepos or projects containing both types of packages.
 
+## Package Targeting in Monorepos
+
+When working with monorepos, you can control which packages are processed for versioning using the `packages` configuration option. This provides flexible targeting with support for various pattern types.
+
+### Package Discovery vs. Targeting
+
+It's important to understand the distinction:
+
+- **Package Discovery**: Handled by your workspace configuration (pnpm-workspace.yaml, package.json workspaces, etc.)
+- **Package Targeting**: Controlled by the `packages` option in version.config.json to filter which discovered packages to process
+
+### Targeting Patterns
+
+#### Exact Package Names
+Target specific packages by their exact names:
+```json
+{
+  "packages": ["@mycompany/core", "@mycompany/utils", "standalone-package"]
+}
+```
+
+#### Scope Wildcards
+Target all packages within a specific scope:
+```json
+{
+  "packages": ["@mycompany/*"]
+}
+```
+This will match all packages whose names start with `@mycompany/`.
+
+#### Global Wildcard
+Target all packages in the workspace:
+```json
+{
+  "packages": ["*"]
+}
+```
+
+#### Mixed Patterns
+Combine different pattern types for flexible targeting:
+```json
+{
+  "packages": ["@mycompany/*", "@utils/logger", "legacy-package"]
+}
+```
+
+### Excluding Packages
+
+Use the `skip` option to exclude specific packages from processing:
+```json
+{
+  "packages": ["@mycompany/*"],
+  "skip": ["@mycompany/deprecated-package"]
+}
+```
+
+This configuration will process all packages in the `@mycompany` scope except for `@mycompany/deprecated-package`.
+
 ## Tag Templates and Configuration
 
 `package-versioner` provides flexible configuration for how Git tags are formatted, allowing you to customize the tag structure for both single package repositories and monorepos.
@@ -175,34 +236,57 @@ You can customize how tags are formatted using the following configuration optio
 {
   "versionPrefix": "v",
   "tagTemplate": "${prefix}${version}",
-  "packageTagTemplate": "${packageName}@${prefix}${version}"
+  "packageSpecificTags": false
 }
 ```
 
 - **versionPrefix**: The prefix used for all version numbers in tags (default: `"v"`)
-- **tagTemplate**: The template for the main Git tag (default: `"${prefix}${version}"`)
-- **packageTagTemplate**: The template for package-specific Git tags in monorepos (default: `"${packageName}@${prefix}${version}"`)
+- **tagTemplate**: The template for Git tags (default: `"${prefix}${version}"`)
+- **packageSpecificTags**: Whether to enable package-specific tagging behaviour (default: `false`)
 
 ### Available Template Variables
 
-The tag templates support the following variables:
+The tag template supports the following variables:
 
 - `${prefix}`: Replaced with the value of `versionPrefix`
 - `${version}`: Replaced with the calculated version number
-- `${packageName}`: (Only in `packageTagTemplate`) Replaced with the package name
+- `${packageName}`: Replaced with the package name (only populated when `packageSpecificTags` is `true`)
+
+### How Package-Specific Tagging Works
+
+The `packageSpecificTags` option controls whether the `${packageName}` variable is populated in your template:
+
+- **When `packageSpecificTags` is `false`**: The `${packageName}` variable is empty, so use templates like `${prefix}${version}`
+- **When `packageSpecificTags` is `true`**: The `${packageName}` variable contains the actual package name
 
 ### Examples
 
-#### Default Tag Format
-With default settings, tags will look like:
-- Single repository or synced monorepo: `v1.2.3`
-- Package-specific tag in async monorepo: `@scope/package-name@v1.2.3`
+#### Global Versioning (Default)
+```json
+{
+  "versionPrefix": "v",
+  "tagTemplate": "${prefix}${version}",
+  "packageSpecificTags": false
+}
+```
+This produces tags like `v1.2.3` for all packages.
+
+#### Package-Specific Versioning
+```json
+{
+  "versionPrefix": "v",
+  "tagTemplate": "${packageName}@${prefix}${version}",
+  "packageSpecificTags": true
+}
+```
+This produces tags like `@scope/package-name@v1.2.3` for each package.
 
 #### Custom Tag Format Examples
 ```json
 {
   "versionPrefix": "",
-  "tagTemplate": "release-${version}"
+  "tagTemplate": "release-${version}",
+  "packageSpecificTags": false
 }
 ```
 This would produce tags like `release-1.2.3` instead of `v1.2.3`.
@@ -210,7 +294,89 @@ This would produce tags like `release-1.2.3` instead of `v1.2.3`.
 ```json
 {
   "versionPrefix": "v",
-  "packageTagTemplate": "${packageName}-${prefix}${version}"
+  "tagTemplate": "${packageName}-${prefix}${version}",
+  "packageSpecificTags": true
 }
 ```
-This would produce package tags like `@scope/package-name-v1.2.3` instead of `@scope/package-name@v1.2.3`. 
+This would produce package tags like `@scope/package-name-v1.2.3` instead of `@scope/package-name@v1.2.3`.
+
+### Behaviour in Different Modes
+
+- **Synced Mode with Single Package**: When `packageSpecificTags` is `true`, the package name is used even though all packages are versioned together
+- **Synced Mode with Multiple Packages**: Package names are not used regardless of the `packageSpecificTags` setting
+- **Async Mode**: Each package gets its own tag when `packageSpecificTags` is enabled
+
+## Troubleshooting Template Configuration
+
+`package-versioner` provides helpful warnings when template configurations don't match your project setup. Here are common issues and their solutions:
+
+### Template Contains ${packageName} but No Package Name Available
+
+If you see this warning, it means your template includes `${packageName}` but the tool cannot determine a package name for the current context.
+
+**Example Warning:**
+```
+Warning: Your tagTemplate contains ${packageName} but no package name is available.
+This will result in an empty package name in the tag (e.g., "@v1.0.0" instead of "my-package@v1.0.0").
+
+To fix this:
+• If using synced mode: Set "packageSpecificTags": true in your config to enable package names in tags
+• If you want global tags: Remove ${packageName} from your tagTemplate (e.g., use "${prefix}${version}")
+• If using single/async mode: Ensure your package.json has a valid "name" field
+```
+
+**Solutions:**
+
+1. **For Synced Mode with Package Names**: Enable package-specific tags
+   ```json
+   {
+     "synced": true,
+     "packageSpecificTags": true,
+     "tagTemplate": "${packageName}@${prefix}${version}"
+   }
+   ```
+
+2. **For Global Tags**: Remove `${packageName}` from your template
+   ```json
+   {
+     "tagTemplate": "${prefix}${version}",
+     "packageSpecificTags": false
+   }
+   ```
+
+3. **For Single/Async Mode**: Ensure your `package.json` has a valid `name` field
+   ```json
+   {
+     "name": "my-package",
+     "version": "1.0.0"
+   }
+   ```
+
+### Common Template Patterns
+
+Here are some common template patterns and when to use them:
+
+| Pattern | Use Case | Example Output |
+|---------|----------|----------------|
+| `"${prefix}${version}"` | Global versioning, all packages get same tag | `v1.2.3` |
+| `"${packageName}@${prefix}${version}"` | Package-specific versioning | `@scope/package@v1.2.3` |
+| `"release-${version}"` | Custom release format | `release-1.2.3` |
+| `"${packageName}-${version}"` | Simple package versioning | `@scope/package-1.2.3` |
+
+### Commit Message Templates
+
+The same principles apply to `commitMessage` templates. If your commit message template includes `${packageName}`, ensure that package names are available in your current mode:
+
+```json
+{
+  "commitMessage": "chore: release ${packageName}@${version}",
+  "packageSpecificTags": true
+}
+```
+
+For global commit messages, use templates without `${packageName}`:
+```json
+{
+  "commitMessage": "chore: release ${version}"
+}
+```

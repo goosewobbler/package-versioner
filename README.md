@@ -92,7 +92,7 @@ For detailed examples of how to use this in CI/CD pipelines, see [CI/CD Integrat
 
 ## Configuration
 
-Customize behavior by creating a `version.config.json` file in your project root:
+Customize behaviour by creating a `version.config.json` file in your project root:
 
 ```json
 {
@@ -179,25 +179,40 @@ Combine different pattern types:
 
 ### Package-Specific Tagging
 
-The `packageSpecificTags` option controls whether the tool creates and searches for package-specific Git tags in monorepo environments:
+The `packageSpecificTags` option controls whether the tool creates and searches for package-specific Git tags:
 
 - **When `false` (default)**: Creates global tags like `v1.2.3` and searches for the latest global tag
 - **When `true`**: Creates package-specific tags like `@scope/package-a@v1.2.3` and searches for package-specific tags
 
-This option works in conjunction with `tagTemplate` to control tag formatting:
-- When `packageSpecificTags` is `false`: Only `${version}` and `${prefix}` variables are used
-- When `packageSpecificTags` is `true`: All variables including `${packageName}` are available
+This option works in conjunction with `tagTemplate` to control tag formatting. The `tagTemplate` is used for all tag creation, with the `packageSpecificTags` boolean controlling whether the `${packageName}` variable is populated:
 
-**Example:**
+- When `packageSpecificTags` is `false`: The `${packageName}` variable is empty, so templates should use `${prefix}${version}`
+- When `packageSpecificTags` is `true`: The `${packageName}` variable contains the package name
+
+**Examples:**
+
+For single-package repositories or synced monorepos:
 ```json
 {
   "packageSpecificTags": true,
   "tagTemplate": "${packageName}@${prefix}${version}"
 }
 ```
+Creates tags like `my-package@v1.2.3`
 
-- **Without package-specific tags** (`tagTemplate: "${prefix}${version}"`): Creates tags like `v1.2.3`
-- **With package-specific tags** (`tagTemplate: "${packageName}@${prefix}${version}"`): Creates tags like `@scope/package-a@v1.2.3`
+For global versioning:
+```json
+{
+  "packageSpecificTags": false,
+  "tagTemplate": "${prefix}${version}"
+}
+```
+Creates tags like `v1.2.3`
+
+**Important Notes:**
+- In **synced mode** with a single package, `packageSpecificTags: true` will use the package name even though all packages are versioned together
+- In **synced mode** with multiple packages, package names are not used regardless of the setting
+- In **async mode**, each package gets its own tag when `packageSpecificTags` is enabled
 
 With package-specific tagging enabled, the tool will:
 1. Look for existing tags matching the configured pattern for each package

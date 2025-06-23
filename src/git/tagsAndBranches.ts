@@ -1,4 +1,5 @@
 import { getSemverTags } from 'git-semver-tags';
+import semver from 'semver';
 import { escapeRegExp } from '../utils/formatting.js';
 import { log } from '../utils/logging.js';
 import { execAsync, execSync } from './commandExecutor.js';
@@ -31,10 +32,61 @@ export function getCommitsLength(pkgRoot: string): number {
 }
 
 /**
- * Get the latest semver tag from the repository
- * @returns The latest tag or empty string if none found
+ * Get the latest semver tag from the repository sorted by semantic version
+ * This function prioritizes semantic ordering over chronological ordering to handle
+ * cases where tags were created out of order (e.g., v0.7.1 created after v0.8.0)
+ * @param versionPrefix Optional version prefix to filter tags
+ * @returns The semantically latest tag or empty string if none found
  */
-export async function getLatestTag(): Promise<string> {
+export async function getLatestTag(versionPrefix?: string): Promise<string> {
+  try {
+    const tags: string[] = await getSemverTags({
+      tagPrefix: versionPrefix,
+    });
+
+    if (tags.length === 0) {
+      return '';
+    }
+
+    // Sort tags by semantic version (highest first)
+    const sortedTags = tags.sort((a, b) => {
+      const versionA = semver.clean(a) || '0.0.0';
+      const versionB = semver.clean(b) || '0.0.0';
+      return semver.rcompare(versionA, versionB); // Reverse compare (highest first)
+    });
+
+    const semanticLatest = sortedTags[0];
+    const chronologicalLatest = tags[0];
+
+    // Log if there's a difference between semantic and chronological ordering
+    if (semanticLatest !== chronologicalLatest) {
+      log(
+        `Tag ordering differs: chronological latest is ${chronologicalLatest}, semantic latest is ${semanticLatest}`,
+        'debug',
+      );
+      log(`Using semantic latest (${semanticLatest}) to handle out-of-order tag creation`, 'info');
+    }
+
+    return semanticLatest;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`Failed to get latest tag: ${errorMessage}`, 'error');
+
+    // Check if the error specifically means no tags were found
+    if (error instanceof Error && error.message.includes('No names found')) {
+      log('No tags found in the repository.', 'info');
+    }
+
+    return ''; // Return empty string on error or no tags
+  }
+}
+
+/**
+ * Get the latest semver tag from the repository in chronological order (legacy)
+ * @deprecated Use getLatestTag() instead, which uses semantic ordering
+ * @returns The chronologically latest tag or empty string if none found
+ */
+export async function getLatestTagChronological(): Promise<string> {
   try {
     const tags: string[] = await getSemverTags({});
     return tags[0] || ''; // Return the latest tag or empty string
@@ -125,11 +177,26 @@ export async function getLatestTagForPackage(
       const packageTagRegex = new RegExp(`^${packageTagPattern}$`);
       let packageTags = allTags.filter((tag) => packageTagRegex.test(tag));
 
-      // If we found tags with the configured pattern, return the first (most recent) one
+      // If we found tags with the configured pattern, sort by semantic version and return the highest
       if (packageTags.length > 0) {
+        // Sort package tags by semantic version (highest first)
+        const sortedPackageTags = packageTags.sort((a, b) => {
+          const versionA = semver.clean(a.replace(/^.*@/, '')) || '0.0.0';
+          const versionB = semver.clean(b.replace(/^.*@/, '')) || '0.0.0';
+          return semver.rcompare(versionA, versionB);
+        });
+
         log(`Found ${packageTags.length} package tags using configured pattern`, 'debug');
-        log(`Using tag: ${packageTags[0]}`, 'debug');
-        return packageTags[0];
+        log(`Using semantically latest tag: ${sortedPackageTags[0]}`, 'debug');
+
+        if (sortedPackageTags[0] !== packageTags[0]) {
+          log(
+            `Package tag ordering differs: chronological first is ${packageTags[0]}, semantic latest is ${sortedPackageTags[0]}`,
+            'debug',
+          );
+        }
+
+        return sortedPackageTags[0];
       }
 
       // If no tags were found with the configured pattern, fall back to the standard patterns
@@ -139,14 +206,20 @@ export async function getLatestTagForPackage(
         const pattern1 = new RegExp(`^${escapedPackageName}@${escapeRegExp(versionPrefix)}`);
         packageTags = allTags.filter((tag) => pattern1.test(tag));
 
-        // If we found tags with this pattern, return the first (most recent) one
+        // If we found tags with this pattern, sort by semantic version and return the highest
         if (packageTags.length > 0) {
+          const sortedPackageTags = packageTags.sort((a, b) => {
+            const versionA = semver.clean(a.replace(/^.*@/, '')) || '0.0.0';
+            const versionB = semver.clean(b.replace(/^.*@/, '')) || '0.0.0';
+            return semver.rcompare(versionA, versionB);
+          });
+
           log(
             `Found ${packageTags.length} package tags using pattern: packageName@${versionPrefix}...`,
             'debug',
           );
-          log(`Using tag: ${packageTags[0]}`, 'debug');
-          return packageTags[0];
+          log(`Using semantically latest tag: ${sortedPackageTags[0]}`, 'debug');
+          return sortedPackageTags[0];
         }
       }
 
@@ -155,14 +228,20 @@ export async function getLatestTagForPackage(
         const pattern2 = new RegExp(`^${escapeRegExp(versionPrefix)}${escapedPackageName}@`);
         packageTags = allTags.filter((tag) => pattern2.test(tag));
 
-        // If we found tags with this pattern, return the first (most recent) one
+        // If we found tags with this pattern, sort by semantic version and return the highest
         if (packageTags.length > 0) {
+          const sortedPackageTags = packageTags.sort((a, b) => {
+            const versionA = semver.clean(a.replace(/^.*@/, '')) || '0.0.0';
+            const versionB = semver.clean(b.replace(/^.*@/, '')) || '0.0.0';
+            return semver.rcompare(versionA, versionB);
+          });
+
           log(
             `Found ${packageTags.length} package tags using pattern: ${versionPrefix}packageName@...`,
             'debug',
           );
-          log(`Using tag: ${packageTags[0]}`, 'debug');
-          return packageTags[0];
+          log(`Using semantically latest tag: ${sortedPackageTags[0]}`, 'debug');
+          return sortedPackageTags[0];
         }
       }
 
@@ -170,8 +249,7 @@ export async function getLatestTagForPackage(
       const pattern3 = new RegExp(`^${escapedPackageName}@`);
       packageTags = allTags.filter((tag) => pattern3.test(tag));
 
-      // Log all found tags for debugging
-      log(`Found ${packageTags.length} package tags for ${packageName}`, 'debug');
+      // Sort and log found tags for debugging
       if (packageTags.length === 0) {
         log('No matching tags found for pattern: packageName@version', 'debug');
         if (allTags.length > 0) {
@@ -179,11 +257,19 @@ export async function getLatestTagForPackage(
         } else {
           log('No tags available in the repository', 'debug');
         }
-      } else {
-        log(`Using tag: ${packageTags[0]}`, 'debug');
+        return '';
       }
 
-      return packageTags[0] || ''; // Return the latest tag or empty string
+      // Sort package tags by semantic version (highest first)
+      const sortedPackageTags = packageTags.sort((a, b) => {
+        const versionA = semver.clean(a.replace(/^.*@/, '')) || '0.0.0';
+        const versionB = semver.clean(b.replace(/^.*@/, '')) || '0.0.0';
+        return semver.rcompare(versionA, versionB);
+      });
+
+      log(`Found ${packageTags.length} package tags for ${packageName}`, 'debug');
+      log(`Using semantically latest tag: ${sortedPackageTags[0]}`, 'debug');
+      return sortedPackageTags[0];
     }
 
     // Package-specific tags disabled, return empty string to fall back to global tags

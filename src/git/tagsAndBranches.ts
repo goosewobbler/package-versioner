@@ -48,15 +48,17 @@ export async function getLatestTag(versionPrefix?: string): Promise<string> {
       return '';
     }
 
+    // Store chronological latest before sorting
+    const chronologicalLatest = tags[0];
+
     // Sort tags by semantic version (highest first)
-    const sortedTags = tags.sort((a, b) => {
+    const sortedTags = [...tags].sort((a, b) => {
       const versionA = semver.clean(a) || '0.0.0';
       const versionB = semver.clean(b) || '0.0.0';
       return semver.rcompare(versionA, versionB); // Reverse compare (highest first)
     });
 
     const semanticLatest = sortedTags[0];
-    const chronologicalLatest = tags[0];
 
     // Log if there's a difference between semantic and chronological ordering
     if (semanticLatest !== chronologicalLatest) {
@@ -68,28 +70,6 @@ export async function getLatestTag(versionPrefix?: string): Promise<string> {
     }
 
     return semanticLatest;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log(`Failed to get latest tag: ${errorMessage}`, 'error');
-
-    // Check if the error specifically means no tags were found
-    if (error instanceof Error && error.message.includes('No names found')) {
-      log('No tags found in the repository.', 'info');
-    }
-
-    return ''; // Return empty string on error or no tags
-  }
-}
-
-/**
- * Get the latest semver tag from the repository in chronological order (legacy)
- * @deprecated Use getLatestTag() instead, which uses semantic ordering
- * @returns The chronologically latest tag or empty string if none found
- */
-export async function getLatestTagChronological(): Promise<string> {
-  try {
-    const tags: string[] = await getSemverTags({});
-    return tags[0] || ''; // Return the latest tag or empty string
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log(`Failed to get latest tag: ${errorMessage}`, 'error');
@@ -179,19 +159,46 @@ export async function getLatestTagForPackage(
 
       // If we found tags with the configured pattern, sort by semantic version and return the highest
       if (packageTags.length > 0) {
+        const chronologicalFirst = packageTags[0];
+
         // Sort package tags by semantic version (highest first)
-        const sortedPackageTags = packageTags.sort((a, b) => {
-          const versionA = semver.clean(a.replace(/^.*@/, '')) || '0.0.0';
-          const versionB = semver.clean(b.replace(/^.*@/, '')) || '0.0.0';
-          return semver.rcompare(versionA, versionB);
+        const sortedPackageTags = [...packageTags].sort((a, b) => {
+          // For configured template pattern, we need to extract version based on template
+          // Since templates can vary, use a more generic approach based on the tag structure
+          let versionA = '';
+          let versionB = '';
+
+          if (a.includes('@')) {
+            const afterAt = a.split('@')[1] || '';
+            versionA = afterAt.replace(new RegExp(`^${escapeRegExp(versionPrefix || '')}`), '');
+          } else {
+            // Handle templates without @ separator
+            versionA = a
+              .replace(new RegExp(`^${escapeRegExp(packageName)}`), '')
+              .replace(new RegExp(`^${escapeRegExp(versionPrefix || '')}`), '');
+          }
+
+          if (b.includes('@')) {
+            const afterAtB = b.split('@')[1] || '';
+            versionB = afterAtB.replace(new RegExp(`^${escapeRegExp(versionPrefix || '')}`), '');
+          } else {
+            // Handle templates without @ separator
+            versionB = b
+              .replace(new RegExp(`^${escapeRegExp(packageName)}`), '')
+              .replace(new RegExp(`^${escapeRegExp(versionPrefix || '')}`), '');
+          }
+
+          const cleanVersionA = semver.clean(versionA) || '0.0.0';
+          const cleanVersionB = semver.clean(versionB) || '0.0.0';
+          return semver.rcompare(cleanVersionA, cleanVersionB);
         });
 
         log(`Found ${packageTags.length} package tags using configured pattern`, 'debug');
         log(`Using semantically latest tag: ${sortedPackageTags[0]}`, 'debug');
 
-        if (sortedPackageTags[0] !== packageTags[0]) {
+        if (sortedPackageTags[0] !== chronologicalFirst) {
           log(
-            `Package tag ordering differs: chronological first is ${packageTags[0]}, semantic latest is ${sortedPackageTags[0]}`,
+            `Package tag ordering differs: chronological first is ${chronologicalFirst}, semantic latest is ${sortedPackageTags[0]}`,
             'debug',
           );
         }
@@ -208,10 +215,22 @@ export async function getLatestTagForPackage(
 
         // If we found tags with this pattern, sort by semantic version and return the highest
         if (packageTags.length > 0) {
-          const sortedPackageTags = packageTags.sort((a, b) => {
-            const versionA = semver.clean(a.replace(/^.*@/, '')) || '0.0.0';
-            const versionB = semver.clean(b.replace(/^.*@/, '')) || '0.0.0';
-            return semver.rcompare(versionA, versionB);
+          const sortedPackageTags = [...packageTags].sort((a, b) => {
+            // Extract version after the prefix for semantic comparison
+            const afterAt = a.split('@')[1] || '';
+            const versionA = afterAt.replace(
+              new RegExp(`^${escapeRegExp(versionPrefix || '')}`),
+              '',
+            );
+            const afterAtB = b.split('@')[1] || '';
+            const versionB = afterAtB.replace(
+              new RegExp(`^${escapeRegExp(versionPrefix || '')}`),
+              '',
+            );
+
+            const cleanVersionA = semver.clean(versionA) || '0.0.0';
+            const cleanVersionB = semver.clean(versionB) || '0.0.0';
+            return semver.rcompare(cleanVersionA, cleanVersionB);
           });
 
           log(
@@ -230,9 +249,10 @@ export async function getLatestTagForPackage(
 
         // If we found tags with this pattern, sort by semantic version and return the highest
         if (packageTags.length > 0) {
-          const sortedPackageTags = packageTags.sort((a, b) => {
-            const versionA = semver.clean(a.replace(/^.*@/, '')) || '0.0.0';
-            const versionB = semver.clean(b.replace(/^.*@/, '')) || '0.0.0';
+          const sortedPackageTags = [...packageTags].sort((a, b) => {
+            // For versionPrefix+packageName@version pattern, extract version after @
+            const versionA = semver.clean(a.split('@')[1] || '') || '0.0.0';
+            const versionB = semver.clean(b.split('@')[1] || '') || '0.0.0';
             return semver.rcompare(versionA, versionB);
           });
 
@@ -261,9 +281,10 @@ export async function getLatestTagForPackage(
       }
 
       // Sort package tags by semantic version (highest first)
-      const sortedPackageTags = packageTags.sort((a, b) => {
-        const versionA = semver.clean(a.replace(/^.*@/, '')) || '0.0.0';
-        const versionB = semver.clean(b.replace(/^.*@/, '')) || '0.0.0';
+      const sortedPackageTags = [...packageTags].sort((a, b) => {
+        // For packageName@version pattern, extract version after @
+        const versionA = semver.clean(a.split('@')[1] || '') || '0.0.0';
+        const versionB = semver.clean(b.split('@')[1] || '') || '0.0.0';
         return semver.rcompare(versionA, versionB);
       });
 

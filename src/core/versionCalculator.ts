@@ -28,19 +28,30 @@ import {
  */
 export async function calculateVersion(config: Config, options: VersionOptions): Promise<string> {
   const {
-    type,
+    type: configType,
     preset = 'angular',
     versionPrefix,
-    prereleaseIdentifier,
+    prereleaseIdentifier: configPrereleaseIdentifier,
     branchPattern,
     baseBranch,
   } = config;
-  const { latestTag, name, path: pkgPath } = options;
+  const {
+    latestTag,
+    name,
+    path: pkgPath,
+    type: optionsType,
+    prereleaseIdentifier: optionsPrereleaseIdentifier,
+  } = options;
+
+  // Prioritize type and prereleaseIdentifier from options, fallback to config
+  const type = optionsType || configType;
+  const prereleaseIdentifier = optionsPrereleaseIdentifier || configPrereleaseIdentifier;
 
   const initialVersion = '0.1.0'; // Default initial version
 
   const hasNoTags = !latestTag || latestTag.trim() === '';
-  const normalizedPrereleaseId = prereleaseIdentifier === '' ? undefined : prereleaseIdentifier;
+  // Normalize prereleaseIdentifier (handles boolean true -> 'next', etc.)
+  const normalizedPrereleaseId = normalizePrereleaseIdentifier(prereleaseIdentifier, config);
 
   try {
     const originalPrefix = versionPrefix || '';

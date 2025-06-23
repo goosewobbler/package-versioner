@@ -46,7 +46,6 @@ const { getPackageVersionFallback } = vi.hoisted(() => ({
 describe('Version Calculator', () => {
   // Default config for tests
   const defaultConfig: Partial<Config> = {
-    type: 'patch',
     preset: 'angular',
     versionPrefix: 'v',
     tagTemplate: '${prefix}${version}',

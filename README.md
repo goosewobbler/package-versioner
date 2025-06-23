@@ -58,6 +58,9 @@ npx package-versioner -t @scope/package-a,@scope/package-b
 # Perform a dry run: calculates version, logs actions, but makes no file changes or Git commits/tags
 npx package-versioner --dry-run
 
+# Only use reachable tags (Git-semantic mode, no fallback to unreachable tags)
+npx package-versioner --strict-reachable
+
 # Output results as JSON (useful for CI/CD scripts)
 npx package-versioner --json
 
@@ -66,6 +69,26 @@ npx package-versioner --dry-run --json
 ```
 
 **Note on Targeting:** Using the `-t` flag creates package-specific tags (e.g., `@scope/package-a@1.2.0`) but *not* a global tag (like `v1.2.0`). If needed, create the global tag manually in your CI/CD script after this command.
+
+### Git Tag Reachability
+
+By default, `package-versioner` intelligently handles Git tag reachability to provide the best user experience:
+
+- **Default behavior**: Uses reachable tags when available, but falls back to the latest repository tag if needed (common in feature branches)
+- **Strict mode (`--strict-reachable`)**: Only uses tags reachable from the current commit, following strict Git semantics
+
+This is particularly useful when working on feature branches that have diverged from the main branch where newer tags exist. The tool will automatically detect the Git context and provide helpful guidance:
+
+```bash
+# On a feature branch with unreachable tags
+npx package-versioner --dry-run
+# Output: "No tags reachable from current branch 'feature-x'. Using latest repository tag v1.2.3 as version base."
+# Tip: Consider 'git merge main' or 'git rebase main' to include tag history in your branch.
+
+# Force strict Git semantics
+npx package-versioner --dry-run --strict-reachable
+# Output: Uses only reachable tags, may result in "No reachable tags found"
+```
 
 ## JSON Output
 
@@ -103,6 +126,7 @@ Customize behaviour by creating a `version.config.json` file in your project roo
   "commitMessage": "chore: release ${packageName}@${version} [skip ci]",
   "updateChangelog": true,
   "changelogFormat": "keep-a-changelog",
+  "strictReachable": false,
   "synced": true,
   "skip": [
     "docs",
@@ -126,6 +150,7 @@ Customize behaviour by creating a `version.config.json` file in your project roo
 - `commitMessage`: Template for commit messages (default: "chore(release): ${version}")
 - `updateChangelog`: Whether to automatically update changelogs (default: true)
 - `changelogFormat`: Format for changelogs - "keep-a-changelog" or "angular" (default: "keep-a-changelog")
+- `strictReachable`: Only use reachable tags, no fallback to unreachable tags (default: false)
 - `cargo`: Options for Rust projects:
   - `enabled`: Whether to handle Cargo.toml files (default: true)
   - `paths`: Directories to search for Cargo.toml files (optional)

@@ -111,6 +111,11 @@
       "default": true,
       "description": "Whether to automatically generate and update changelogs"
     },
+    "strictReachable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Only use reachable tags (no fallback to unreachable tags)"
+    },
     "cargo": {
       "type": "object",
       "properties": {

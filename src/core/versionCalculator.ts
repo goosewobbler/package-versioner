@@ -28,40 +28,95 @@ import {
  */
 export async function calculateVersion(config: Config, options: VersionOptions): Promise<string> {
   const {
-    latestTag = '',
     type,
-    versionPrefix = '',
+    preset = 'angular',
+    versionPrefix,
+    prereleaseIdentifier,
     branchPattern,
     baseBranch,
-    prereleaseIdentifier,
-    path: pkgPath,
-    name,
-  } = options;
+  } = config;
+  const { latestTag, name, path: pkgPath } = options;
 
-  // Get default config values
-  const preset = config.preset || 'conventional-commits';
-  const initialVersion = '0.1.0'; // Default initial version if not provided elsewhere
+  const initialVersion = '0.1.0'; // Default initial version
 
-  // Normalize prerelease identifier here, once for all usage
-  const normalizedPrereleaseId = normalizePrereleaseIdentifier(prereleaseIdentifier, config);
+  const hasNoTags = !latestTag || latestTag.trim() === '';
+  const normalizedPrereleaseId = prereleaseIdentifier === '' ? undefined : prereleaseIdentifier;
 
   try {
-    // Handle the special case of no tags yet - use package.json version
-    const hasNoTags = !latestTag;
+    const originalPrefix = versionPrefix || '';
 
-    // Define the tag search pattern (for stripping prefix from tags)
-    const originalPrefix = versionPrefix;
     function determineTagSearchPattern(packageName: string | undefined, prefix: string): string {
-      if (packageName) {
-        const escapedPackageName = escapeRegExp(packageName);
-        const escapedPrefix = escapeRegExp(prefix);
-        return `${escapedPackageName}[@]?${escapedPrefix}`;
+      // If no package name is provided or packageSpecificTags is disabled, use global pattern
+      if (!packageName) {
+        return prefix;
       }
-      return escapeRegExp(prefix);
+      return `${packageName}@${prefix}`;
+    }
+
+    function escapeRegExp(string: string): string {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     const tagSearchPattern = determineTagSearchPattern(name, originalPrefix);
     const escapedTagPattern = escapeRegExp(tagSearchPattern);
+
+    // Check for version mismatch between package.json and Git tags
+    if (!hasNoTags && pkgPath) {
+      const packageDir = pkgPath || cwd();
+      const manifestResult = getVersionFromManifests(packageDir);
+
+      if (manifestResult.manifestFound && manifestResult.version) {
+        const cleanedTag = semver.clean(latestTag) || latestTag;
+        const tagVersion =
+          semver.clean(cleanedTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
+        const packageVersion = manifestResult.version;
+
+        // Check for version mismatches in both directions
+        if (semver.gt(packageVersion, tagVersion)) {
+          log(
+            `Warning: Version mismatch detected!
+• ${manifestResult.manifestType} version: ${packageVersion}
+• Latest Git tag version: ${tagVersion} (from ${latestTag})
+• Package version is AHEAD of Git tags
+
+This usually happens when:
+• A version was released but the tag wasn't pushed to the remote repository
+• The ${manifestResult.manifestType} was manually updated without creating a corresponding tag
+• You're running in CI and the latest tag isn't available yet
+
+The tool will use the Git tag version (${tagVersion}) as the base for calculation.
+Expected next version will be based on ${tagVersion}, not ${packageVersion}.
+
+To fix this mismatch:
+• Push missing tags: git push origin --tags
+• Or use package version as base by ensuring tags are up to date`,
+            'warning',
+          );
+        } else if (semver.gt(tagVersion, packageVersion)) {
+          log(
+            `Warning: Version mismatch detected!
+• ${manifestResult.manifestType} version: ${packageVersion}
+• Latest Git tag version: ${tagVersion} (from ${latestTag})
+• Git tag version is AHEAD of package version
+
+This usually happens when:
+• A release was tagged but the ${manifestResult.manifestType} wasn't updated
+• You're on an older branch that hasn't been updated with the latest version
+• Automated release process created tags but didn't update manifest files
+• You pulled tags but not the corresponding commits that update the package version
+
+The tool will use the Git tag version (${tagVersion}) as the base for calculation.
+This will likely result in a version that's already been released.
+
+To fix this mismatch:
+• Update ${manifestResult.manifestType}: Set version to ${tagVersion} or higher
+• Or checkout the branch/commit that corresponds to the tag
+• Or ensure your branch is up to date with the latest changes`,
+            'warning',
+          );
+        }
+      }
+    }
 
     // 1. Handle specific type if provided
     const specifiedType = type;

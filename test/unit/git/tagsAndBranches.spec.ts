@@ -325,3 +325,114 @@ describe('tagsAndBranches', () => {
     });
   });
 });
+
+describe('Semantic Tag Ordering', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('getLatestTag with semantic ordering', () => {
+    it('should return semantically latest tag when tags are in correct chronological order', async () => {
+      // Setup - chronological order matches semantic order
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([
+        'v1.2.0', // chronologically and semantically latest
+        'v1.1.0',
+        'v1.0.0',
+      ]);
+
+      // Execute
+      const result = await getLatestTag('v');
+
+      // Verify
+      expect(result).toBe('v1.2.0');
+      expect(mockGetSemverTags.getSemverTags).toHaveBeenCalledWith({ tagPrefix: 'v' });
+    });
+
+    it('should return semantically latest tag when tags are misordered chronologically', async () => {
+      // Setup - chronological order does NOT match semantic order
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([
+        'v1.0.5', // chronologically latest but semantically older
+        'v1.2.0', // semantically latest but chronologically older
+        'v1.1.0',
+        'v1.0.0',
+      ]);
+
+      // Execute
+      const result = await getLatestTag('v');
+
+      // Verify - should return semantic latest, not chronological latest
+      expect(result).toBe('v1.2.0');
+      expect(log).toHaveBeenCalledWith(
+        'Tag ordering differs: chronological latest is v1.0.5, semantic latest is v1.2.0',
+        'debug',
+      );
+      expect(log).toHaveBeenCalledWith(
+        'Using semantic latest (v1.2.0) to handle out-of-order tag creation',
+        'info',
+      );
+    });
+
+    it('should handle prereleases correctly in semantic ordering', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([
+        'v1.0.0-beta.2', // chronologically latest prerelease
+        'v1.0.0', // semantically latest stable
+        'v1.0.0-beta.1',
+        'v0.9.0',
+      ]);
+
+      // Execute
+      const result = await getLatestTag('v');
+
+      // Verify - stable release should be considered higher than prerelease
+      expect(result).toBe('v1.0.0');
+    });
+
+    it('should return empty string when no tags found', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([]);
+
+      // Execute
+      const result = await getLatestTag('v');
+
+      // Verify
+      expect(result).toBe('');
+    });
+
+    it('should handle semver.clean failures gracefully', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([
+        'invalid-tag',
+        'v1.0.0',
+        'another-invalid',
+      ]);
+
+      // Execute
+      const result = await getLatestTag('v');
+
+      // Verify - should handle invalid tags and return the valid one
+      expect(result).toBe('v1.0.0');
+    });
+
+    it('should use semantic ordering by default', async () => {
+      // Setup
+      const mockGetSemverTags = await import('git-semver-tags');
+      vi.mocked(mockGetSemverTags.getSemverTags, { partial: true }).mockResolvedValue([
+        'v0.7.4', // chronologically latest
+        'v0.8.1', // semantically latest
+        'v0.7.1',
+      ]);
+
+      // Execute
+      const result = await getLatestTag('v');
+
+      // Verify
+      expect(result).toBe('v0.8.1'); // Should return semantic latest
+    });
+  });
+});

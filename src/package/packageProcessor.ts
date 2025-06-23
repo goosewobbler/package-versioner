@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import path from 'node:path';
 import { exit } from 'node:process';
@@ -192,7 +193,30 @@ export class PackageProcessor {
 
         try {
           // Extract entries from commits between the latest tag and HEAD
-          changelogEntries = extractChangelogEntriesFromCommits(pkgPath, latestTag);
+          // If latestTag is empty or doesn't exist, we'll extract from HEAD
+          let revisionRange = latestTag;
+
+          // Check if the tag actually exists in the repository
+          if (latestTag) {
+            try {
+              execSync(`git rev-parse --verify "${latestTag}"`, {
+                cwd: pkgPath,
+                stdio: 'ignore',
+              });
+            } catch {
+              // Tag doesn't exist, use HEAD instead to get recent commits
+              log(
+                `Tag ${latestTag} doesn't exist, using recent commits from HEAD for changelog`,
+                'debug',
+              );
+              revisionRange = 'HEAD~10..HEAD'; // Get last 10 commits as a reasonable default
+            }
+          } else {
+            // No tag provided, use recent commits
+            revisionRange = 'HEAD~10..HEAD';
+          }
+
+          changelogEntries = extractChangelogEntriesFromCommits(pkgPath, revisionRange);
 
           // If we have no entries but we're definitely changing versions,
           // add a minimal entry about the version change

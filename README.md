@@ -151,6 +151,7 @@ Customize behaviour by creating a `version.config.json` file in your project roo
 - `updateChangelog`: Whether to automatically update changelogs (default: true)
 - `changelogFormat`: Format for changelogs - "keep-a-changelog" or "angular" (default: "keep-a-changelog")
 - `strictReachable`: Only use reachable tags, no fallback to unreachable tags (default: false)
+- `prereleaseIdentifier`: Identifier for prerelease versions (e.g., "alpha", "beta", "next") used in versions like "1.2.0-alpha.3"
 - `cargo`: Options for Rust projects:
   - `enabled`: Whether to handle Cargo.toml files (default: true)
   - `paths`: Directories to search for Cargo.toml files (optional)

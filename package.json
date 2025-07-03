@@ -67,6 +67,7 @@
   },
   "dependencies": {
     "@manypkg/get-packages": "^3.0.0",
+    "@types/micromatch": "^4.0.9",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
     "conventional-changelog-angular": "^8.0.0",
@@ -74,6 +75,7 @@
     "conventional-recommended-bump": "^11.2.0",
     "figlet": "^1.8.1",
     "git-semver-tags": "^8.0.0",
+    "micromatch": "^4.0.8",
     "semver": "^7.7.2",
     "smol-toml": "^1.4.1"
   },

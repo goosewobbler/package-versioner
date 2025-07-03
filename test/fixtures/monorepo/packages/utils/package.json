@@ -1,5 +1,5 @@
 {
-  "name": "@scope/package-a",
+  "name": "@internal/utils",
   "version": "0.1.0",
   "private": true
 }

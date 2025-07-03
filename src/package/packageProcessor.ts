@@ -18,7 +18,6 @@ import { updatePackageVersion } from './packageManagement.js';
 
 export interface PackageProcessorOptions {
   skip?: string[];
-  targets?: string[];
   versionPrefix?: string;
   tagTemplate?: string;
   commitMessageTemplate?: string;
@@ -42,7 +41,6 @@ export interface ProcessResult {
 
 export class PackageProcessor {
   private skip: string[];
-  private targets: string[];
   private versionPrefix: string;
   private tagTemplate?: string;
   private commitMessageTemplate: string;
@@ -55,7 +53,6 @@ export class PackageProcessor {
 
   constructor(options: PackageProcessorOptions) {
     this.skip = options.skip || [];
-    this.targets = options.targets || [];
     this.versionPrefix = options.versionPrefix || 'v';
     this.tagTemplate = options.tagTemplate;
     this.commitMessageTemplate = options.commitMessageTemplate || '';
@@ -67,14 +64,7 @@ export class PackageProcessor {
   }
 
   /**
-   * Set package targets to process
-   */
-  setTargets(targets: string[]): void {
-    this.targets = targets;
-  }
-
-  /**
-   * Process packages based on targeting criteria
+   * Process packages based on skip list only (targeting handled at discovery time)
    */
   async processPackages(packages: Package[]): Promise<ProcessResult> {
     const tags: string[] = [];
@@ -86,26 +76,22 @@ export class PackageProcessor {
       return { updatedPackages: [], tags: [] };
     }
 
-    // 2. Apply filtering to determine which packages to process
+    // 2. Apply skip filtering only (targeting is handled at discovery time)
     const pkgsToConsider = packages.filter((pkg) => {
       const pkgName = pkg.packageJson.name;
-      const shouldProcess = shouldProcessPackage(pkgName, this.targets, this.skip);
+      const shouldProcess = shouldProcessPackage(pkgName, this.skip);
 
       if (!shouldProcess) {
-        if (this.skip?.includes(pkgName)) {
-          log(`Skipping package ${pkgName} as it's in the skip list.`, 'info');
-        } else {
-          log(`Package ${pkgName} not in target list, skipping.`, 'info');
-        }
+        log(`Skipping package ${pkgName} as it's in the skip list.`, 'info');
       }
 
       return shouldProcess;
     });
 
-    log(`Found ${pkgsToConsider.length} targeted package(s) to process after filtering.`, 'info');
+    log(`Found ${pkgsToConsider.length} package(s) to process after filtering.`, 'info');
 
     if (pkgsToConsider.length === 0) {
-      log('No matching targeted packages found to process.', 'info');
+      log('No packages found to process.', 'info');
       return { updatedPackages: [], tags: [] };
     }
 
@@ -351,7 +337,7 @@ export class PackageProcessor {
 
     // 4. Create single commit if any packages were updated
     if (updatedPackagesInfo.length === 0) {
-      log('No targeted packages required a version update.', 'info');
+      log('No packages required a version update.', 'info');
       return { updatedPackages: [], tags };
     }
 

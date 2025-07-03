@@ -37,23 +37,17 @@ export function matchesPackageTarget(packageName: string, target: string): boole
 }
 
 /**
- * Check if a package should be processed based on targets and skip lists
+ * Check if a package name matches any of the target patterns
  */
-export function shouldProcessPackage(
-  packageName: string,
-  targets: string[] = [],
-  skip: string[] = [],
-): boolean {
-  // Skip packages explicitly excluded (exact match only for skip)
-  if (skip.includes(packageName)) {
-    return false;
-  }
-
-  // If no targets specified, process all non-skipped packages
-  if (targets.length === 0) {
-    return true;
-  }
-
-  // Check if package matches any target pattern
+export function shouldMatchPackageTargets(packageName: string, targets: string[]): boolean {
   return targets.some((target) => matchesPackageTarget(packageName, target));
+}
+
+/**
+ * Check if a package should be processed based on skip list only
+ * Note: Package targeting is now handled at discovery time, so this only handles exclusions
+ */
+export function shouldProcessPackage(packageName: string, skip: string[] = []): boolean {
+  // Only check skip list - targeting is now handled at discovery time
+  return !skip.includes(packageName);
 }

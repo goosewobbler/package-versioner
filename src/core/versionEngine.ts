@@ -1,11 +1,12 @@
 import { cwd } from 'node:process';
 
-import { type Package, type Packages, getPackagesSync } from '@manypkg/get-packages';
+import { type Packages, getPackagesSync } from '@manypkg/get-packages';
 
 import { GitError } from '../errors/gitError.js';
 import { VersionError, VersionErrorCode, createVersionError } from '../errors/versionError.js';
 import type { Config } from '../types.js';
 import { log } from '../utils/logging.js';
+import { shouldMatchPackageTargets } from '../utils/packageMatching.js';
 import {
   type StrategyFunction,
   type StrategyType,
@@ -72,6 +73,31 @@ export class VersionEngine {
           'warning',
         );
         pkgsResult.root = cwd();
+      }
+
+      // Filter packages based on config.packages if specified
+      if (this.config.packages && this.config.packages.length > 0) {
+        const originalCount = pkgsResult.packages.length;
+        const filteredPackages = pkgsResult.packages.filter((pkg) =>
+          shouldMatchPackageTargets(pkg.packageJson.name, this.config.packages),
+        );
+
+        pkgsResult.packages = filteredPackages;
+
+        // Log filtering results
+        log(
+          `Filtered ${originalCount} workspace packages to ${filteredPackages.length} based on packages config`,
+          'info',
+        );
+
+        if (filteredPackages.length === 0) {
+          log('Warning: No packages matched the specified patterns in config.packages', 'warning');
+        }
+      } else {
+        log(
+          `Processing all ${pkgsResult.packages.length} workspace packages (no packages filter specified)`,
+          'info',
+        );
       }
 
       // Cache the result for subsequent calls

@@ -30,10 +30,11 @@ export type StrategyFunction = (packages: PackagesWithRoot, targets?: string[]) 
 
 /**
  * Helper function to determine if a package should be processed
+ * Note: Package targeting is now handled at discovery time, so this only handles skip logic
  */
-function shouldProcessPackage(pkg: Package, config: Config, targets: string[] = []): boolean {
+function shouldProcessPackage(pkg: Package, config: Config): boolean {
   const pkgName = pkg.packageJson.name;
-  return shouldProcessPackageUtil(pkgName, targets, config.skip);
+  return shouldProcessPackageUtil(pkgName, config.skip);
 }
 
 /**
@@ -317,7 +318,6 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
   // Initialize processor with configuration
   const processorOptions = {
     skip: config.skip || [],
-    targets: config.packages || [],
     versionPrefix: config.versionPrefix || 'v',
     tagTemplate: config.tagTemplate,
     commitMessageTemplate: config.commitMessage || '',
@@ -336,17 +336,10 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
 
   const packageProcessor = new PackageProcessor(processorOptions);
 
-  return async (packages: PackagesWithRoot, targets: string[] = []): Promise<void> => {
+  return async (packages: PackagesWithRoot, _targets: string[] = []): Promise<void> => {
     try {
-      // 1. Set targets for processing
-      const targetPackages = targets.length > 0 ? targets : config.packages || [];
-      packageProcessor.setTargets(targetPackages);
-
-      if (targetPackages.length > 0) {
-        log(`Processing targeted packages: ${targetPackages.join(', ')}`, 'info');
-      } else {
-        log('No targets specified, processing all non-skipped packages', 'info');
-      }
+      // Packages are already filtered at discovery time, so just process all passed packages
+      log(`Processing ${packages.packages.length} pre-filtered packages`, 'info');
 
       // 2. Process packages with PackageProcessor
       const result = await packageProcessor.processPackages(packages.packages);

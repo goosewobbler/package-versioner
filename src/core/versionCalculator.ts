@@ -223,7 +223,10 @@ To fix this mismatch:
       const bumper = new Bumper();
       bumper.loadPreset(preset);
       const recommendedBump = await bumper.bump();
-      const releaseTypeFromCommits = recommendedBump?.releaseType as ReleaseType | undefined;
+      const releaseTypeFromCommits =
+        recommendedBump && 'releaseType' in recommendedBump
+          ? (recommendedBump.releaseType as ReleaseType)
+          : undefined;
 
       if (hasNoTags) {
         // Get package version from package.json if releaseTypeFromCommits is found

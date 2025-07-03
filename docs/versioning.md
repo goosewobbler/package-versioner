@@ -170,13 +170,6 @@ This dual support makes `package-versioner` suitable for both JavaScript/TypeScr
 
 When working with monorepos, you can control which packages are processed for versioning using the `packages` configuration option. This provides flexible targeting with support for various pattern types.
 
-### Package Discovery vs. Targeting
-
-It's important to understand the distinction:
-
-- **Package Discovery**: Handled by your workspace configuration (pnpm-workspace.yaml, package.json workspaces, etc.)
-- **Package Targeting**: Controlled by the `packages` option in version.config.json to filter which discovered packages to process
-
 ### Targeting Patterns
 
 #### Exact Package Names
@@ -212,6 +205,12 @@ Combine different pattern types for flexible targeting:
 }
 ```
 
+### Behaviour
+
+- **When `packages` is specified**: Only packages matching those patterns will be processed for versioning
+- **When `packages` is empty or not specified**: All workspace packages will be processed
+- **Error handling**: If no packages match the specified patterns, a warning is displayed
+
 ### Excluding Packages
 
 Use the `skip` option to exclude specific packages from processing:
@@ -223,6 +222,8 @@ Use the `skip` option to exclude specific packages from processing:
 ```
 
 This configuration will process all packages in the `@mycompany` scope except for `@mycompany/deprecated-package`.
+
+**Note**: Your workspace configuration (pnpm-workspace.yaml, package.json workspaces, etc.) determines which packages are available in your workspace, but the `packages` option directly controls which ones get versioned.
 
 ## Tag Templates and Configuration
 

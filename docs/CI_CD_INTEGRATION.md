@@ -154,7 +154,7 @@ git push origin "v$NEW_VERSION"
 `package-versioner` respects the following environment variables:
 
 - `NO_COLOR=1`: Disables colored output in logs (automatically detected in CI environments)
-- `CI=true`: Most CI environments set this automatically, which helps the tool adjust its output behavior
+- `CI=true`: Most CI environments set this automatically, which helps the tool adjust its output behaviour
 
 ## Skipping CI for Version Commits
 

@@ -74,7 +74,7 @@ npx package-versioner --dry-run --json
 
 By default, `package-versioner` intelligently handles Git tag reachability to provide the best user experience:
 
-- **Default behavior**: Uses reachable tags when available, but falls back to the latest repository tag if needed (common in feature branches)
+- **Default behaviour**: Uses reachable tags when available, but falls back to the latest repository tag if needed (common in feature branches)
 - **Strict mode (`--strict-reachable`)**: Only uses tags reachable from the current commit, following strict Git semantics
 
 This is particularly useful when working on feature branches that have diverged from the main branch where newer tags exist. The tool will automatically detect the Git context and provide helpful guidance:
@@ -168,7 +168,7 @@ For more details on CI/CD integration and advanced usage, see [CI/CD Integration
 
 ### Package Targeting
 
-The `packages` configuration option allows you to specify which packages should be processed for versioning. It supports several pattern types:
+The `packages` configuration option controls which packages are processed for versioning. It supports several pattern types:
 
 #### Exact Package Names
 ```json
@@ -201,7 +201,12 @@ Combine different pattern types:
 }
 ```
 
-**Note**: Package discovery is handled by your workspace configuration (pnpm-workspace.yaml, package.json workspaces, etc.). The `packages` option only filters which discovered packages to process.
+**Behaviour:**
+- When `packages` is specified, **only** packages matching those patterns will be processed
+- When `packages` is empty or not specified, **all** workspace packages will be processed  
+- The `skip` option can exclude specific packages from the selected set
+
+**Note**: Your workspace configuration (pnpm-workspace.yaml, package.json workspaces, etc.) determines which packages are available, but the `packages` option directly controls which ones get versioned.
 
 ### Package-Specific Tagging
 

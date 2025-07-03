@@ -2,11 +2,15 @@
  * Package matching utilities for scope-based and exact name matching
  */
 
+import micromatch from 'micromatch';
+import { log } from './logging.js';
+
 /**
  * Check if a package name matches a target pattern
  * Supports:
  * - Exact matches: "@scope/package-name"
  * - Scope wildcards: "@scope/*"
+ * - Path patterns: "packages/**\/*"
  * - Unscoped wildcards: "*" (matches all packages)
  */
 export function matchesPackageTarget(packageName: string, target: string): boolean {
@@ -16,24 +20,26 @@ export function matchesPackageTarget(packageName: string, target: string): boole
   }
 
   // Handle scope wildcards like "@scope/*"
-  if (target.endsWith('/*')) {
+  if (target.startsWith('@') && target.endsWith('/*')) {
     const scope = target.slice(0, -2); // Remove "/*"
-
-    // For "@scope/*", match packages that start with "@scope/"
-    if (scope.startsWith('@')) {
-      return packageName.startsWith(`${scope}/`);
-    }
-
-    // For "prefix/*", match packages that start with "prefix/"
     return packageName.startsWith(`${scope}/`);
   }
 
-  // Handle global wildcard "*"
-  if (target === '*') {
-    return true;
+  // Handle path-based patterns using micromatch
+  try {
+    return micromatch.isMatch(packageName, target, {
+      dot: true,
+      contains: true,
+      noglobstar: false,
+      bash: true,
+    });
+  } catch (error) {
+    log(
+      `Invalid pattern "${target}": ${error instanceof Error ? error.message : String(error)}`,
+      'warning',
+    );
+    return false;
   }
-
-  return false;
 }
 
 /**

@@ -58,12 +58,23 @@ export function createVersionConfig(dir: string, config: Record<string, unknown>
  * Get the version from a package.json file
  */
 export function getPackageVersion(dir: string, pkgName?: string): string {
-  const packageJsonPath = pkgName
-    ? join(dir, 'packages', pkgName, 'package.json')
-    : join(dir, 'package.json');
+  if (!pkgName) {
+    return JSON.parse(readFileSync(join(dir, 'package.json'), 'utf-8')).version;
+  }
 
-  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-  return packageJson.version;
+  // Try different possible locations
+  const possiblePaths = [
+    join(dir, 'packages', pkgName, 'package.json'),
+    join(dir, pkgName, 'package.json'),
+  ];
+
+  for (const path of possiblePaths) {
+    if (existsSync(path)) {
+      return JSON.parse(readFileSync(path, 'utf-8')).version;
+    }
+  }
+
+  throw new Error(`No package.json found for ${pkgName} in ${dir}`);
 }
 
 /**

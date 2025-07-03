@@ -50,10 +50,19 @@ export function shouldMatchPackageTargets(packageName: string, targets: string[]
 }
 
 /**
- * Check if a package should be processed based on skip list only
- * Note: Package targeting is now handled at discovery time, so this only handles exclusions
+ * Check if a package should be processed based on skip patterns
+ * Supports the same pattern matching as package targeting:
+ * - Exact matches: "@scope/package-name"
+ * - Scope wildcards: "@scope/*"
+ * - Path patterns: "packages/**\/*"
+ * - Unscoped wildcards: "*"
  */
 export function shouldProcessPackage(packageName: string, skip: string[] = []): boolean {
-  // Only check skip list - targeting is now handled at discovery time
-  return !skip.includes(packageName);
+  // If no skip patterns, always process
+  if (skip.length === 0) {
+    return true;
+  }
+
+  // Check if package matches any skip pattern
+  return !shouldMatchPackageTargets(packageName, skip);
 }

@@ -98,9 +98,6 @@ describe('Version Strategies', () => {
       tags: ['v1.1.0'],
       commitMessage: 'chore(release): v1.1.0',
     });
-    vi.mocked(PackageProcessor.prototype.setTargets, { partial: true }).mockImplementation(
-      () => undefined,
-    );
   });
 
   afterEach(() => {
@@ -108,27 +105,12 @@ describe('Version Strategies', () => {
   });
 
   // Helper function for testing package processing logic
-  // Since we can't directly access the private function, we'll implement our own version
-  // that matches the behavior we expect from the real implementation
-  const shouldProcessPackage = (
-    pkg: Package,
-    config: Partial<Config>,
-    targets: string[] = [],
-  ): boolean => {
+  // Since targeting is now handled at discovery time, this only checks skip logic
+  const shouldProcessPackage = (pkg: Package, config: Partial<Config>): boolean => {
     const pkgName = pkg.packageJson.name;
 
-    // Skip packages explicitly excluded
-    if (config.skip?.includes(pkgName)) {
-      return false;
-    }
-
-    // If no targets specified, process all non-skipped packages
-    if (!targets || targets.length === 0) {
-      return true;
-    }
-
-    // Otherwise, only process packages in targets list
-    return targets.includes(pkgName);
+    // Only check skip list - targeting is now handled at discovery time
+    return !config.skip?.includes(pkgName);
   };
 
   describe('shouldProcessPackage', () => {
@@ -153,16 +135,16 @@ describe('Version Strategies', () => {
       expect(result).toBe(true);
     });
 
-    it('should only process targeted packages when targets specified', () => {
+    it('should process all packages since targeting is now at discovery time', () => {
       const config: Partial<Config> = {
         ...defaultConfig,
       };
 
-      const resultA = shouldProcessPackage(mockPackages.packages[0], config, ['package-a']);
-      const resultB = shouldProcessPackage(mockPackages.packages[1], config, ['package-a']);
+      const resultA = shouldProcessPackage(mockPackages.packages[0], config);
+      const resultB = shouldProcessPackage(mockPackages.packages[1], config);
 
       expect(resultA).toBe(true);
-      expect(resultB).toBe(false);
+      expect(resultB).toBe(true);
     });
   });
 
@@ -494,24 +476,17 @@ describe('Version Strategies', () => {
       // Execute
       await asyncStrategy(mockPackages);
 
-      // Verify
-      expect(PackageProcessor.prototype.setTargets).toHaveBeenCalledWith([
-        'package-a',
-        'package-b',
-      ]);
+      // Verify that packages are processed (no setTargets call since targeting is at discovery time)
       expect(PackageProcessor.prototype.processPackages).toHaveBeenCalledWith(
         mockPackages.packages,
       );
 
-      // Check logging
-      expect(logging.log).toHaveBeenCalledWith(
-        'Processing targeted packages: package-a, package-b',
-        'info',
-      );
+      // Check logging for new behavior
+      expect(logging.log).toHaveBeenCalledWith('Processing 2 pre-filtered packages', 'info');
       expect(logging.log).toHaveBeenCalledWith('Updated 1 package(s): package-a', 'success');
     });
 
-    it('should use provided targets instead of config packages', async () => {
+    it('should ignore provided targets since targeting is now at discovery time', async () => {
       // Setup
       const config: Partial<Config> = {
         ...defaultConfig,
@@ -520,14 +495,17 @@ describe('Version Strategies', () => {
 
       const asyncStrategy = strategies.createAsyncStrategy(config as Config);
 
-      // Execute with override targets
+      // Execute with targets (should be ignored)
       await asyncStrategy(mockPackages, ['package-b']);
 
-      // Verify
-      expect(PackageProcessor.prototype.setTargets).toHaveBeenCalledWith(['package-b']);
+      // Verify that packages are processed normally (targets ignored)
+      expect(PackageProcessor.prototype.processPackages).toHaveBeenCalledWith(
+        mockPackages.packages,
+      );
+      expect(logging.log).toHaveBeenCalledWith('Processing 2 pre-filtered packages', 'info');
     });
 
-    it('should process all non-skipped packages if no targets', async () => {
+    it('should process all pre-filtered packages', async () => {
       // Setup
       const config: Partial<Config> = {
         ...defaultConfig,
@@ -539,12 +517,11 @@ describe('Version Strategies', () => {
       // Execute
       await asyncStrategy(mockPackages);
 
-      // Verify
-      expect(PackageProcessor.prototype.setTargets).toHaveBeenCalledWith([]);
-      expect(logging.log).toHaveBeenCalledWith(
-        'No targets specified, processing all non-skipped packages',
-        'info',
+      // Verify packages are processed
+      expect(PackageProcessor.prototype.processPackages).toHaveBeenCalledWith(
+        mockPackages.packages,
       );
+      expect(logging.log).toHaveBeenCalledWith('Processing 2 pre-filtered packages', 'info');
     });
 
     it('should handle case when no packages were updated', async () => {

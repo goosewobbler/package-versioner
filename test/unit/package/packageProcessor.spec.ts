@@ -128,7 +128,6 @@ describe('Package Processor', () => {
   // Default processor options
   const defaultOptions = {
     skip: ['package-c'],
-    targets: ['package-a', 'package-b'],
     versionPrefix: 'v',
     commitMessageTemplate: 'chore(release): ${version}',
     dryRun: false,
@@ -165,7 +164,7 @@ describe('Package Processor', () => {
       (version, prefix) => `${prefix}${version}`,
     );
     vi.spyOn(formatting, 'formatCommitMessage').mockImplementation(
-      (template: string, version: string, packageName?: string) => {
+      (template: string, version: string, packageName?: string | null | undefined) => {
         if (packageName) {
           return template.replace('${version}', version).replace('${packageName}', packageName);
         }
@@ -250,22 +249,6 @@ describe('Package Processor', () => {
     });
   });
 
-  describe('setTargets', () => {
-    it('should update the targets array', async () => {
-      const processor = new PackageProcessor(defaultOptions);
-      const newTargets = ['package-b'];
-
-      processor.setTargets(newTargets);
-
-      // Verify behavior by processing packages
-      const result = await processor.processPackages(mockPackages);
-
-      // Should only process package-b now
-      expect(result.updatedPackages.length).toBe(1);
-      expect(result.updatedPackages[0].name).toBe('package-b');
-    });
-  });
-
   describe('processPackages', () => {
     it('should return early if no packages are provided', async () => {
       const processor = new PackageProcessor(defaultOptions);
@@ -273,35 +256,29 @@ describe('Package Processor', () => {
 
       expect(result).toEqual({ updatedPackages: [], tags: [] });
       expect(logging.log).toHaveBeenCalledWith(
-        'Found 0 targeted package(s) to process after filtering.',
+        'Found 0 package(s) to process after filtering.',
         'info',
       );
-      expect(logging.log).toHaveBeenCalledWith(
-        'No matching targeted packages found to process.',
-        'info',
-      );
+      expect(logging.log).toHaveBeenCalledWith('No packages found to process.', 'info');
     });
 
-    it('should return early if no packages match filtering criteria', async () => {
+    it('should process all provided packages since targeting is now at discovery time', async () => {
       const processor = new PackageProcessor({
         ...defaultOptions,
-        targets: ['non-existent-package'],
       });
 
       const result = await processor.processPackages(mockPackages);
 
-      expect(result).toEqual({ updatedPackages: [], tags: [] });
-      expect(logging.log).toHaveBeenCalledWith(
-        'No matching targeted packages found to process.',
-        'info',
-      );
+      // Should process all packages except those in skip list (package-c is skipped)
+      expect(result.updatedPackages.length).toBe(2);
+      expect(result.updatedPackages.some((p) => p.name === 'package-a')).toBe(true);
+      expect(result.updatedPackages.some((p) => p.name === 'package-b')).toBe(true);
     });
 
     it('should skip packages in the exclusion list', async () => {
       const processor = new PackageProcessor({
         ...defaultOptions,
         skip: ['package-a'],
-        targets: [], // Process all non-skipped packages
       });
 
       await processor.processPackages(mockPackages);
@@ -316,21 +293,17 @@ describe('Package Processor', () => {
       );
     });
 
-    it('should only process packages in the target list if provided', async () => {
+    it('should process all provided packages since targeting is handled at discovery time', async () => {
       const processor = new PackageProcessor({
         ...defaultOptions,
-        targets: ['package-a'],
       });
 
       await processor.processPackages(mockPackages);
 
-      expect(logging.log).toHaveBeenCalledWith(
-        'Package package-b not in target list, skipping.',
-        'info',
-      );
-      expect(calculator.calculateVersion).toHaveBeenCalledTimes(1);
+      // Should process all non-skipped packages (package-a and package-b, but not package-c which is skipped)
+      expect(calculator.calculateVersion).toHaveBeenCalledTimes(2);
 
-      // Only verify it was called for the package-a and not for other packages
+      // Verify it was called for both package-a and package-b
       expect(calculator.calculateVersion).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
@@ -338,8 +311,7 @@ describe('Package Processor', () => {
         }),
       );
 
-      // Verify it was NOT called for package-b
-      expect(calculator.calculateVersion).not.toHaveBeenCalledWith(
+      expect(calculator.calculateVersion).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
           name: 'package-b',
@@ -350,7 +322,6 @@ describe('Package Processor', () => {
     it('should process all non-skipped packages if no targets specified', async () => {
       const processor = new PackageProcessor({
         ...defaultOptions,
-        targets: [], // empty targets = process all non-skipped
       });
 
       await processor.processPackages(mockPackages);
@@ -375,7 +346,6 @@ describe('Package Processor', () => {
     it('should create tags and update packages with version changes', async () => {
       const processor = new PackageProcessor({
         ...defaultOptions,
-        targets: ['package-a'],
       });
 
       const result = await processor.processPackages([mockPackages[0]]);
@@ -406,7 +376,6 @@ describe('Package Processor', () => {
     it('should create a commit for all updated packages', async () => {
       const processor = new PackageProcessor({
         ...defaultOptions,
-        targets: ['package-a', 'package-b'],
       });
 
       const result = await processor.processPackages(mockPackages);
@@ -473,7 +442,6 @@ describe('Package Processor', () => {
     it('should use custom commit message format with one package', async () => {
       const processor = new PackageProcessor({
         ...defaultOptions,
-        targets: ['package-a'],
         commitMessageTemplate: 'release: v${version} of packages',
       });
 
@@ -496,7 +464,6 @@ describe('Package Processor', () => {
 
       const processor = new PackageProcessor({
         ...defaultOptions,
-        targets: ['package-a'],
         commitMessageTemplate: 'chore: release ${packageName}@${version} [skip-ci]',
       });
 
@@ -512,7 +479,6 @@ describe('Package Processor', () => {
     it('should use generic commit message format with multiple packages', async () => {
       const processor = new PackageProcessor({
         ...defaultOptions,
-        targets: ['package-a', 'package-b'],
         commitMessageTemplate: 'release: v${version} of package',
       });
 
@@ -562,19 +528,18 @@ describe('Package Processor', () => {
       );
     });
 
-    it('should only process target packages when specified', async () => {
+    it('should process all packages since targeting is now at discovery time', async () => {
       const processor = new PackageProcessor({
         getLatestTag: gitTags.getLatestTag,
         config: {},
         fullConfig: mockConfig,
-        targets: ['package-a'],
       });
 
       const result = await processor.processPackages(mockPackages);
 
-      expect(result.updatedPackages.length).toBe(1);
-      expect(result.tags.length).toBe(1);
-      expect(packageManagement.updatePackageVersion).toHaveBeenCalledTimes(1);
+      expect(result.updatedPackages.length).toBe(3);
+      expect(result.tags.length).toBe(3);
+      expect(packageManagement.updatePackageVersion).toHaveBeenCalledTimes(3);
       expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(
         expect.stringContaining('package-a'),
         expect.any(String),

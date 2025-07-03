@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { Bumper } from 'conventional-recommended-bump';
+import { Bumper, type BumperRecommendationResult } from 'conventional-recommended-bump';
 import semver from 'semver';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { calculateVersion } from '../../../src/core/versionCalculator.js';
@@ -225,7 +225,12 @@ describe('Version Calculator', () => {
       return {} as Bumper;
     });
 
-    vi.spyOn(Bumper.prototype, 'bump').mockResolvedValue({ releaseType: 'patch' as const });
+    vi.spyOn(Bumper.prototype, 'bump').mockResolvedValue({
+      releaseType: 'patch' as const,
+      commits: [],
+      level: 0,
+      reason: 'test',
+    });
   });
 
   afterEach(() => {
@@ -563,7 +568,9 @@ describe('Version Calculator', () => {
         // Return the Bumper instance (this)
         return {} as Bumper;
       });
-      vi.spyOn(Bumper.prototype, 'bump').mockResolvedValue({ releaseType: 'patch' as const });
+      vi.spyOn(Bumper.prototype, 'bump').mockResolvedValue({
+        releaseType: 'patch',
+      } as unknown as BumperRecommendationResult);
       vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.0.1');
 
       // Execute
@@ -599,8 +606,10 @@ describe('Version Calculator', () => {
     });
 
     it('should return empty string if conventional-commits finds no relevant commits', async () => {
-      // Fix the type issue with releaseType
-      vi.spyOn(Bumper.prototype, 'bump').mockResolvedValue({ releaseType: undefined });
+      // Fix the type issue with releaseType - return empty result for no commits
+      vi.spyOn(Bumper.prototype, 'bump').mockResolvedValue(
+        {} as unknown as BumperRecommendationResult,
+      );
 
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
@@ -801,7 +810,9 @@ describe('Version Calculator', () => {
         manifestPath: 'path/to/package.json',
         manifestType: 'package.json',
       });
-      vi.spyOn(Bumper.prototype, 'bump').mockResolvedValue({ releaseType: 'patch' as const });
+      vi.spyOn(Bumper.prototype, 'bump').mockResolvedValue({
+        releaseType: 'patch',
+      } as unknown as BumperRecommendationResult);
       vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.0.1');
 
       const options: VersionOptions = {

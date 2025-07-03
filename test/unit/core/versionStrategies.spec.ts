@@ -481,7 +481,7 @@ describe('Version Strategies', () => {
         mockPackages.packages,
       );
 
-      // Check logging for new behavior
+      // Check logging
       expect(logging.log).toHaveBeenCalledWith('Processing 2 pre-filtered packages', 'info');
       expect(logging.log).toHaveBeenCalledWith('Updated 1 package(s): package-a', 'success');
     });

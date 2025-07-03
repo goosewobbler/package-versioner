@@ -226,7 +226,7 @@ describe('Package Processor', () => {
 
       const processor = new PackageProcessor(minimalOptions);
 
-      // Test behavior instead of implementation details
+      // Test behaviour instead of implementation details
       const result = await processor.processPackages(mockPackages);
 
       // Since we're not providing targets or skip lists, all packages should be processed
@@ -237,7 +237,7 @@ describe('Package Processor', () => {
     it('should initialize with provided options', async () => {
       const processor = new PackageProcessor(defaultOptions);
 
-      // Test behavior instead of checking private properties
+      // Test behaviour instead of checking private properties
       // Process with packages to verify skip and target lists are applied
       const result = await processor.processPackages(mockPackages);
 

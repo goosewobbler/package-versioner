@@ -293,7 +293,7 @@ export class PackageProcessor {
             }
           }
         } else {
-          // Default behavior: check for Cargo.toml in the root package directory
+          // Default behaviour: check for Cargo.toml in the root package directory
           const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
           if (fs.existsSync(cargoTomlPath)) {
             updatePackageVersion(cargoTomlPath, nextVersion);
@@ -366,7 +366,7 @@ export class PackageProcessor {
             }
           }
         } else {
-          // Default behavior: check for Cargo.toml in the root package directory
+          // Default behaviour: check for Cargo.toml in the root package directory
           const cargoTomlPath = path.join(info.path, 'Cargo.toml');
           if (fs.existsSync(cargoTomlPath)) {
             filesToCommit.push(cargoTomlPath);

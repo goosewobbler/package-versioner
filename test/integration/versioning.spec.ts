@@ -634,7 +634,7 @@ edition = "2021"
       },
     });
 
-    // Simulate PackageProcessor behavior by manually running updatePackageVersion
+    // Simulate PackageProcessor behaviour by manually running updatePackageVersion
     // - For root package.json
     const packageJsonPath = join(testDir, 'package.json');
     updatePackageVersion(packageJsonPath, '0.4.0');

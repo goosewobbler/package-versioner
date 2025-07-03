@@ -718,7 +718,7 @@ describe('Version Calculator', () => {
         return null;
       });
 
-      // Implement semver.inc with a more complex behavior for different scenarios
+      // Implement semver.inc with a more complex behaviour for different scenarios
       vi.spyOn(semver, 'inc').mockImplementation((version, releaseType, identifier) => {
         if (!version) return '1.0.0';
 

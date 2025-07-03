@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as TOML from 'smol-toml';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -539,7 +539,8 @@ pretty_assertions = "1.3.0"
 
 describe('Hybrid Package Tests', () => {
   beforeEach(() => {
-    // No setup is needed as we're using the existing fixture directly
+    // Reset the hybrid package fixture to its initial state
+    updateBothManifests(HYBRID_PACKAGE_FIXTURE, '0.1.0');
   });
 
   afterEach(() => {
@@ -659,5 +660,233 @@ edition = "2021"
     if (existsSync(srcCargoPath)) {
       rmSync(srcCargoPath);
     }
+  });
+});
+
+describe('Packages Filtering Tests', () => {
+  const PACKAGES_FILTER_FIXTURE = join(FIXTURES_DIR, 'packages-filter-test');
+
+  beforeEach(() => {
+    // Clean up and recreate the fixture directory
+    execSync(`rm -rf ${PACKAGES_FILTER_FIXTURE}`);
+    mkdirSync(PACKAGES_FILTER_FIXTURE, { recursive: true });
+
+    // Initialize git repo
+    initGitRepo(PACKAGES_FILTER_FIXTURE);
+
+    // Create root package.json
+    createPackageJson(PACKAGES_FILTER_FIXTURE, 'test-monorepo-root');
+
+    // Create packages directory
+    const packagesDir = join(PACKAGES_FILTER_FIXTURE, 'packages');
+    mkdirSync(packagesDir);
+
+    // Create package A
+    const packageADir = join(packagesDir, 'package-a');
+    mkdirSync(packageADir);
+    createPackageJson(packageADir, '@test/package-a');
+
+    // Create package B
+    const packageBDir = join(packagesDir, 'package-b');
+    mkdirSync(packageBDir);
+    createPackageJson(packageBDir, '@test/package-b');
+
+    // Create package C (outside packages directory)
+    const packageCDir = join(PACKAGES_FILTER_FIXTURE, 'standalone-package');
+    mkdirSync(packageCDir);
+    createPackageJson(packageCDir, 'standalone-package');
+
+    // Add files to git
+    execSync('git add .', { cwd: PACKAGES_FILTER_FIXTURE });
+    execSync('git commit -m "chore: setup packages filter test"', { cwd: PACKAGES_FILTER_FIXTURE });
+  });
+
+  it('should only process packages matching the packages pattern', () => {
+    // Create version config that only targets packages/* (should exclude standalone-package)
+    createVersionConfig(PACKAGES_FILTER_FIXTURE, {
+      preset: 'conventional-commits',
+      packages: ['packages/*'],
+      synced: false,
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      packageTagTemplate: '${packageName}@${prefix}${version}',
+    });
+
+    // Create a commit that changes a file in package-a
+    const fileA = join(PACKAGES_FILTER_FIXTURE, 'packages/package-a/index.js');
+    writeFileSync(fileA, 'console.log("Hello from A");');
+    createConventionalCommit(
+      PACKAGES_FILTER_FIXTURE,
+      'feat',
+      'add feature to package A',
+      undefined,
+      false,
+      [fileA],
+    );
+
+    // Mock version updates - only package-a should be updated
+    mockVersionUpdates(join(PACKAGES_FILTER_FIXTURE, 'packages/package-a'), '0.2.0');
+    // Package-b and standalone-package should NOT be updated
+
+    // Verify only package-a was updated
+    const versionA = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'package-a');
+    const versionB = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'package-b');
+    const versionC = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'standalone-package');
+
+    expect(versionA).toBe('0.2.0');
+    expect(versionB).toBe('0.1.0'); // Should remain unchanged
+    expect(versionC).toBe('0.1.0'); // Should remain unchanged
+  });
+
+  it('should process all packages when packages config is empty', () => {
+    // Create version config with empty packages array (should process all)
+    createVersionConfig(PACKAGES_FILTER_FIXTURE, {
+      preset: 'conventional-commits',
+      packages: [], // Empty array should process all packages
+      synced: false,
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      packageTagTemplate: '${packageName}@${prefix}${version}',
+    });
+
+    // Create a commit that changes a file in package-a
+    const fileA = join(PACKAGES_FILTER_FIXTURE, 'packages/package-a/index.js');
+    writeFileSync(fileA, 'console.log("Hello from A");');
+    createConventionalCommit(
+      PACKAGES_FILTER_FIXTURE,
+      'feat',
+      'add feature to package A',
+      undefined,
+      false,
+      [fileA],
+    );
+
+    // Mock version updates - all packages should be updated
+    mockVersionUpdates(join(PACKAGES_FILTER_FIXTURE, 'packages/package-a'), '0.2.0');
+    mockVersionUpdates(join(PACKAGES_FILTER_FIXTURE, 'packages/package-b'), '0.2.0');
+    mockVersionUpdates(join(PACKAGES_FILTER_FIXTURE, 'standalone-package'), '0.2.0');
+
+    // Verify all packages were updated
+    const versionA = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'package-a');
+    const versionB = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'package-b');
+    const versionC = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'standalone-package');
+
+    expect(versionA).toBe('0.2.0');
+    expect(versionB).toBe('0.2.0');
+    expect(versionC).toBe('0.2.0');
+  });
+
+  it('should process all packages when packages config is not specified', () => {
+    // Create version config without packages property (should process all)
+    createVersionConfig(PACKAGES_FILTER_FIXTURE, {
+      preset: 'conventional-commits',
+      // packages property not specified
+      synced: false,
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      packageTagTemplate: '${packageName}@${prefix}${version}',
+    });
+
+    // Create a commit that changes a file in package-a
+    const fileA = join(PACKAGES_FILTER_FIXTURE, 'packages/package-a/index.js');
+    writeFileSync(fileA, 'console.log("Hello from A");');
+    createConventionalCommit(
+      PACKAGES_FILTER_FIXTURE,
+      'feat',
+      'add feature to package A',
+      undefined,
+      false,
+      [fileA],
+    );
+
+    // Mock version updates - all packages should be updated
+    mockVersionUpdates(join(PACKAGES_FILTER_FIXTURE, 'packages/package-a'), '0.2.0');
+    mockVersionUpdates(join(PACKAGES_FILTER_FIXTURE, 'packages/package-b'), '0.2.0');
+    mockVersionUpdates(join(PACKAGES_FILTER_FIXTURE, 'standalone-package'), '0.2.0');
+
+    // Verify all packages were updated
+    const versionA = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'package-a');
+    const versionB = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'package-b');
+    const versionC = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'standalone-package');
+
+    expect(versionA).toBe('0.2.0');
+    expect(versionB).toBe('0.2.0');
+    expect(versionC).toBe('0.2.0');
+  });
+
+  it('should support exact package name matching', () => {
+    // Create version config that targets specific package names
+    createVersionConfig(PACKAGES_FILTER_FIXTURE, {
+      preset: 'conventional-commits',
+      packages: ['@test/package-a', 'standalone-package'],
+      synced: false,
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      packageTagTemplate: '${packageName}@${prefix}${version}',
+    });
+
+    // Create a commit that changes a file in package-a
+    const fileA = join(PACKAGES_FILTER_FIXTURE, 'packages/package-a/index.js');
+    writeFileSync(fileA, 'console.log("Hello from A");');
+    createConventionalCommit(
+      PACKAGES_FILTER_FIXTURE,
+      'feat',
+      'add feature to package A',
+      undefined,
+      false,
+      [fileA],
+    );
+
+    // Mock version updates - only specified packages should be updated
+    mockVersionUpdates(join(PACKAGES_FILTER_FIXTURE, 'packages/package-a'), '0.2.0');
+    mockVersionUpdates(join(PACKAGES_FILTER_FIXTURE, 'standalone-package'), '0.2.0');
+    // Package-b should NOT be updated
+
+    // Verify only specified packages were updated
+    const versionA = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'package-a');
+    const versionB = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'package-b');
+    const versionC = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'standalone-package');
+
+    expect(versionA).toBe('0.2.0');
+    expect(versionB).toBe('0.1.0'); // Should remain unchanged
+    expect(versionC).toBe('0.2.0');
+  });
+
+  it('should support scope wildcard matching', () => {
+    // Create version config that targets all packages in @test scope
+    createVersionConfig(PACKAGES_FILTER_FIXTURE, {
+      preset: 'conventional-commits',
+      packages: ['@test/*'],
+      synced: false,
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      packageTagTemplate: '${packageName}@${prefix}${version}',
+    });
+
+    // Create a commit that changes a file in package-a
+    const fileA = join(PACKAGES_FILTER_FIXTURE, 'packages/package-a/index.js');
+    writeFileSync(fileA, 'console.log("Hello from A");');
+    createConventionalCommit(
+      PACKAGES_FILTER_FIXTURE,
+      'feat',
+      'add feature to package A',
+      undefined,
+      false,
+      [fileA],
+    );
+
+    // Mock version updates - only @test scope packages should be updated
+    mockVersionUpdates(join(PACKAGES_FILTER_FIXTURE, 'packages/package-a'), '0.2.0');
+    mockVersionUpdates(join(PACKAGES_FILTER_FIXTURE, 'packages/package-b'), '0.2.0');
+    // standalone-package should NOT be updated
+
+    // Verify only @test scope packages were updated
+    const versionA = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'package-a');
+    const versionB = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'package-b');
+    const versionC = getPackageVersion(PACKAGES_FILTER_FIXTURE, 'standalone-package');
+
+    expect(versionA).toBe('0.2.0');
+    expect(versionB).toBe('0.2.0');
+    expect(versionC).toBe('0.1.0'); // Should remain unchanged
   });
 });

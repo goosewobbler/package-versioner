@@ -1,7 +1,12 @@
 {
   "preset": "conventional-commits",
   "packages": [
-    "packages/*"
+    "packages/**/*"
   ],
-  "synced": false
+  "skip": [
+    "@scope/package-a"
+  ],
+  "versionPrefix": "v",
+  "tagTemplate": "${prefix}${version}",
+  "packageTagTemplate": "${packageName}@${prefix}${version}"
 }

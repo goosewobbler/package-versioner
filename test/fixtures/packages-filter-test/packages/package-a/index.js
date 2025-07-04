@@ -1,1 +1,1 @@
-console.log('Hello from package');
+console.log('Hello from A');

@@ -4,7 +4,8 @@
     "packages/**/*"
   ],
   "skip": [
-    "packages/**/utils"
+    "@scope/*",
+    "standalone-pkg"
   ],
   "versionPrefix": "v",
   "tagTemplate": "${prefix}${version}",

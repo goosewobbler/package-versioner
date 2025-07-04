@@ -4,7 +4,7 @@
     "packages/**/*"
   ],
   "skip": [
-    "@internal/*"
+    "packages/**/utils"
   ],
   "versionPrefix": "v",
   "tagTemplate": "${prefix}${version}",

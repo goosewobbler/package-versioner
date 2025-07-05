@@ -36,7 +36,7 @@
     "clean": "rm -rf node_modules && rm -rf dist",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:watch": "vitest --coverage",
-    "test:integration": "pnpm run build && vitest --run --dir test/integration",
+    "test:integration": "pnpm run build && VITEST_INTEGRATION=true vitest --run --dir test/integration",
     "posttest:integration": "pnpm tsx scripts/cleanup-fixtures.ts",
     "test:unit": "vitest --run --coverage --dir test/unit",
     "lint": "biome check .",

@@ -20,5 +20,7 @@ export default defineConfig({
         statements: 70,
       },
     },
+    setupFiles: [],
+    globalSetup: './test/setup.ts',
   },
 });

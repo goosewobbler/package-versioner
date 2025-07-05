@@ -1,3 +1,4 @@
+import { cwd as mockCwd } from 'node:process';
 import { getPackagesSync } from '@manypkg/get-packages';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VersionEngine } from '../../../src/core/versionEngine.js';
@@ -10,6 +11,8 @@ import { log } from '../../../src/utils/logging.js';
 vi.mock('@manypkg/get-packages');
 vi.mock('../../../src/core/versionStrategies.js');
 vi.mock('../../../src/utils/logging.js');
+
+// Mock the process module
 vi.mock('node:process', () => ({
   cwd: vi.fn().mockReturnValue('/test/workspace'),
 }));
@@ -40,8 +43,7 @@ describe('Version Engine', () => {
     preset: 'conventional-commits',
     synced: true,
     versionPrefix: 'v',
-    tagTemplate: '${prefix}${version}',
-    packageTagTemplate: '${packageName}@${prefix}${version}',
+    tagTemplate: '${packageName}@${prefix}${version}',
     baseBranch: 'main',
     packages: [],
   };
@@ -49,6 +51,9 @@ describe('Version Engine', () => {
   beforeEach(() => {
     // Reset all mocks
     vi.resetAllMocks();
+
+    // Re-setup cwd mock after reset
+    vi.mocked(mockCwd, { partial: true }).mockReturnValue('/test/workspace');
 
     // Setup strategy mocks
     vi.mocked(strategyModule.createSyncedStrategy, { partial: true }).mockReturnValue(
@@ -86,8 +91,7 @@ describe('Version Engine', () => {
       const config: Partial<Config> = {
         synced: true,
         versionPrefix: 'v',
-        tagTemplate: '${prefix}${version}',
-        packageTagTemplate: '${packageName}@${prefix}${version}',
+        tagTemplate: '${packageName}@${prefix}${version}',
         baseBranch: 'main',
         packages: [],
       };
@@ -112,48 +116,210 @@ describe('Version Engine', () => {
     });
   });
 
+  describe('getWorkspacePackages', () => {
+    it('should return all packages when no packages filter is specified', async () => {
+      const engine = new VersionEngine(defaultConfig as Config);
+      const result = await engine.getWorkspacePackages();
+
+      expect(result).toEqual(mockPackages);
+      expect(getPackagesSync).toHaveBeenCalledWith('/test/workspace');
+    });
+
+    it('should filter packages based on packages config', async () => {
+      const config = {
+        ...defaultConfig,
+        packages: ['package-a'],
+      };
+      const engine = new VersionEngine(config as Config);
+      const result = await engine.getWorkspacePackages();
+
+      expect(result.packages).toHaveLength(1);
+      expect(result.packages[0].packageJson.name).toBe('package-a');
+    });
+
+    it('should resolve path patterns like "./" to root package name', async () => {
+      const mockPackagesWithRoot = {
+        root: '/test/workspace',
+        packages: [
+          {
+            dir: '/test/workspace',
+            packageJson: { name: 'root-package', version: '1.0.0' },
+          },
+          {
+            dir: '/test/workspace/packages/a',
+            packageJson: { name: 'package-a', version: '1.0.0' },
+          },
+        ],
+      };
+
+      vi.mocked(getPackagesSync, { partial: true }).mockReturnValue(mockPackagesWithRoot);
+
+      const config = {
+        ...defaultConfig,
+        packages: ['./'],
+      };
+      const engine = new VersionEngine(config as Config);
+      const result = await engine.getWorkspacePackages();
+
+      expect(result.packages).toHaveLength(1);
+      expect(result.packages[0].packageJson.name).toBe('root-package');
+      expect(log).toHaveBeenCalledWith(
+        'Filtered 2 workspace packages to 1 based on packages config',
+        'info',
+      );
+    });
+
+    it('should resolve path patterns like "." to root package name', async () => {
+      const mockPackagesWithRoot = {
+        root: '/test/workspace',
+        packages: [
+          {
+            dir: '/test/workspace',
+            packageJson: { name: 'root-package', version: '1.0.0' },
+          },
+          {
+            dir: '/test/workspace/packages/a',
+            packageJson: { name: 'package-a', version: '1.0.0' },
+          },
+        ],
+      };
+
+      vi.mocked(getPackagesSync, { partial: true }).mockReturnValue(mockPackagesWithRoot);
+
+      const config = {
+        ...defaultConfig,
+        packages: ['.'],
+      };
+      const engine = new VersionEngine(config as Config);
+      const result = await engine.getWorkspacePackages();
+
+      expect(result.packages).toHaveLength(1);
+      expect(result.packages[0].packageJson.name).toBe('root-package');
+      expect(log).toHaveBeenCalledWith(
+        'Filtered 2 workspace packages to 1 based on packages config',
+        'info',
+      );
+    });
+
+    it('should cache workspace packages for subsequent calls', async () => {
+      const engine = new VersionEngine(defaultConfig as Config);
+      await engine.getWorkspacePackages();
+      await engine.getWorkspacePackages();
+
+      // getPackagesSync should only be called once due to caching
+      expect(getPackagesSync).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle missing root property by setting it to cwd', async () => {
+      const mockPackagesWithoutRoot = {
+        packages: [
+          {
+            dir: '/test/workspace/packages/a',
+            packageJson: { name: 'package-a', version: '1.0.0' },
+          },
+        ],
+      } as any;
+
+      vi.mocked(getPackagesSync, { partial: true }).mockReturnValue(mockPackagesWithoutRoot);
+
+      const engine = new VersionEngine(defaultConfig as Config);
+      const result = await engine.getWorkspacePackages();
+
+      expect(result.root).toBe('/test/workspace');
+      expect(log).toHaveBeenCalledWith(
+        'Root path is undefined in packages result, setting to current working directory',
+        'warning',
+      );
+    });
+
+    it('should throw error when getPackagesSync fails', async () => {
+      const error = new Error('Failed to get packages');
+      vi.mocked(getPackagesSync, { partial: true }).mockImplementation(() => {
+        throw error;
+      });
+
+      const engine = new VersionEngine(defaultConfig as Config);
+
+      await expect(engine.getWorkspacePackages()).rejects.toThrow(VersionError);
+      expect(log).toHaveBeenCalledWith(
+        'Failed to get packages information: Failed to get packages',
+        'error',
+      );
+    });
+
+    it('should log filtering results when packages config is specified', async () => {
+      const mockPackagesForFiltering = {
+        root: '/test/workspace',
+        packages: [
+          {
+            dir: '/test/workspace/packages/a',
+            packageJson: { name: 'package-a', version: '1.0.0' },
+          },
+          {
+            dir: '/test/workspace/packages/b',
+            packageJson: { name: 'package-b', version: '1.0.0' },
+          },
+        ],
+      };
+
+      vi.mocked(getPackagesSync, { partial: true }).mockReturnValue(mockPackagesForFiltering);
+
+      const config = {
+        ...defaultConfig,
+        packages: ['package-a'],
+      };
+      const engine = new VersionEngine(config as Config);
+      await engine.getWorkspacePackages();
+
+      expect(log).toHaveBeenCalledWith(
+        'Filtered 2 workspace packages to 1 based on packages config',
+        'info',
+      );
+    });
+
+    it('should warn when no packages match the specified patterns', async () => {
+      const config = {
+        ...defaultConfig,
+        packages: ['non-existent-package'],
+      };
+      const engine = new VersionEngine(config as Config);
+      await engine.getWorkspacePackages();
+
+      expect(log).toHaveBeenCalledWith(
+        'Warning: No packages matched the specified patterns in config.packages',
+        'warning',
+      );
+    });
+  });
+
   describe('Run method', () => {
     it('should get workspace packages and execute the current strategy', async () => {
       const engine = new VersionEngine(defaultConfig as Config);
-      await engine.run();
-
-      expect(getPackagesSync).toHaveBeenCalled();
+      await engine.run(mockPackages);
       expect(syncedStrategyMock).toHaveBeenCalledWith(mockPackages, []);
     });
 
     it('should pass targets to the strategy function', async () => {
       const engine = new VersionEngine(defaultConfig as Config);
       const targets = ['package-a'];
-      await engine.run(targets);
-
+      await engine.run(mockPackages, targets);
       expect(syncedStrategyMock).toHaveBeenCalledWith(mockPackages, targets);
+    });
+
+    it('should propagate errors thrown by the strategy', async () => {
+      const error = new Error('Strategy failed');
+      syncedStrategyMock.mockRejectedValue(error);
+      const engine = new VersionEngine(defaultConfig as Config);
+      await expect(engine.run(mockPackages)).rejects.toThrow('Strategy failed');
     });
 
     it('should cache workspace packages for subsequent calls', async () => {
       const engine = new VersionEngine(defaultConfig as Config);
-      await engine.run();
-      await engine.run();
+      await engine.getWorkspacePackages();
+      await engine.getWorkspacePackages();
 
-      // getPackagesSync should only be called once
+      // getPackagesSync should only be called once due to caching
       expect(getPackagesSync).toHaveBeenCalledTimes(1);
-    });
-
-    it('should log and rethrow error if strategy function throws', async () => {
-      // Import the VersionError and helper function
-      const { VersionError, createVersionError, VersionErrorCode } = await import(
-        '../../../src/errors/versionError.js'
-      );
-
-      // Create an error using the factory function
-      const error = createVersionError(VersionErrorCode.INVALID_CONFIG, 'Strategy failed');
-      syncedStrategyMock.mockRejectedValue(error);
-
-      const engine = new VersionEngine(defaultConfig as Config);
-
-      // Just test that the error is properly rethrown, as we can't reliably test the logging
-      await expect(engine.run()).rejects.toThrow(VersionError);
-
-      // The log assertion was removed as it wasn't working reliably in the test environment
     });
 
     it('should handle error if getPackagesSync throws', async () => {
@@ -164,7 +330,7 @@ describe('Version Engine', () => {
 
       const engine = new VersionEngine(defaultConfig as Config);
 
-      await expect(engine.run()).rejects.toThrow(VersionError);
+      await expect(engine.getWorkspacePackages()).rejects.toThrow(VersionError);
       expect(log).toHaveBeenCalledWith(
         expect.stringContaining('Failed to get packages information'),
         'error',
@@ -173,7 +339,7 @@ describe('Version Engine', () => {
 
     it('should process all packages', async () => {
       const engine = new VersionEngine(defaultConfig as Config);
-      await engine.run();
+      await engine.run(mockPackages);
       expect(syncedStrategyMock).toHaveBeenCalledWith(mockPackages, []);
     });
   });
@@ -183,7 +349,7 @@ describe('Version Engine', () => {
       const engine = new VersionEngine(defaultConfig as Config);
 
       // Initially synced strategy should be used
-      await engine.run();
+      await engine.run(mockPackages);
       expect(syncedStrategyMock).toHaveBeenCalled();
 
       // Change to async strategy
@@ -191,7 +357,7 @@ describe('Version Engine', () => {
       syncedStrategyMock.mockClear();
 
       // Now async strategy should be used
-      await engine.run();
+      await engine.run(mockPackages);
       expect(syncedStrategyMock).not.toHaveBeenCalled();
       expect(asyncStrategyMock).toHaveBeenCalled();
     });

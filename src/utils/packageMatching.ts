@@ -11,6 +11,7 @@ import { log } from './logging.js';
  * - Exact matches: "@scope/package-name"
  * - Scope wildcards: "@scope/*"
  * - Path patterns: "packages/**\/*"
+ * - Scoped glob patterns: "@scope/**\/*"
  * - Unscoped wildcards: "*" (matches all packages)
  */
 export function matchesPackageTarget(packageName: string, target: string): boolean {
@@ -19,17 +20,17 @@ export function matchesPackageTarget(packageName: string, target: string): boole
     return true;
   }
 
-  // Handle scope wildcards like "@scope/*"
-  if (target.startsWith('@') && target.endsWith('/*')) {
+  // Handle simple scope wildcards like "@scope/*" for backward compatibility
+  if (target.startsWith('@') && target.endsWith('/*') && !target.includes('**')) {
     const scope = target.slice(0, -2); // Remove "/*"
     return packageName.startsWith(`${scope}/`);
   }
 
-  // Handle path-based patterns using micromatch
+  // Handle all patterns (including complex scoped patterns) using micromatch
   try {
     return micromatch.isMatch(packageName, target, {
       dot: true,
-      contains: true,
+      contains: false, // Changed to false to ensure full pattern matching
       noglobstar: false,
       bash: true,
     });

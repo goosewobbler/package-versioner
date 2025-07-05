@@ -1,17 +1,17 @@
 import { cwd } from 'node:process';
 
-import { type Packages, getPackagesSync } from '@manypkg/get-packages';
+import { getPackagesSync, type Packages } from '@manypkg/get-packages';
 
 import { GitError } from '../errors/gitError.js';
-import { VersionError, VersionErrorCode, createVersionError } from '../errors/versionError.js';
+import { createVersionError, VersionError, VersionErrorCode } from '../errors/versionError.js';
 import type { Config } from '../types.js';
 import { log } from '../utils/logging.js';
-import { shouldMatchPackageTargets } from '../utils/packageMatching.js';
+import { filterPackagesByConfig } from '../utils/packageFiltering.js';
 import {
-  type StrategyFunction,
-  type StrategyType,
   createStrategy,
   createStrategyMap,
+  type StrategyFunction,
+  type StrategyType,
 } from './versionStrategies.js';
 
 // Define extended type that includes root property
@@ -54,7 +54,7 @@ export class VersionEngine {
   /**
    * Get workspace packages information - with caching for performance
    */
-  private async getWorkspacePackages(): Promise<PackagesWithRoot> {
+  public async getWorkspacePackages(): Promise<PackagesWithRoot> {
     try {
       // Return cached result if available for better performance
       if (this.workspaceCache) {
@@ -78,8 +78,11 @@ export class VersionEngine {
       // Filter packages based on config.packages if specified
       if (this.config.packages && this.config.packages.length > 0) {
         const originalCount = pkgsResult.packages.length;
-        const filteredPackages = pkgsResult.packages.filter((pkg) =>
-          shouldMatchPackageTargets(pkg.packageJson.name, this.config.packages),
+
+        const filteredPackages = filterPackagesByConfig(
+          pkgsResult.packages,
+          this.config.packages,
+          pkgsResult.root,
         );
 
         pkgsResult.packages = filteredPackages;
@@ -93,11 +96,6 @@ export class VersionEngine {
         if (filteredPackages.length === 0) {
           log('Warning: No packages matched the specified patterns in config.packages', 'warning');
         }
-      } else {
-        log(
-          `Processing all ${pkgsResult.packages.length} workspace packages (no packages filter specified)`,
-          'info',
-        );
       }
 
       // Cache the result for subsequent calls
@@ -115,13 +113,11 @@ export class VersionEngine {
 
   /**
    * Run the current strategy
+   * @param packages Workspace packages to process
    * @param targets Optional package targets to process (only used by async strategy)
    */
-  public async run(targets: string[] = []): Promise<void> {
+  public async run(packages: PackagesWithRoot, targets: string[] = []): Promise<void> {
     try {
-      // Get workspace packages
-      const packages = await this.getWorkspacePackages();
-
       // Execute the strategy function
       return this.currentStrategy(packages, targets);
     } catch (error) {

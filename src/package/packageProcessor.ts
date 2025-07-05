@@ -180,7 +180,7 @@ export class PackageProcessor {
         try {
           // Extract entries from commits between the latest tag and HEAD
           // If latestTag is empty or doesn't exist, we'll extract from HEAD
-          let revisionRange = latestTag;
+          let revisionRange: string;
 
           // Check if the tag actually exists in the repository
           if (latestTag) {
@@ -189,17 +189,16 @@ export class PackageProcessor {
                 cwd: pkgPath,
                 stdio: 'ignore',
               });
+              // Tag exists, get commits since that tag
+              revisionRange = `${latestTag}..HEAD`;
             } catch {
-              // Tag doesn't exist, use HEAD instead to get recent commits
-              log(
-                `Tag ${latestTag} doesn't exist, using recent commits from HEAD for changelog`,
-                'debug',
-              );
-              revisionRange = 'HEAD~10..HEAD'; // Get last 10 commits as a reasonable default
+              // Tag doesn't exist, get all commits
+              log(`Tag ${latestTag} doesn't exist, using all commits for changelog`, 'debug');
+              revisionRange = 'HEAD';
             }
           } else {
-            // No tag provided, use recent commits
-            revisionRange = 'HEAD~10..HEAD';
+            // No tag provided, get all commits
+            revisionRange = 'HEAD';
           }
 
           changelogEntries = extractChangelogEntriesFromCommits(pkgPath, revisionRange);

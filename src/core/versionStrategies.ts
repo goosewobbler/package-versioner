@@ -1,12 +1,15 @@
 /**
  * Strategy functions for versioning using the higher-order function pattern
  */
+
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import * as path from 'node:path';
-
 import type { Package } from '@manypkg/get-packages';
+import { updateChangelog } from '../changelog/changelogManager.js';
+import { extractChangelogEntriesFromCommits } from '../changelog/commitParser.js';
 import { GitError } from '../errors/gitError.js';
-import { VersionError, VersionErrorCode, createVersionError } from '../errors/versionError.js';
+import { createVersionError, VersionError, VersionErrorCode } from '../errors/versionError.js';
 import { createGitCommitAndTag } from '../git/commands.js';
 import { getLatestTag, getLatestTagForPackage } from '../git/tagsAndBranches.js';
 import { updatePackageVersion } from '../package/packageManagement.js';
@@ -99,7 +102,10 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
       });
 
       if (!nextVersion) {
-        log('No version change needed', 'info');
+        const msg = mainPkgName
+          ? `No version change needed for ${mainPkgName}`
+          : 'No version change needed';
+        log(msg, 'info');
         return;
       }
 
@@ -156,7 +162,7 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
       // Create tag using the template
       // In synced mode with single package, respect packageSpecificTags setting
       let tagPackageName: string | null = null;
-      let commitPackageName: string | undefined = undefined;
+      let commitPackageName: string | undefined;
 
       // If packageSpecificTags is enabled and we have exactly one package, use its name
       if (config.packageSpecificTags && packages.packages.length === 1) {
@@ -199,7 +205,6 @@ export function createSingleStrategy(config: Config): StrategyFunction {
   return async (packages: PackagesWithRoot): Promise<void> => {
     try {
       const {
-        packages: configPackages,
         mainPackage,
         versionPrefix,
         tagTemplate,
@@ -208,17 +213,17 @@ export function createSingleStrategy(config: Config): StrategyFunction {
         skipHooks,
       } = config;
 
-      // Use mainPackage if specified, otherwise use the first package from the packages array
+      // Use mainPackage if specified, otherwise use the first package from the resolved packages
       let packageName: string | undefined;
 
       if (mainPackage) {
         packageName = mainPackage;
-      } else if (configPackages && configPackages.length === 1) {
-        packageName = configPackages[0];
+      } else if (packages.packages.length === 1) {
+        packageName = packages.packages[0].packageJson.name;
       } else {
         throw createVersionError(
           VersionErrorCode.INVALID_CONFIG,
-          'Single mode requires either mainPackage or exactly one package in the packages array',
+          'Single mode requires either mainPackage or exactly one resolved package',
         );
       }
 
@@ -246,60 +251,145 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       // At this point, latestTagResult is guaranteed to be a string (possibly empty)
       const latestTag = latestTagResult;
 
-      let nextVersion: string | undefined = undefined;
-      try {
-        // Calculate the next version
-        nextVersion = await calculateVersion(config, {
-          latestTag,
-          versionPrefix: formattedPrefix,
-          path: pkgPath,
-          name: packageName,
-          type: config.type,
-        });
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        throw createVersionError(VersionErrorCode.VERSION_CALCULATION_ERROR, errorMessage);
-      }
+      let nextVersion: string | undefined;
 
-      // Explicitly check for undefined (error) or empty string (no bump)
-      if (nextVersion === undefined || nextVersion === '') {
+      // Calculate the next version
+      nextVersion = await calculateVersion(config, {
+        latestTag,
+        versionPrefix: formattedPrefix,
+        branchPattern: config.branchPattern,
+        baseBranch: config.baseBranch,
+        prereleaseIdentifier: config.prereleaseIdentifier,
+        path: pkgPath,
+        name: packageName,
+        type: config.type,
+      });
+
+      if (!nextVersion) {
         log(`No version change needed for ${packageName}`, 'info');
         return;
       }
 
-      // Update package.json
+      // Generate changelog entries from conventional commits
+      if (config.updateChangelog !== false) {
+        // Extract changelog entries from commit messages
+        let changelogEntries: any[] = [];
+
+        try {
+          // Extract entries from commits between the latest tag and HEAD
+          let revisionRange: string;
+
+          // Check if the tag actually exists in the repository
+          if (latestTag) {
+            try {
+              execSync(`git rev-parse --verify "${latestTag}"`, {
+                cwd: pkgPath,
+                stdio: 'ignore',
+              });
+              // Tag exists, get commits since that tag
+              revisionRange = `${latestTag}..HEAD`;
+            } catch {
+              // Tag doesn't exist, get all commits
+              log(`Tag ${latestTag} doesn't exist, using all commits for changelog`, 'debug');
+              revisionRange = 'HEAD';
+            }
+          } else {
+            // No tag provided, get all commits
+            revisionRange = 'HEAD';
+          }
+
+          changelogEntries = extractChangelogEntriesFromCommits(pkgPath, revisionRange);
+
+          // If we have no entries but we're definitely changing versions,
+          // add a minimal entry about the version change
+          if (changelogEntries.length === 0) {
+            changelogEntries = [
+              {
+                type: 'changed',
+                description: `Update version to ${nextVersion}`,
+              },
+            ];
+          }
+        } catch (error) {
+          log(
+            `Error extracting changelog entries: ${error instanceof Error ? error.message : String(error)}`,
+            'warning',
+          );
+          // Fall back to minimal entry
+          changelogEntries = [
+            {
+              type: 'changed',
+              description: `Update version to ${nextVersion}`,
+            },
+          ];
+        }
+
+        // Determine repo URL from package.json or git config
+        let repoUrl: string | undefined;
+        try {
+          const packageJsonPath = path.join(pkgPath, 'package.json');
+          if (fs.existsSync(packageJsonPath)) {
+            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+            if (packageJson.repository) {
+              if (typeof packageJson.repository === 'string') {
+                repoUrl = packageJson.repository;
+              } else if (packageJson.repository.url) {
+                repoUrl = packageJson.repository.url;
+              }
+
+              // Clean up GitHub URL format if needed
+              if (repoUrl?.startsWith('git+') && repoUrl?.endsWith('.git')) {
+                repoUrl = repoUrl.substring(4, repoUrl.length - 4);
+              }
+            }
+          }
+        } catch (error) {
+          log(
+            `Could not determine repository URL for changelog links: ${error instanceof Error ? error.message : String(error)}`,
+            'warning',
+          );
+        }
+
+        // Update the changelog
+        updateChangelog(
+          pkgPath,
+          packageName,
+          nextVersion,
+          changelogEntries,
+          repoUrl,
+          config.changelogFormat,
+        );
+      }
+
+      // Update package version
       const packageJsonPath = path.join(pkgPath, 'package.json');
       updatePackageVersion(packageJsonPath, nextVersion);
 
       log(`Updated package ${packageName} to version ${nextVersion}`, 'success');
 
-      // Create tag
-      const nextTag = formatTag(
+      // Create tag and commit
+      const tagName = formatTag(
         nextVersion,
         formattedPrefix,
         packageName,
         tagTemplate,
         config.packageSpecificTags,
       );
-      const formattedCommitMessage = formatCommitMessage(commitMessage, nextVersion, packageName);
 
-      // Use the Git service functions
-      await createGitCommitAndTag(
-        [packageJsonPath],
-        nextTag,
-        formattedCommitMessage,
-        skipHooks,
-        dryRun,
-      );
+      const commitMsg = formatCommitMessage(commitMessage, nextVersion, packageName);
+
+      if (!dryRun) {
+        await createGitCommitAndTag([packageJsonPath], tagName, commitMsg, skipHooks, dryRun);
+        log(`Created tag: ${tagName}`, 'success');
+      } else {
+        log(`Would create tag: ${tagName}`, 'info');
+      }
     } catch (error) {
       if (error instanceof VersionError || error instanceof GitError) {
-        log(
-          `Single Package Strategy failed: ${error.message} (${error.code || 'UNKNOWN'})`,
-          'error',
-        );
+        log(`Single Strategy failed: ${error.message} (${error.code || 'UNKNOWN'})`, 'error');
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        log(`Single Package Strategy failed: ${errorMessage}`, 'error');
+        log(`Single Strategy failed: ${errorMessage}`, 'error');
       }
       throw error;
     }
@@ -373,17 +463,16 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
 
 /**
  * Create a strategy function based on configuration
+ * Note: This is only used for initial strategy creation.
+ * The CLI will override this based on resolved packages.
  */
 export function createStrategy(config: Config): StrategyFunction {
   if (config.synced) {
     return createSyncedStrategy(config);
   }
 
-  // If single package specified either via mainPackage or packages
-  if (config.mainPackage || config.packages?.length === 1) {
-    return createSingleStrategy(config);
-  }
-
+  // Default to async strategy - the CLI will determine the actual strategy
+  // based on resolved packages after glob expansion
   return createAsyncStrategy(config);
 }
 

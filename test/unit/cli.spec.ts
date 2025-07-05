@@ -122,9 +122,9 @@ describe('CLI Interface', () => {
     ]);
   });
 
-  it('should execute the regenerate-changelog command when explicitly specified', async () => {
-    // Set argv to simulate CLI with regenerate-changelog command
-    mockProcess.argv = ['node', 'index.js', 'regenerate-changelog', '--dry-run'];
+  it('should execute the changelog command when explicitly specified', async () => {
+    // Set argv to simulate CLI with changelog command
+    mockProcess.argv = ['node', 'index.js', 'changelog', '--dry-run'];
 
     // Call the run function
     await indexModule.run();
@@ -135,10 +135,8 @@ describe('CLI Interface', () => {
     // Check if parse was called
     expect(commanderInstance.parse).toHaveBeenCalled();
 
-    // Check that regenerate-changelog command exists
+    // Check that changelog command exists
     const commands = commanderInstance.getCommands();
-    expect(commands.map(([cmdName]: [string, unknown]) => cmdName)).toContain(
-      'regenerate-changelog',
-    );
+    expect(commands.map(([cmdName]: [string, unknown]) => cmdName)).toContain('changelog');
   });
 });

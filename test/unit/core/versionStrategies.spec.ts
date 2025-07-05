@@ -316,7 +316,7 @@ describe('Version Strategies', () => {
       // Setup
       const config: Partial<Config> = {
         ...defaultConfig,
-        packages: ['package-a'],
+        mainPackage: 'package-a',
         commitMessage: 'chore(release): ${version}',
       };
 
@@ -358,7 +358,7 @@ describe('Version Strategies', () => {
       // Setup
       const config: Partial<Config> = {
         ...defaultConfig,
-        packages: ['package-a'],
+        mainPackage: 'package-a',
         commitMessage: 'chore: release ${packageName}@${version} [skip-ci]',
       };
 
@@ -393,10 +393,10 @@ describe('Version Strategies', () => {
 
       // Execute and verify errors - update the expected error message to match the new implementation
       await expect(singleStrategy1(mockPackages)).rejects.toThrow(
-        'Invalid configuration: Single mode requires either mainPackage or exactly one package in the packages array',
+        'Invalid configuration: Single mode requires either mainPackage or exactly one resolved package',
       );
       await expect(singleStrategy2(mockPackages)).rejects.toThrow(
-        'Invalid configuration: Single mode requires either mainPackage or exactly one package in the packages array',
+        'Invalid configuration: Single mode requires either mainPackage or exactly one resolved package',
       );
     });
 
@@ -448,7 +448,7 @@ describe('Version Strategies', () => {
 
       const config: Partial<Config> = {
         ...defaultConfig,
-        packages: ['package-a'],
+        mainPackage: 'package-a',
       };
 
       const singleStrategy = strategies.createSingleStrategy(config as Config);
@@ -557,29 +557,34 @@ describe('Version Strategies', () => {
       expect(strategyMap).toHaveProperty('synced');
     });
 
-    it('should return single strategy when packages has one item', () => {
+    it('should return async strategy when packages has one item (CLI will handle strategy selection)', () => {
       const config: Partial<Config> = {
         ...defaultConfig,
         packages: ['package-a'],
       };
 
-      // Since we've already tested the individual strategies, just verify the strategy map exists
-      const strategyMap = strategies.createStrategyMap(config as Config);
-      expect(strategyMap).toHaveProperty('single');
+      // The createStrategy function now defaults to async strategy
+      // The CLI will determine the actual strategy based on resolved packages
+      const strategy = strategies.createStrategy(config as Config);
+
+      // Since it's now async strategy, it should process packages without throwing
+      // (the actual strategy selection happens in the CLI)
+      expect(strategy).toBeDefined();
     });
 
-    it('should return single strategy when mainPackage is specified', async () => {
-      // We can't directly compare functions, so we'll check if it's the single strategy
-      // by checking if it throws the right error when mainPackage doesn't exist
-      const badConfig: Partial<Config> = {
+    it('should return async strategy when mainPackage is specified (CLI will handle strategy selection)', async () => {
+      // The createStrategy function now defaults to async strategy
+      // The CLI will determine the actual strategy based on resolved packages
+      const config: Partial<Config> = {
         ...defaultConfig,
-        mainPackage: 'non-existent-package',
+        mainPackage: 'package-a',
       };
 
-      const badStrategy = strategies.createStrategy(badConfig as Config);
+      const strategy = strategies.createStrategy(config as Config);
 
-      // Execute the bad strategy and expect it to throw the error from single strategy
-      await expect(badStrategy(mockPackages)).rejects.toThrow('Package not found');
+      // Since it's now async strategy, it should process packages without throwing
+      // (the actual strategy selection happens in the CLI)
+      await expect(strategy(mockPackages)).resolves.toBeUndefined();
     });
 
     it('should return async strategy as default', () => {

@@ -159,7 +159,7 @@ Customize behaviour by creating a `version.config.json` file in your project roo
 #### Monorepo-Specific Options
 - `synced`: Whether all packages should be versioned together (default: true)
 - `skip`: Array of package names or patterns to exclude from versioning. Supports exact names, scope wildcards, path patterns, and global wildcards (e.g., ["@scope/package-a", "@scope/*", "packages/**/*"])
-- `packages`: Array of package names or patterns to target for versioning. Supports exact names, scope wildcards, and global wildcards (e.g., ["@scope/package-a", "@scope/*", "*"])
+- `packages`: Array of package names or patterns to target for versioning. Supports exact names, scope wildcards, path patterns and global wildcards (e.g., ["@scope/package-a", "@scope/*", "*"])
 - `mainPackage`: Package name whose commit history should drive version determination
 - `packageSpecificTags`: Whether to enable package-specific tagging behaviour (default: false)
 - `updateInternalDependencies`: How to update internal dependencies ("patch", "minor", "major", or "inherit")
@@ -185,6 +185,15 @@ Target all packages within a specific scope:
 }
 ```
 
+#### Path Patterns / Globs
+Target all packages in a directory or matching a path pattern:
+```json
+{
+  "packages": ["packages/**/*", "examples/**"]
+}
+```
+This will match all packages in nested directories under `packages/` or `examples/`.
+
 #### Global Wildcard
 Target all packages in the workspace:
 ```json
@@ -197,7 +206,7 @@ Target all packages in the workspace:
 Combine different pattern types:
 ```json
 {
-  "packages": ["@mycompany/*", "@utils/logger", "legacy-package"]
+  "packages": ["@mycompany/*", "@utils/logger", "legacy-package", "packages/**/*"]
 }
 ```
 

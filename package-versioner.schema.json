@@ -53,7 +53,7 @@
         "minLength": 1
       },
       "default": [],
-      "description": "Array of package names or patterns that determines which packages will be processed for versioning. When specified, only packages matching these patterns will be versioned. When empty or not specified, all workspace packages will be processed. Supports exact names (e.g., '@scope/package-a'), scope wildcards (e.g., '@scope/*'), and global wildcards (e.g., '*')"
+      "description": "Array of package names or patterns that determines which packages will be processed for versioning. When specified, only packages matching these patterns will be versioned. When empty or not specified, all workspace packages will be processed. Supports exact names (e.g., '@scope/package-a'), scope wildcards (e.g., '@scope/*'), path patterns (e.g., 'packages/**/*', 'examples/**'), and global wildcards (e.g., '*')."
     },
     "mainPackage": {
       "type": "string",

@@ -1,0 +1,7 @@
+{
+  "preset": "conventional-commits",
+  "packages": ["."],
+  "versionPrefix": "v",
+  "updateChangelog": true,
+  "changelogFormat": "keep-a-changelog"
+}

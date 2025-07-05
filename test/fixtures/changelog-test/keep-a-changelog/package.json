@@ -1,0 +1,9 @@
+{
+  "name": "keep-a-changelog-test",
+  "version": "0.1.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example/keep-a-changelog-test"
+  }
+}

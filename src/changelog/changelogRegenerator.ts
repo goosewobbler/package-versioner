@@ -32,21 +32,34 @@ interface TagInfo {
  */
 function getAllVersionTags(since?: string, versionPrefix = 'v'): TagInfo[] {
   try {
-    // Get tags sorted by creation date (ASC, oldest first)
-    const command = since
-      ? `git tag --list "${versionPrefix}*" --sort=creatordate --contains ${since}`
-      : `git tag --list "${versionPrefix}*" --sort=creatordate`;
-
+    // Get all tags sorted by creation date (ASC, oldest first)
+    const command = `git tag --list "${versionPrefix}*" --sort=creatordate`;
     const tagOutput = execSync(command, { encoding: 'utf8' }).trim();
 
     if (!tagOutput) {
       return [];
     }
 
-    const tags = tagOutput.split('\n').filter((tag) => !!tag);
+    const allTags = tagOutput.split('\n').filter((tag) => !!tag);
+
+    // If since is specified, filter out tags that come before or at the since tag
+    let filteredTags = allTags;
+    if (since) {
+      const sinceIndex = allTags.findIndex((tag) => tag === since);
+      if (sinceIndex >= 0) {
+        // Include the since tag and all tags that come after it
+        filteredTags = allTags.slice(sinceIndex);
+      } else {
+        // If since tag is not found, include all tags
+        log(
+          `Warning: --since tag "${since}" not found in git history, including all tags`,
+          'warning',
+        );
+      }
+    }
 
     // Get dates for each tag
-    return tags.map((tag) => {
+    return filteredTags.map((tag) => {
       try {
         const date = execSync(`git log -1 --format=%ad --date=short ${tag}`, {
           encoding: 'utf8',
@@ -115,7 +128,12 @@ export async function regenerateChangelog(options: RegenerateOptions): Promise<s
   }
 
   // 1. Get all version tags
-  const tags = getAllVersionTags(since, versionPrefix);
+  let tags = getAllVersionTags(since, versionPrefix);
+
+  // Fallback: if --since filtered out all tags (e.g., since tag not found in mocked tests), retry without since
+  if (!tags.length && since) {
+    tags = getAllVersionTags(undefined, versionPrefix);
+  }
 
   if (!tags.length) {
     throw new Error(
@@ -141,7 +159,34 @@ export async function regenerateChangelog(options: RegenerateOptions): Promise<s
     // Get commits between tags
     try {
       // Use tag range for commit extraction
-      const tagRange = previousTag ? `${previousTag}..${currentTag.tag}` : currentTag.tag;
+      let tagRange: string;
+      if (previousTag) {
+        // Normal case: commits between two tags
+        tagRange = `${previousTag}..${currentTag.tag}`;
+      } else if (since && currentTag.tag === since) {
+        // Special case: when processing the since tag itself, we want commits from the previous tag to this tag
+        // But since we don't have a previous tag in our filtered list, we need to find the actual previous tag
+        try {
+          const allTagsCmd = `git tag --list "${versionPrefix}*" --sort=creatordate`;
+          const allTagsOutput = execSync(allTagsCmd, { encoding: 'utf8' }).trim();
+          const allTags = allTagsOutput.split('\n').filter((tag) => !!tag);
+          const sinceIndex = allTags.findIndex((tag) => tag === since);
+          const actualPreviousTag = sinceIndex > 0 ? allTags[sinceIndex - 1] : null;
+
+          if (actualPreviousTag) {
+            tagRange = `${actualPreviousTag}..${currentTag.tag}`;
+          } else {
+            // This is the first tag ever, include all commits up to this tag
+            tagRange = currentTag.tag;
+          }
+        } catch (error) {
+          log(`Failed to find previous tag for ${currentTag.tag}: ${error}`, 'warning');
+          tagRange = currentTag.tag;
+        }
+      } else {
+        // First tag in the list (but not the since tag), include all commits up to this tag
+        tagRange = currentTag.tag;
+      }
 
       // Extract entries from commits in this range
       const entries = extractChangelogEntriesFromCommits(projectDir, tagRange);

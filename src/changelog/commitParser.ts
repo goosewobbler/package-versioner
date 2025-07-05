@@ -69,8 +69,11 @@ export function extractChangelogEntriesFromCommits(
  * Parse a commit message into a changelog entry
  */
 function parseCommitMessage(message: string): ChangelogEntry | null {
+  // Trim whitespace from the message to handle leading/trailing newlines
+  const trimmedMessage = message.trim();
+
   // Try to parse as conventional commit
-  const match = message.match(CONVENTIONAL_COMMIT_REGEX);
+  const match = trimmedMessage.match(CONVENTIONAL_COMMIT_REGEX);
 
   if (match) {
     const [, type, scope, breakingMark, subject, body = ''] = match;
@@ -108,8 +111,8 @@ function parseCommitMessage(message: string): ChangelogEntry | null {
 
   // Non-conventional commit - try to extract basic information
   // Only include if it seems meaningful (not just a merge or version bump)
-  if (!message.startsWith('Merge') && !message.match(/^v?\d+\.\d+\.\d+/)) {
-    const firstLine = message.split('\n')[0].trim();
+  if (!trimmedMessage.startsWith('Merge') && !trimmedMessage.match(/^v?\d+\.\d+\.\d+/)) {
+    const firstLine = trimmedMessage.split('\n')[0].trim();
     return {
       type: 'changed',
       description: firstLine,

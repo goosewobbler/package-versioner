@@ -31,6 +31,8 @@ export function formatChangelogEntries(
     return {
       ...entry,
       breaking: hasBreaking,
+      // Clean up the description to remove the **BREAKING** prefix since we'll handle it in formatting
+      description: hasBreaking ? entry.description.replace('**BREAKING** ', '') : entry.description,
     } as FormattingChangelogEntry;
   });
 
@@ -58,22 +60,29 @@ function formatKeepAChangelogEntries(
 
   // Process entries
   for (const entry of entries) {
-    const entryText = entry.scope
-      ? `- **${entry.scope}**: ${entry.description}`
-      : `- ${entry.description}`;
-
-    // Handle breaking changes specially
-    const formattedEntry = entry.breaking ? entryText.replace(/^- /, '- **BREAKING** ') : entryText;
+    // Format the entry text with scope if present
+    let entryText: string;
+    if (entry.breaking) {
+      // For breaking changes, format as: - **BREAKING** **scope**: description
+      entryText = entry.scope
+        ? `- **BREAKING** **${entry.scope}**: ${entry.description}`
+        : `- **BREAKING** ${entry.description}`;
+    } else {
+      // For regular entries, format as: - **scope**: description
+      entryText = entry.scope
+        ? `- **${entry.scope}**: ${entry.description}`
+        : `- ${entry.description}`;
+    }
 
     // Map conventional commit types to Keep a Changelog sections
     const entryType = entry.originalType || entry.type;
 
     switch (entryType) {
       case 'feat':
-        added.push(formattedEntry);
+        added.push(entryText);
         break;
       case 'fix':
-        fixed.push(formattedEntry);
+        fixed.push(entryText);
         break;
       case 'docs':
       case 'style':
@@ -81,39 +90,39 @@ function formatKeepAChangelogEntries(
       case 'perf':
       case 'build':
       case 'ci':
-        changed.push(formattedEntry);
+        changed.push(entryText);
         break;
       case 'test':
         // Usually ignored in changelogs
         break;
       case 'chore':
         if (entry.description.toLowerCase().includes('deprecat')) {
-          deprecated.push(formattedEntry);
+          deprecated.push(entryText);
         } else {
-          changed.push(formattedEntry);
+          changed.push(entryText);
         }
         break;
       // Keep-a-changelog standard types
       case 'added':
-        added.push(formattedEntry);
+        added.push(entryText);
         break;
       case 'changed':
-        changed.push(formattedEntry);
+        changed.push(entryText);
         break;
       case 'deprecated':
-        deprecated.push(formattedEntry);
+        deprecated.push(entryText);
         break;
       case 'removed':
-        removed.push(formattedEntry);
+        removed.push(entryText);
         break;
       case 'fixed':
-        fixed.push(formattedEntry);
+        fixed.push(entryText);
         break;
       case 'security':
-        security.push(formattedEntry);
+        security.push(entryText);
         break;
       default:
-        changed.push(formattedEntry);
+        changed.push(entryText);
     }
   }
 

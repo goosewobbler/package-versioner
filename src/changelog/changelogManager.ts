@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { log } from '../utils/logging.js';
+import { formatChangelogEntries } from './formatters.js';
 
 /**
  * Changelog entry structure
@@ -351,6 +352,9 @@ export function generateChangelogContent(
   repoUrl?: string,
   format: ChangelogFormat = 'keep-a-changelog',
 ): string {
+  // Debug: log arguments
+  // eslint-disable-next-line no-console
+  console.log('[DEBUG] generateChangelogContent called:', { changelog, repoUrl, format });
   if (format === 'angular') {
     return generateAngularChangelogContent(changelog, repoUrl);
   }
@@ -445,44 +449,73 @@ export function updateChangelog(
 ): void {
   try {
     const changelogPath = path.join(packagePath, 'CHANGELOG.md');
-    let changelog: Changelog;
-
-    // Check if changelog exists
+    // Read existing changelog content if it exists
+    let existingContent = '';
     if (fs.existsSync(changelogPath)) {
-      const existingChangelog = parseChangelog(changelogPath);
-      if (existingChangelog) {
-        changelog = existingChangelog;
+      existingContent = fs.readFileSync(changelogPath, 'utf8');
+    }
+
+    // Generate the new version section
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const newVersionContent = formatChangelogEntries(
+      format,
+      version,
+      today,
+      entries,
+      packageName,
+      repoUrl,
+    );
+
+    let finalContent: string;
+
+    if (existingContent) {
+      // If we have existing content, we need to insert the new version at the top
+      if (format === 'keep-a-changelog') {
+        // For Keep-a-Changelog format, insert after the header
+        const headerEndIndex = existingContent.indexOf('\n## ');
+        if (headerEndIndex > 0) {
+          // Insert the new version before the first existing version
+          const beforeVersions = existingContent.substring(0, headerEndIndex);
+          const afterVersions = existingContent.substring(headerEndIndex);
+          finalContent = `${beforeVersions}\n${newVersionContent}\n${afterVersions}`;
+        } else {
+          // No existing versions, append to the end
+          finalContent = `${existingContent}\n${newVersionContent}\n`;
+        }
       } else {
-        // If parsing failed, create a new one
-        changelog = createChangelog(packagePath, packageName);
+        // For Angular format, insert after the header
+        const headerEndIndex = existingContent.indexOf('\n## ');
+        if (headerEndIndex > 0) {
+          const beforeVersions = existingContent.substring(0, headerEndIndex);
+          const afterVersions = existingContent.substring(headerEndIndex);
+          finalContent = `${beforeVersions}\n${newVersionContent}\n${afterVersions}`;
+        } else {
+          finalContent = `${existingContent}\n${newVersionContent}\n`;
+        }
       }
     } else {
-      // Create new changelog
-      changelog = createChangelog(packagePath, packageName);
+      // Create new changelog with header
+      if (format === 'keep-a-changelog') {
+        finalContent = `# Changelog
+
+All notable changes to ${packageName} will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+${newVersionContent}
+`;
+      } else {
+        finalContent = `# Changelog
+
+${newVersionContent}
+`;
+      }
     }
 
-    // Move unreleased entries to the new version if this is a version release
-    if (version) {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-
-      // Create new version with unreleased entries + new entries
-      const newVersion: ChangelogVersion = {
-        version,
-        date: today,
-        entries: [...changelog.unreleased, ...entries],
-      };
-
-      // Clear unreleased and add the new version at the beginning
-      changelog.unreleased = [];
-      changelog.versions.unshift(newVersion);
-    } else {
-      // Just add entries to unreleased section
-      changelog.unreleased = [...changelog.unreleased, ...entries];
-    }
-
-    // Generate content and write to file
-    const content = generateChangelogContent(changelog, repoUrl, format);
-    fs.writeFileSync(changelogPath, content);
+    // Write the final content to the changelog file
+    log(`Writing changelog to: ${changelogPath}`, 'info');
+    fs.writeFileSync(changelogPath, finalContent);
 
     log(`Updated changelog at ${changelogPath}`, 'success');
   } catch (error) {

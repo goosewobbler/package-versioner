@@ -90,25 +90,36 @@ export async function run(): Promise<void> {
           // Initialize engine with JSON mode setting
           const engine = new VersionEngine(config, !!options.json);
 
-          // Determine strategy and run
+          // Resolve actual packages before selecting strategy
+          const pkgsResult = await engine.getWorkspacePackages();
+          const resolvedCount = pkgsResult.packages.length;
+
+          log(`Resolved ${resolvedCount} packages from workspace`, 'debug');
+          log(`Config packages: ${JSON.stringify(config.packages)}`, 'debug');
+          log(`Config synced: ${config.synced}`, 'debug');
+
+          // Determine strategy based on resolved package count
           if (config.synced) {
             log('Using synced versioning strategy.', 'info');
             engine.setStrategy('synced');
-            await engine.run(); // Synced doesn't use targets
-          } else if (config.packages && config.packages.length === 1) {
+            await engine.run(pkgsResult);
+          } else if (resolvedCount === 1) {
+            // Check if the resolved package is a real package (not a glob pattern)
             log('Using single package versioning strategy.', 'info');
             if (cliTargets.length > 0) {
               log('--target flag is ignored for single package strategy.', 'warning');
             }
             engine.setStrategy('single');
-            await engine.run();
+            await engine.run(pkgsResult);
+          } else if (resolvedCount === 0) {
+            throw new Error('No packages found in workspace');
           } else {
             log('Using async versioning strategy.', 'info');
             if (cliTargets.length > 0) {
               log(`Targeting specific packages: ${cliTargets.join(', ')}`, 'info');
             }
             engine.setStrategy('async');
-            await engine.run(cliTargets); // Pass targets to async strategy
+            await engine.run(pkgsResult, cliTargets);
           }
 
           log('Versioning process completed.', 'success');
@@ -137,10 +148,11 @@ export async function run(): Promise<void> {
         }
       });
 
-    // Add regenerate-changelog subcommand
+    // Changelog command
     program
-      .command('regenerate-changelog')
-      .description('Regenerate a complete changelog from git history')
+      .command('changelog')
+      .description('Changelog management commands')
+      .option('--regenerate', 'Regenerate a complete changelog from git history')
       .option('-o, --output <path>', 'Output path for changelog file', 'CHANGELOG.md')
       .option(
         '-f, --format <format>',
@@ -152,41 +164,46 @@ export async function run(): Promise<void> {
       .option('-d, --dry-run', 'Preview changelog without writing to file', false)
       .option('-p, --project-dir <path>', 'Project directory', process.cwd())
       .action(async (options) => {
-        try {
-          log('Regenerating changelog from git history...', 'info');
+        if (options.regenerate) {
+          try {
+            log('Regenerating changelog from git history...', 'info');
 
-          // Validate options
-          if (options.format !== 'keep-a-changelog' && options.format !== 'angular') {
-            throw new Error(
-              'Invalid format specified. Must be either "keep-a-changelog" or "angular"',
+            // Validate options
+            if (options.format !== 'keep-a-changelog' && options.format !== 'angular') {
+              throw new Error(
+                'Invalid format specified. Must be either "keep-a-changelog" or "angular"',
+              );
+            }
+
+            const regenerateOptions = {
+              format: options.format,
+              since: options.since,
+              output: options.output,
+              dryRun: options.dryRun,
+              projectDir: options.projectDir,
+              repoUrl: options.repoUrl,
+            };
+
+            // Generate changelog content
+            const content = await regenerateChangelog(regenerateOptions);
+
+            // Write to file or preview
+            await writeChangelog(
+              content,
+              path.resolve(options.projectDir, options.output),
+              options.dryRun,
             );
+
+            if (!options.dryRun) {
+              log(`Changelog successfully regenerated at ${options.output}`, 'success');
+            }
+          } catch (error) {
+            log(error instanceof Error ? error.message : String(error), 'error');
+            process.exit(1);
           }
-
-          const regenerateOptions = {
-            format: options.format,
-            since: options.since,
-            output: options.output,
-            dryRun: options.dryRun,
-            projectDir: options.projectDir,
-            repoUrl: options.repoUrl,
-          };
-
-          // Generate changelog content
-          const content = await regenerateChangelog(regenerateOptions);
-
-          // Write to file or preview
-          await writeChangelog(
-            content,
-            path.resolve(options.projectDir, options.output),
-            options.dryRun,
-          );
-
-          if (!options.dryRun) {
-            log(`Changelog successfully regenerated at ${options.output}`, 'success');
-          }
-        } catch (error) {
-          log(error instanceof Error ? error.message : String(error), 'error');
-          process.exit(1);
+        } else {
+          // Print help for changelog command if no subcommand/flag is passed
+          program.commands.find((cmd) => cmd.name() === 'changelog')?.help();
         }
       });
 

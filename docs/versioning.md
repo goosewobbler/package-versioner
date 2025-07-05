@@ -198,12 +198,61 @@ Target all packages in the workspace:
 ```
 
 #### Mixed Patterns
-Combine different pattern types for flexible targeting:
+Target different types of packages using a combination of patterns:
 ```json
 {
   "packages": ["@mycompany/*", "@utils/logger", "legacy-package"]
 }
 ```
+
+### Skip Patterns
+
+The `skip` configuration option allows you to exclude specific packages from versioning using the same pattern matching capabilities as package targeting.
+
+#### Pattern Types
+
+1. **Exact Package Names**
+```json
+{
+  "skip": ["@internal/docs", "test-utils"]
+}
+```
+
+2. **Scope Wildcards**
+```json
+{
+  "skip": ["@internal/*"]
+}
+```
+This will skip all packages whose names start with `@internal/`.
+
+3. **Path Patterns**
+```json
+{
+  "skip": ["packages/**/test-*", "examples/**/*"]
+}
+```
+This will skip packages matching the specified path patterns.
+
+4. **Mixed Patterns**
+```json
+{
+  "skip": ["@internal/*", "test-*", "packages/examples/**/*"]
+}
+```
+
+#### Skip Pattern Priority
+
+Skip patterns take precedence over include patterns. If a package matches both a pattern in `packages` and a pattern in `skip`, it will be excluded from versioning.
+
+Example:
+```json
+{
+  "packages": ["@company/*"],
+  "skip": ["@company/internal-*"]
+}
+```
+In this case, all packages under the `@company` scope will be versioned except those starting with `@company/internal-`.
 
 ### Behaviour
 
@@ -299,7 +348,7 @@ This would produce tags like `release-1.2.3` instead of `v1.2.3`.
   "packageSpecificTags": true
 }
 ```
-This would produce package tags like `@scope/package-name-v1.2.3` instead of `@scope/package-name@v1.2.3`.
+This would produce package tags like `@scope/package-name-v1.2.3` instead of `@scope/package-name@v1.2.3`. 
 
 ### Behaviour in Different Modes
 

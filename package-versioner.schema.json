@@ -88,7 +88,7 @@
         "minLength": 1
       },
       "default": [],
-      "description": "Packages to exclude from versioning"
+      "description": "Packages to exclude from versioning. Supports exact package names (e.g., '@internal/docs'), scope wildcards (e.g., '@internal/*'), and path patterns (e.g., 'packages/**/test-*', 'examples/**/*')"
     },
     "commitMessage": {
       "type": "string",

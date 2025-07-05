@@ -158,7 +158,7 @@ Customize behaviour by creating a `version.config.json` file in your project roo
 
 #### Monorepo-Specific Options
 - `synced`: Whether all packages should be versioned together (default: true)
-- `skip`: Array of package names to exclude from versioning
+- `skip`: Array of package names or patterns to exclude from versioning. Supports exact names, scope wildcards, path patterns, and global wildcards (e.g., ["@scope/package-a", "@scope/*", "packages/**/*"])
 - `packages`: Array of package names or patterns to target for versioning. Supports exact names, scope wildcards, and global wildcards (e.g., ["@scope/package-a", "@scope/*", "*"])
 - `mainPackage`: Package name whose commit history should drive version determination
 - `packageSpecificTags`: Whether to enable package-specific tagging behaviour (default: false)

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Map to store original fixture content
@@ -20,7 +20,11 @@ export function findConfigFiles(directory: string): string[] {
     const itemPath = join(directory, item.name);
     if (item.isDirectory()) {
       files.push(...findConfigFiles(itemPath));
-    } else if (item.name === 'package.json' || item.name === 'version.config.json') {
+    } else if (
+      item.name === 'package.json' ||
+      item.name === 'version.config.json' ||
+      item.name === 'pnpm-workspace.yaml'
+    ) {
       files.push(itemPath);
     }
   }

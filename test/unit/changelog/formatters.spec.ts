@@ -64,8 +64,8 @@ describe('Changelog Formatters', () => {
       expect(formattedContent).toContain('- **api**: Refactored code');
       expect(formattedContent).toContain('- **core**: Removed feature');
 
-      // Verify breaking change formatting (the actual output has double **BREAKING**)
-      expect(formattedContent).toContain('- **BREAKING** **api**: **BREAKING** API change');
+      // Verify breaking change formatting (single **BREAKING** prefix with scope)
+      expect(formattedContent).toContain('- **BREAKING** **api**: API change');
     });
 
     it('includes repository links when URL is provided', () => {

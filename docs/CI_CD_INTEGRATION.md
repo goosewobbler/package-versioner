@@ -180,4 +180,5 @@ Each CI system might have slightly different syntax, so check your CI provider's
 2. **Use the `fetch-depth: 0`** option in GitHub Actions (or equivalent in other CIs) to ensure access to the full Git history
 3. **Store the JSON output** as a build artifact for debugging and auditing
 4. **Consider dry runs** in your preview/staging branches to validate version changes before they're applied
-5. **Be mindful of Git credentials** - ensure your CI has proper permissions for creating commits and tags 
+5. **Use `--project-dir`** when running from a different directory than your project root
+6. **Be mindful of Git credentials** - ensure your CI has proper permissions for creating commits and tags 

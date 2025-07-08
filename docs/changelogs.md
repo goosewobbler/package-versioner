@@ -52,7 +52,14 @@ You can configure the preferred format in your `version.config.json`:
 For projects with existing history, you can regenerate a complete changelog from scratch using the CLI:
 
 ```bash
+# Generate changelog in current directory
 npx package-versioner changelog --regenerate
+
+# Generate changelog in a specific directory
+npx package-versioner changelog --regenerate --project-dir /path/to/project
+
+# Customize output path and format
+npx package-versioner changelog --regenerate --output CHANGELOG.md --format keep-a-changelog
 ```
 
 This will scan your entire git history and create a comprehensive changelog based on all version tags found in your repository.

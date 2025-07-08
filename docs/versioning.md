@@ -65,78 +65,6 @@ You define patterns in the `branchPattern` array in `version.config.json`. Each 
 
 This allows you to enforce version bumps based on your branching workflow (e.g., all branches starting with `feature/` result in a minor bump).
 
-## Monorepo Versioning Modes
-
-While primarily used for single packages now, `package-versioner` retains options for monorepo workflows, controlled mainly by the `synced` flag in `version.config.json`.
-
-### Synced Mode (`synced: true`)
-
-This is the default if the `synced` flag is present and true.
-
--   **Behaviour:** The tool calculates **one** version bump based on the overall history (or branch pattern). This single new version is applied to **all** packages within the repository (or just the root `package.json` if not a structured monorepo). A single Git tag is created.
--   **Tag Behaviour:** 
-    - In **multi-package monorepos**: Creates global tags like `v1.2.3` regardless of `packageSpecificTags` setting
-    - In **single-package repositories**: Respects the `packageSpecificTags` setting - can create either `v1.2.3` or `package-name@v1.2.3`
--   **Use Case:** Suitable for monorepos where all packages are tightly coupled and released together with the same version number. Also the effective mode for single-package repositories.
-
-### Async Mode (`synced: false`)
-
-*(Note: This mode relies heavily on monorepo tooling and structure, like `pnpm workspaces` and correctly configured package dependencies.)*
-
--   **Behaviour (Default - No `-t` flag):** The tool analyzes commits to determine which specific packages within the monorepo have changed since the last relevant commit/tag.
-    -   It calculates an appropriate version bump **independently for each changed package** based on the commits affecting that package.
-    -   Only the `package.json` files of the changed packages are updated.
-    -   A **single commit** is created grouping all the version bumps, using the commit message template. **No Git tags are created** in this mode.
--   **Use Case:** Suitable for monorepos where packages are versioned independently, but a single commit represents the batch of updates for traceability.
-
--   **Behaviour (Targeted - With `-t` flag):** When using the `-t, --target <targets>` flag:
-    -   Only the specified packages (respecting the `skip` list) are considered for versioning.
-    -   It calculates an appropriate version bump **independently for each targeted package** based on its commit history.
-    -   The `package.json` file of each successfully updated targeted package is modified.
-    -   An **individual Git tag** (e.g., `packageName@1.2.3`) is created **for each successfully updated package** immediately after its version is bumped.
-    -   Finally, a **single commit** is created including all the updated `package.json` files, using a summary commit message (e.g., `chore(release): pkg-a, pkg-b 1.2.3 [skip-ci]`).
-    -   **Important:** Only package-specific tags are created. The global tag (e.g., `v1.2.3`) is **not** automatically generated in this mode. If your release process (like GitHub Releases) depends on a global tag, you'll need to create it manually in your CI/CD script *after* `package-versioner` completes.
--   **Use Case:** Releasing specific packages independently while still tagging each released package individually.
-
-## Prerelease Handling
-
-`package-versioner` provides flexible handling for prerelease versions, allowing both creation of prereleases and promotion to stable releases.
-
-### Creating Prereleases
-
-Use the `--prerelease` flag with an identifier to create a prerelease version:
-
-```bash
-# Create a beta prerelease
-npx package-versioner --bump minor --prerelease beta
-# Result: 1.0.0 -> 1.1.0-beta.0
-```
-
-You can also set a default prerelease identifier in your `version.config.json`:
-
-```json
-{
-  "prereleaseIdentifier": "beta"
-}
-```
-
-### Promoting Prereleases to Stable Releases
-
-When using standard bump types (`major`, `minor`, `patch`) with the `--bump` flag on a prerelease version, `package-versioner` will automatically clean the prerelease identifier:
-
-```bash
-# Starting from version 1.0.0-beta.1
-npx package-versioner --bump major
-# Result: 1.0.0-beta.1 -> 2.0.0 (not 2.0.0-beta.0)
-```
-
-This intuitive behaviour means you don't need to use an empty prerelease identifier (`--prerelease ""`) to promote a prerelease to a stable version. Simply specify the standard bump type and the tool will automatically produce a clean version number.
-
-This applies to all standard bump types:
-- `--bump major`: 1.0.0-beta.1 -> 2.0.0
-- `--bump minor`: 1.0.0-beta.1 -> 1.1.0 
-- `--bump patch`: 1.0.0-beta.1 -> 1.0.1
-
 ## Package Type Support
 
 `package-versioner` supports both JavaScript/TypeScript projects using `package.json` and Rust projects using `Cargo.toml`:
@@ -149,11 +77,6 @@ For JavaScript/TypeScript projects, the tool looks for and updates the `version`
 
 For Rust projects, the tool looks for and updates the `package.version` field in `Cargo.toml` files using the same versioning strategies.
 
-When no tags are found for a project, `package-versioner` will:
-1. Look for the `version` in `package.json` if it exists
-2. Look for the `package.version` in `Cargo.toml` if it exists
-3. Fall back to the configured `initialVersion` (default: "0.1.0")
-
 ### Mixed Projects with Both Manifests
 
 When both `package.json` and `Cargo.toml` exist in the same directory, `package-versioner` will:
@@ -164,7 +87,48 @@ When both `package.json` and `Cargo.toml` exist in the same directory, `package-
 
 This allows you to maintain consistent versioning across JavaScript and Rust components in the same package.
 
-This dual support makes `package-versioner` suitable for both JavaScript/TypeScript and Rust repositories, as well as monorepos or projects containing both types of packages.
+## Version Source Selection
+
+`package-versioner` uses a smart version source selection strategy to determine the base version for calculating the next version:
+
+1. First, it checks for Git tags:
+   - In normal mode: Uses the latest reachable tag, falling back to unreachable tags if needed
+   - In strict mode (`--strict-reachable`): Only uses reachable tags
+   
+2. Then, it checks manifest files (package.json, Cargo.toml):
+   - Reads version from package.json if it exists
+   - Falls back to Cargo.toml if package.json doesn't exist or has no version
+   
+3. Finally, it compares the versions:
+   - If both Git tag and manifest versions exist, it uses the newer version
+   - If the versions are equal, it prefers the Git tag for better history tracking
+   - If only one source has a version, it uses that
+   - If no version is found, it uses the default initial version (0.1.0)
+
+This strategy ensures that:
+- Version numbers never go backwards
+- Git history is respected when possible
+- Manifest files are considered as valid version sources
+- The tool always has a valid base version to work from
+
+For example:
+```
+Scenario 1:
+- Git tag: v1.0.0
+- package.json: 1.1.0
+Result: Uses 1.1.0 as base (package.json is newer)
+
+Scenario 2:
+- Git tag: v1.0.0
+- package.json: 1.0.0
+Result: Uses v1.0.0 as base (versions equal, prefer Git)
+
+Scenario 3:
+- Git tag: unreachable v2.0.0
+- package.json: 1.0.0
+Result: Uses 2.0.0 as base in normal mode (unreachable tag is newer)
+        Uses 1.0.0 as base in strict mode (unreachable tag ignored)
+```
 
 ## Package Targeting in Monorepos
 
@@ -430,3 +394,75 @@ For global commit messages, use templates without `${packageName}`:
   "commitMessage": "chore: release ${version}"
 }
 ```
+
+## Monorepo Versioning Modes
+
+While primarily used for single packages now, `package-versioner` retains options for monorepo workflows, controlled mainly by the `synced` flag in `version.config.json`.
+
+### Synced Mode (`synced: true`)
+
+This is the default if the `synced` flag is present and true.
+
+-   **Behaviour:** The tool calculates **one** version bump based on the overall history (or branch pattern). This single new version is applied to **all** packages within the repository (or just the root `package.json` if not a structured monorepo). A single Git tag is created.
+-   **Tag Behaviour:** 
+    - In **multi-package monorepos**: Creates global tags like `v1.2.3` regardless of `packageSpecificTags` setting
+    - In **single-package repositories**: Respects the `packageSpecificTags` setting - can create either `v1.2.3` or `package-name@v1.2.3`
+-   **Use Case:** Suitable for monorepos where all packages are tightly coupled and released together with the same version number. Also the effective mode for single-package repositories.
+
+### Async Mode (`synced: false`)
+
+*(Note: This mode relies heavily on monorepo tooling and structure, like `pnpm workspaces` and correctly configured package dependencies.)*
+
+-   **Behaviour (Default - No `-t` flag):** The tool analyzes commits to determine which specific packages within the monorepo have changed since the last relevant commit/tag.
+    -   It calculates an appropriate version bump **independently for each changed package** based on the commits affecting that package.
+    -   Only the `package.json` files of the changed packages are updated.
+    -   A **single commit** is created grouping all the version bumps, using the commit message template. **No Git tags are created** in this mode.
+-   **Use Case:** Suitable for monorepos where packages are versioned independently, but a single commit represents the batch of updates for traceability.
+
+-   **Behaviour (Targeted - With `-t` flag):** When using the `-t, --target <targets>` flag:
+    -   Only the specified packages (respecting the `skip` list) are considered for versioning.
+    -   It calculates an appropriate version bump **independently for each targeted package** based on its commit history.
+    -   The `package.json` file of each successfully updated targeted package is modified.
+    -   An **individual Git tag** (e.g., `packageName@1.2.3`) is created **for each successfully updated package** immediately after its version is bumped.
+    -   Finally, a **single commit** is created including all the updated `package.json` files, using a summary commit message (e.g., `chore(release): pkg-a, pkg-b 1.2.3 [skip-ci]`).
+    -   **Important:** Only package-specific tags are created. The global tag (e.g., `v1.2.3`) is **not** automatically generated in this mode. If your release process (like GitHub Releases) depends on a global tag, you'll need to create it manually in your CI/CD script *after* `package-versioner` completes.
+-   **Use Case:** Releasing specific packages independently while still tagging each released package individually.
+
+## Prerelease Handling
+
+`package-versioner` provides flexible handling for prerelease versions, allowing both creation of prereleases and promotion to stable releases.
+
+### Creating Prereleases
+
+Use the `--prerelease` flag with an identifier to create a prerelease version:
+
+```bash
+# Create a beta prerelease
+npx package-versioner --bump minor --prerelease beta
+# Result: 1.0.0 -> 1.1.0-beta.0
+```
+
+You can also set a default prerelease identifier in your `version.config.json`:
+
+```json
+{
+  "prereleaseIdentifier": "beta"
+}
+```
+
+### Promoting Prereleases to Stable Releases
+
+When using standard bump types (`major`, `minor`, `patch`) with the `--bump` flag on a prerelease version, `package-versioner` will automatically clean the prerelease identifier:
+
+```bash
+# Starting from version 1.0.0-beta.1
+npx package-versioner --bump major
+# Result: 1.0.0-beta.1 -> 2.0.0 (not 2.0.0-beta.0)
+```
+
+This intuitive behaviour means you don't need to use an empty prerelease identifier (`--prerelease ""`) to promote a prerelease to a stable version. Simply specify the standard bump type and the tool will automatically produce a clean version number.
+
+This applies to all standard bump types:
+- `--bump major`: 1.0.0-beta.1 -> 2.0.0
+- `--bump minor`: 1.0.0-beta.1 -> 1.1.0 
+- `--bump patch`: 1.0.0-beta.1 -> 1.0.1

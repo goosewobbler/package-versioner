@@ -60,7 +60,7 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
 
       // Calculate version for root package first
       const formattedPrefix = formatVersionPrefix(versionPrefix || 'v');
-      const latestTag = await getLatestTag();
+      let latestTag = await getLatestTag();
 
       // Find the main package if specified
       let mainPkgPath = packages.root;
@@ -87,6 +87,24 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
           `No valid package path found, using current working directory: ${mainPkgPath}`,
           'warning',
         );
+      }
+
+      // If we have a main package, try to get package-specific tags first
+      if (mainPkgName) {
+        const packageSpecificTag = await getLatestTagForPackage(mainPkgName, formattedPrefix, {
+          tagTemplate,
+          packageSpecificTags: config.packageSpecificTags,
+        });
+
+        if (packageSpecificTag) {
+          latestTag = packageSpecificTag;
+          log(`Using package-specific tag for ${mainPkgName}: ${latestTag}`, 'debug');
+        } else {
+          log(
+            `No package-specific tag found for ${mainPkgName}, using global tag: ${latestTag}`,
+            'debug',
+          );
+        }
       }
 
       // Calculate the next version using the main package if specified

@@ -16,13 +16,22 @@ export interface TagSearchOptions {
 /**
  * Get the number of commits since the last tag for a specific package
  * @param pkgRoot Path to the package
+ * @param sinceTag Optional specific tag to count commits since (instead of using git describe)
  * @returns Number of commits
  */
-export function getCommitsLength(pkgRoot: string): number {
+export function getCommitsLength(pkgRoot: string, sinceTag?: string): number {
   try {
-    const gitCommand = `git rev-list --count HEAD ^$(git describe --tags --abbrev=0) ${pkgRoot}`;
-    const amount = execSync(gitCommand).toString().trim();
+    let gitCommand: string;
 
+    if (sinceTag && sinceTag.trim() !== '') {
+      // Use the specific tag provided
+      gitCommand = `git rev-list --count ${sinceTag}..HEAD ${pkgRoot}`;
+    } else {
+      // Fallback to original behavior using git describe
+      gitCommand = `git rev-list --count HEAD ^$(git describe --tags --abbrev=0) ${pkgRoot}`;
+    }
+
+    const amount = execSync(gitCommand).toString().trim();
     return Number(amount);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

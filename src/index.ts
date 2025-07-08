@@ -64,6 +64,7 @@ export async function run(): Promise<void> {
       .option('-s, --synced', 'Use synchronized versioning across all packages')
       .option('-j, --json', 'Output results as JSON', false)
       .option('-t, --target <packages>', 'Comma-delimited list of package names to target')
+      .option('--project-dir <path>', 'Project directory to run commands in', process.cwd())
       .action(async (options) => {
         // Enable JSON output mode if requested
         if (options.json) {
@@ -71,6 +72,19 @@ export async function run(): Promise<void> {
         }
 
         try {
+          // Change to the specified directory if provided
+          const originalCwd = process.cwd();
+          if (options.projectDir && options.projectDir !== originalCwd) {
+            try {
+              process.chdir(options.projectDir);
+              log(`Changed working directory to: ${options.projectDir}`, 'debug');
+            } catch (error) {
+              throw new Error(
+                `Failed to change to directory "${options.projectDir}": ${error instanceof Error ? error.message : String(error)}`,
+              );
+            }
+          }
+
           // Load config
           const config: Config = await loadConfig(options.config);
           log(`Loaded configuration from ${options.config || 'version.config.json'}`, 'info');

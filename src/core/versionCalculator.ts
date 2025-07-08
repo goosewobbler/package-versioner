@@ -2,25 +2,20 @@
  * Version calculation logic
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
 import { cwd } from 'node:process';
 import { Bumper } from 'conventional-recommended-bump';
-import semver from 'semver';
 import type { ReleaseType } from 'semver';
-import * as TOML from 'smol-toml';
+import semver from 'semver';
 import { getCurrentBranch } from '../git/repository.js';
 import { getCommitsLength, lastMergeBranchName } from '../git/tagsAndBranches.js';
-import type { CargoToml, Config, VersionOptions } from '../types.js';
-import { escapeRegExp } from '../utils/formatting.js';
+import type { Config, VersionOptions } from '../types.js';
 import { log } from '../utils/logging.js';
-import { getVersionFromManifests, throwIfNoManifestsFound } from '../utils/manifestHelpers.js';
+import { getVersionFromManifests } from '../utils/manifestHelpers.js';
 import {
-  STANDARD_BUMP_TYPES,
   bumpVersion,
-  getVersionFromCargoToml,
-  getVersionFromPackageJson,
+  getBestVersionSource,
   normalizePrereleaseIdentifier,
+  STANDARD_BUMP_TYPES,
 } from '../utils/versionUtils.js';
 
 /**
@@ -71,84 +66,47 @@ export async function calculateVersion(config: Config, options: VersionOptions):
     const tagSearchPattern = determineTagSearchPattern(name, originalPrefix);
     const escapedTagPattern = escapeRegExp(tagSearchPattern);
 
-    // Check for version mismatch between package.json and Git tags
-    if (!hasNoTags && pkgPath) {
+    // Get the best available version source using smart fallback
+    let versionSource:
+      | { source: 'git' | 'package' | 'initial'; version: string; reason: string }
+      | undefined;
+
+    if (pkgPath) {
       const packageDir = pkgPath || cwd();
       const manifestResult = getVersionFromManifests(packageDir);
+      const packageVersion =
+        manifestResult.manifestFound && manifestResult.version ? manifestResult.version : undefined;
 
-      if (manifestResult.manifestFound && manifestResult.version) {
-        const cleanedTag = semver.clean(latestTag) || latestTag;
-        const tagVersion =
-          semver.clean(cleanedTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
-        const packageVersion = manifestResult.version;
+      versionSource = await getBestVersionSource(latestTag, packageVersion, packageDir);
+      log(`Using version source: ${versionSource.source} (${versionSource.reason})`, 'info');
+    }
 
-        // Check for version mismatches in both directions
-        if (semver.gt(packageVersion, tagVersion)) {
-          log(
-            `Warning: Version mismatch detected!
-• ${manifestResult.manifestType} version: ${packageVersion}
-• Latest Git tag version: ${tagVersion} (from ${latestTag})
-• Package version is AHEAD of Git tags
-
-This usually happens when:
-• A version was released but the tag wasn't pushed to the remote repository
-• The ${manifestResult.manifestType} was manually updated without creating a corresponding tag
-• You're running in CI and the latest tag isn't available yet
-
-The tool will use the Git tag version (${tagVersion}) as the base for calculation.
-Expected next version will be based on ${tagVersion}, not ${packageVersion}.
-
-To fix this mismatch:
-• Push missing tags: git push origin --tags
-• Or use package version as base by ensuring tags are up to date`,
-            'warning',
-          );
-        } else if (semver.gt(tagVersion, packageVersion)) {
-          log(
-            `Warning: Version mismatch detected!
-• ${manifestResult.manifestType} version: ${packageVersion}
-• Latest Git tag version: ${tagVersion} (from ${latestTag})
-• Git tag version is AHEAD of package version
-
-This usually happens when:
-• A release was tagged but the ${manifestResult.manifestType} wasn't updated
-• You're on an older branch that hasn't been updated with the latest version
-• Automated release process created tags but didn't update manifest files
-• You pulled tags but not the corresponding commits that update the package version
-
-The tool will use the Git tag version (${tagVersion}) as the base for calculation.
-This will likely result in a version that's already been released.
-
-To fix this mismatch:
-• Update ${manifestResult.manifestType}: Set version to ${tagVersion} or higher
-• Or checkout the branch/commit that corresponds to the tag
-• Or ensure your branch is up to date with the latest changes`,
-            'warning',
-          );
+    // Helper function to get current version from version source
+    function getCurrentVersionFromSource(): string {
+      if (!versionSource) {
+        // Fallback to old logic if no version source determined
+        if (hasNoTags) {
+          return initialVersion;
         }
+        const cleanedTag = semver.clean(latestTag) || latestTag;
+        return semver.clean(cleanedTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
       }
+
+      if (versionSource.source === 'git') {
+        // Extract version from git tag (remove prefix if present)
+        const cleanedTag = semver.clean(versionSource.version) || versionSource.version;
+        return semver.clean(cleanedTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
+      }
+
+      // For package or initial source, use the version directly
+      return versionSource.version;
     }
 
     // 1. Handle specific type if provided
     const specifiedType = type;
 
     if (specifiedType) {
-      if (hasNoTags) {
-        // Get package version from package.json
-        return getPackageVersionFallback(
-          pkgPath,
-          name,
-          specifiedType,
-          normalizedPrereleaseId,
-          initialVersion,
-        );
-      }
-
-      // Clean the latestTag to ensure proper semver format
-      const cleanedTag = semver.clean(latestTag) || latestTag;
-
-      const currentVersion =
-        semver.clean(cleanedTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
+      const currentVersion = getCurrentVersionFromSource();
 
       // Handle prerelease versions with our helper
       if (
@@ -197,22 +155,7 @@ To fix this mismatch:
       }
 
       if (branchVersionType) {
-        if (hasNoTags) {
-          // Get package version from package.json
-          return getPackageVersionFallback(
-            pkgPath,
-            name,
-            branchVersionType,
-            normalizedPrereleaseId,
-            initialVersion,
-          );
-        }
-        // Clean the latestTag to ensure proper semver format
-        const cleanedTag = semver.clean(latestTag) || latestTag;
-
-        const currentVersion =
-          semver.clean(cleanedTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
-
+        const currentVersion = getCurrentVersionFromSource();
         log(`Applying ${branchVersionType} bump based on branch pattern`, 'debug');
         return bumpVersion(currentVersion, branchVersionType, normalizedPrereleaseId);
       }
@@ -228,44 +171,44 @@ To fix this mismatch:
           ? (recommendedBump.releaseType as ReleaseType)
           : undefined;
 
-      if (hasNoTags) {
-        // Get package version from package.json if releaseTypeFromCommits is found
-        if (releaseTypeFromCommits) {
-          return getPackageVersionFallback(
-            pkgPath,
-            name,
-            releaseTypeFromCommits,
-            normalizedPrereleaseId,
-            initialVersion,
+      // Get current version from version source
+      const currentVersion = getCurrentVersionFromSource();
+
+      // Check if we have a version source to compare against for commit counting
+      // Use the actual version source (could be git tag or package version) instead of raw latestTag
+      if (versionSource && versionSource.source === 'git') {
+        // If we're using a git tag as version source, check for new commits since that tag
+        const checkPath = pkgPath || cwd();
+        const commitsLength = getCommitsLength(checkPath, versionSource.version); // Use the actual tag from version source
+        if (commitsLength === 0) {
+          log(
+            `No new commits found for ${name || 'project'} since ${versionSource.version}, skipping version bump`,
+            'info',
           );
+          return ''; // No change needed
         }
-        // No tags yet, return initial version
-        return initialVersion;
-      }
-
-      // If tags exist, check for new commits since the last tag
-      // Use path if provided, otherwise check the whole repo (cwd)
-      const checkPath = pkgPath || cwd();
-      const commitsLength = getCommitsLength(checkPath); // Uses git describe internally
-      if (commitsLength === 0) {
+      } else if (versionSource && versionSource.source === 'package') {
+        // If we're using package version as source, we can't count commits against it
+        // In this case, let conventional commits determine if there should be a bump
         log(
-          `No new commits found for ${name || 'project'} since ${latestTag}, skipping version bump`,
-          'info',
+          `Using package version ${versionSource.version} as base, letting conventional commits determine bump necessity`,
+          'debug',
         );
-        return ''; // No change needed
       }
 
-      // If tags exist AND there are new commits, calculate the next version
+      // If no git tag or we have commits, check if conventional commits indicate a bump
       if (!releaseTypeFromCommits) {
-        log(
-          `No relevant commits found for ${name || 'project'} since ${latestTag}, skipping version bump`,
-          'info',
-        );
+        if (latestTag && latestTag.trim() !== '') {
+          log(
+            `No relevant commits found for ${name || 'project'} since ${latestTag}, skipping version bump`,
+            'info',
+          );
+        } else {
+          log(`No relevant commits found for ${name || 'project'}, skipping version bump`, 'info');
+        }
         return ''; // No bump indicated by conventional commits
       }
 
-      const currentVersion =
-        semver.clean(latestTag.replace(new RegExp(`^${escapedTagPattern}`), '')) || '0.0.0';
       return bumpVersion(currentVersion, releaseTypeFromCommits, normalizedPrereleaseId);
     } catch (error) {
       // Handle errors during conventional bump calculation
@@ -295,80 +238,4 @@ To fix this mismatch:
     // Rethrow unexpected errors to prevent silent failures
     throw error;
   }
-}
-
-/**
- * Helper function to get package version from package.json when no tags are found
- *
- * Note: When both package.json and Cargo.toml are present in the same directory,
- * both manifests will be updated independently with their respective versions.
- * The package.json is checked first for determining the version, and Cargo.toml
- * is used as a fallback if package.json is not found or doesn't contain a version.
- */
-function getPackageVersionFallback(
-  pkgPath: string | undefined,
-  name: string | undefined,
-  releaseType: ReleaseType,
-  prereleaseIdentifier: string | undefined,
-  initialVersion: string,
-): string {
-  const packageDir = pkgPath || cwd();
-
-  // Use centralized helper to get version from any available manifest
-  const manifestResult = getVersionFromManifests(packageDir);
-
-  if (manifestResult.manifestFound && manifestResult.version) {
-    log(
-      `No tags found for ${name || 'package'}, using ${manifestResult.manifestType} version: ${manifestResult.version} as base`,
-      'info',
-    );
-
-    return calculateNextVersion(
-      manifestResult.version,
-      manifestResult.manifestType || 'manifest',
-      name,
-      releaseType,
-      prereleaseIdentifier,
-      initialVersion,
-    );
-  }
-
-  // If no manifests found or couldn't extract a version
-  throwIfNoManifestsFound(packageDir);
-}
-
-/**
- * Calculate the next version based on the current version and bump type
- * Handles special cases like prerelease versions and specific bump types
- */
-function calculateNextVersion(
-  version: string,
-  manifestType: string,
-  name: string | undefined,
-  releaseType: ReleaseType,
-  prereleaseIdentifier: string | undefined,
-  initialVersion: string,
-): string {
-  log(
-    `No tags found for ${name || 'package'}, using ${manifestType} version: ${version} as base`,
-    'info',
-  );
-
-  // Handle prerelease versions with our helper
-  if (
-    STANDARD_BUMP_TYPES.includes(releaseType as 'major' | 'minor' | 'patch') &&
-    (semver.prerelease(version) || prereleaseIdentifier)
-  ) {
-    log(
-      prereleaseIdentifier
-        ? `Creating prerelease version with identifier '${prereleaseIdentifier}' using ${releaseType}`
-        : `Cleaning prerelease identifier from ${version} for ${releaseType} bump`,
-      'debug',
-    );
-    return bumpVersion(version, releaseType, prereleaseIdentifier);
-  }
-
-  // For non-prerelease versions without prerelease identifier
-  const result = bumpVersion(version, releaseType, prereleaseIdentifier);
-  return result || initialVersion; // Fallback to initialVersion if result is empty
 }

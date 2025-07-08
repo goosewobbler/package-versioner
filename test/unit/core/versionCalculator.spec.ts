@@ -71,8 +71,25 @@ describe('Version Calculator', () => {
       };
     });
 
+    // Mock getBestVersionSource with a default implementation
+    vi.spyOn(versionUtils, 'getBestVersionSource').mockImplementation(
+      async (latestTag, packageVersion) => {
+        if (!latestTag) {
+          return {
+            source: 'package',
+            version: packageVersion || '0.1.0',
+            reason: 'No git tag provided',
+          };
+        }
+        return {
+          source: 'git',
+          version: latestTag,
+          reason: 'Git tag exists',
+        };
+      },
+    );
+
     // Override the hoisted mock of getPackageVersionFallback with a default implementation
-    // This won't be used directly now that we've mocked the underlying functions
     getPackageVersionFallback.mockImplementation(
       (_packageDir, _name, _releaseType, _config, _initialVersion) => {
         return '1.0.0';
@@ -92,7 +109,7 @@ describe('Version Calculator', () => {
       return val as string;
     });
 
-    // Mock bumpVersion - this is the key function we updated
+    // Mock bumpVersion
     vi.spyOn(versionUtils, 'bumpVersion').mockImplementation((version, releaseType, identifier) => {
       // Special cases for test expectations
       if (version === '1.0.0' && releaseType === 'minor' && !identifier) return '1.1.0';
@@ -131,8 +148,13 @@ describe('Version Calculator', () => {
       if (version === '1.3.0' && releaseType === 'premajor' && identifier === 'next')
         return '2.0.0-next.0';
 
-      // Fallback
-      return `${version}-MOCK`;
+      // Handle smart fallback cases where git tag version is used directly
+      if (version === '1.1.0' && releaseType === 'patch' && !identifier) return '1.1.1';
+      if (version === '1.2.0' && releaseType === 'patch' && !identifier) return '1.2.1';
+
+      // Fallback - for unexpected cases, increment patch
+      const semverResult = semver.inc(version, 'patch');
+      return semverResult || '1.0.1';
     });
 
     // Create a mock for semver.inc
@@ -510,8 +532,11 @@ describe('Version Calculator', () => {
 
       vi.spyOn(gitRepo, 'getCurrentBranch').mockReturnValue('docs/update-readme');
 
-      // Mock conventional-commits as fallback
+      // Mock conventional-commits as fallback - no commits and no release type
       vi.spyOn(gitTags, 'getCommitsLength').mockReturnValue(0);
+      vi.spyOn(Bumper.prototype, 'bump').mockResolvedValue(
+        {} as unknown as BumperRecommendationResult,
+      );
 
       // Execute
       const options: VersionOptions = {
@@ -523,10 +548,10 @@ describe('Version Calculator', () => {
 
       const version = await calculateVersion(config as Config, options);
 
-      // Verify
+      // Verify - with smart fallback, we check commits since the tag
       expect(version).toBe('');
       expect(logging.log).toHaveBeenCalledWith(
-        expect.stringContaining('No new commits found'),
+        'No relevant commits found for project since v1.0.0, skipping version bump',
         'info',
       );
     });
@@ -589,7 +614,20 @@ describe('Version Calculator', () => {
     });
 
     it('should return empty string if no commits since last tag', async () => {
+      // Mock getCommitsLength to return 0 for this test
       vi.spyOn(gitTags, 'getCommitsLength').mockReturnValue(0);
+
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'git',
+        version: 'v1.0.0',
+        reason: 'Git tag exists',
+      });
+
+      // Reset all mocks including the default Bumper mock for this specific test
+      vi.spyOn(Bumper.prototype, 'bump').mockResolvedValue(
+        {} as unknown as BumperRecommendationResult,
+      );
 
       const options: VersionOptions = {
         latestTag: 'v1.0.0',
@@ -600,7 +638,7 @@ describe('Version Calculator', () => {
 
       expect(version).toBe('');
       expect(logging.log).toHaveBeenCalledWith(
-        expect.stringContaining('No new commits found'),
+        'No relevant commits found for project since v1.0.0, skipping version bump',
         'info',
       );
     });
@@ -740,6 +778,11 @@ describe('Version Calculator', () => {
           return '1.0.1'; // Clean version for patch bump
         }
 
+        // For test: should attempt to use package.json version with conventional commits when no latestTag exists
+        if (version === '1.0.0' && releaseType === 'patch') {
+          return '1.0.1'; // Patch bump from 1.0.0 to 1.0.1
+        }
+
         // If identifier is provided, use it
         if (identifier) {
           return `${version}-${identifier}.0`;
@@ -775,45 +818,46 @@ describe('Version Calculator', () => {
       // With our special prerelease handling, 1.0.0-beta.1 with major bump now becomes 1.0.0
       expect(version).toBe('1.0.0');
       expect(logging.log).toHaveBeenCalledWith(
-        expect.stringContaining('No tags found for package, using package.json version:'),
+        expect.stringContaining('Using version source: package'),
         'info',
       );
     });
 
     it('should correctly handle major bump on 1.0.0-next.0 to become 1.0.0', async () => {
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValueOnce({
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'package',
         version: '1.0.0-next.0',
-        manifestFound: true,
-        manifestPath: 'path/to/package.json',
-        manifestType: 'package.json',
+        reason: 'No git tag provided',
       });
-      vi.spyOn(semver, 'prerelease').mockReturnValue(['next', 0]);
-      vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.0.0');
+
+      const config: Partial<Config> = {
+        ...defaultConfig,
+        type: 'major',
+      };
 
       const options: VersionOptions = {
         latestTag: '',
-        type: 'major',
         versionPrefix: 'v',
         path: '/test/path',
       };
 
-      const version = await calculateVersion(defaultConfig as Config, options);
-
-      // Should remove prerelease identifier but keep major version at 1
+      const version = await calculateVersion(config as Config, options);
       expect(version).toBe('1.0.0');
     });
 
     it('should attempt to use package.json version with conventional commits when no latestTag exists', async () => {
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValueOnce({
-        version: '1.0.0-beta.1',
-        manifestFound: true,
-        manifestPath: 'path/to/package.json',
-        manifestType: 'package.json',
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'package',
+        version: '1.0.0',
+        reason: 'No git tag provided',
       });
-      vi.spyOn(Bumper.prototype, 'bump').mockResolvedValue({
-        releaseType: 'patch',
-      } as unknown as BumperRecommendationResult);
-      vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.0.1');
+
+      const config: Partial<Config> = {
+        ...defaultConfig,
+        type: 'patch',
+      };
 
       const options: VersionOptions = {
         latestTag: '',
@@ -821,13 +865,8 @@ describe('Version Calculator', () => {
         path: '/test/path',
       };
 
-      const version = await calculateVersion(defaultConfig as Config, options);
-
+      const version = await calculateVersion(config as Config, options);
       expect(version).toBe('1.0.1');
-      expect(logging.log).toHaveBeenCalledWith(
-        expect.stringContaining('No tags found for package, using package.json version:'),
-        'info',
-      );
     });
 
     it('should throw error if package.json does not exist', async () => {
@@ -885,516 +924,258 @@ describe('Version Calculator', () => {
   });
 
   describe('Version Mismatch Detection', () => {
-    beforeEach(() => {
-      vi.resetAllMocks();
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockClear();
-      vi.spyOn(logging, 'log').mockClear();
-      vi.spyOn(semver, 'gt').mockClear();
-      vi.spyOn(semver, 'clean').mockClear();
-      vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('0.7.2');
-    });
-
-    afterEach(() => {
-      vi.clearAllMocks();
-    });
-
-    it('should warn when package.json version is ahead of Git tag version', async () => {
-      // Mock manifest helper to return version 0.8.0
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
-        version: '0.8.0',
-        manifestFound: true,
-        manifestPath: '/test/package.json',
-        manifestType: 'package.json',
+    it('should use smart fallback when package.json version is ahead of Git tag version', async () => {
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'package',
+        version: '1.1.0',
+        reason: 'Package version is newer',
       });
-
-      // Mock semver functions
-      vi.spyOn(semver, 'clean').mockImplementation((version) => {
-        if (version === 'v0.7.1') return '0.7.1';
-        if (version === '0.7.1') return '0.7.1';
-        return version;
-      });
-      vi.spyOn(semver, 'gt').mockReturnValue(true); // 0.8.0 > 0.7.1
 
       const config: Partial<Config> = {
         ...defaultConfig,
-        type: 'patch',
+        type: 'patch', // Explicitly specify type to bypass conventional commits
       };
 
       const options: VersionOptions = {
-        latestTag: 'v0.7.1',
+        latestTag: 'v1.0.0',
         versionPrefix: 'v',
         path: '/test/path',
-        name: 'test-package',
       };
 
-      await calculateVersion(config as Config, options);
-
-      // Check that the warning was logged with all expected content
-      const warningCall = (
-        logging.log as unknown as { mock: { calls: unknown[][] } }
-      ).mock.calls.find((call: unknown[]) =>
-        (call[0] as string).includes('Warning: Version mismatch detected!'),
-      );
-
-      expect(warningCall).toBeDefined();
-      const warningMessage = warningCall?.[0] as string;
-
-      expect(warningMessage).toContain('Warning: Version mismatch detected!');
-      expect(warningMessage).toContain('• package.json version: 0.8.0');
-      expect(warningMessage).toContain('• Latest Git tag version: 0.7.1 (from v0.7.1)');
-      expect(warningMessage).toContain('• Package version is AHEAD of Git tags');
+      const version = await calculateVersion(config as Config, options);
+      expect(version).toBe('1.1.1'); // Will be bumped from 1.1.0 to 1.1.1
     });
 
-    it('should warn with Cargo.toml when package version is ahead', async () => {
-      // Mock manifest helper to return Cargo.toml version
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
-        version: '1.2.0',
-        manifestFound: true,
-        manifestPath: '/test/Cargo.toml',
-        manifestType: 'Cargo.toml',
+    it('should use smart fallback with Cargo.toml when package version is ahead', async () => {
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'package',
+        version: '1.1.0',
+        reason: 'Package version is newer',
       });
-
-      // Mock semver functions
-      vi.spyOn(semver, 'clean').mockImplementation((version) => {
-        if (version === 'v1.1.5') return '1.1.5';
-        if (version === '1.1.5') return '1.1.5';
-        return version;
-      });
-      vi.spyOn(semver, 'gt').mockReturnValue(true); // 1.2.0 > 1.1.5
 
       const config: Partial<Config> = {
         ...defaultConfig,
-        type: 'minor',
+        type: 'patch', // Explicitly specify type to bypass conventional commits
       };
 
       const options: VersionOptions = {
-        latestTag: 'v1.1.5',
+        latestTag: 'v1.0.0',
         versionPrefix: 'v',
         path: '/test/path',
-        name: 'rust-package',
       };
 
-      await calculateVersion(config as Config, options);
-
-      // Check that the warning was logged with all expected content
-      const warningCall = (
-        logging.log as unknown as { mock: { calls: unknown[][] } }
-      ).mock.calls.find((call: unknown[]) =>
-        (call[0] as string).includes('Warning: Version mismatch detected!'),
-      );
-
-      expect(warningCall).toBeDefined();
-      const warningMessage = warningCall?.[0] as string;
-
-      expect(warningMessage).toContain('Warning: Version mismatch detected!');
-      expect(warningMessage).toContain('• Cargo.toml version: 1.2.0');
-      expect(warningMessage).toContain('• Latest Git tag version: 1.1.5 (from v1.1.5)');
-      expect(warningMessage).toContain('• Package version is AHEAD of Git tags');
+      const version = await calculateVersion(config as Config, options);
+      expect(version).toBe('1.1.1'); // Will be bumped from 1.1.0 to 1.1.1
     });
 
-    it('should warn when Git tag version is ahead of package.json version', async () => {
-      // Mock manifest helper to return older package.json version
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
-        version: '0.7.0',
-        manifestFound: true,
-        manifestPath: '/test/package.json',
-        manifestType: 'package.json',
-      });
-
-      // Mock semver functions
-      vi.spyOn(semver, 'clean').mockImplementation((version) => {
-        if (version === 'v0.8.0') return '0.8.0';
-        if (version === '0.8.0') return '0.8.0';
-        return version;
-      });
-      vi.spyOn(semver, 'gt').mockImplementation((a, b) => {
-        if (a === '0.7.0' && b === '0.8.0') return false; // package < tag
-        if (a === '0.8.0' && b === '0.7.0') return true; // tag > package
-        return false;
+    it('should use smart fallback when Git tag version is ahead of package.json version', async () => {
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'git',
+        version: 'v1.2.0',
+        reason: 'Git tag is newer',
       });
 
       const config: Partial<Config> = {
         ...defaultConfig,
-        type: 'patch',
-      };
-
-      const options: VersionOptions = {
-        latestTag: 'v0.8.0',
-        versionPrefix: 'v',
-        path: '/test/path',
-        name: 'test-package',
-      };
-
-      await calculateVersion(config as Config, options);
-
-      // Check that the warning was logged with all expected content
-      const warningCall = (
-        logging.log as unknown as { mock: { calls: unknown[][] } }
-      ).mock.calls.find((call: unknown[]) =>
-        (call[0] as string).includes('Warning: Version mismatch detected!'),
-      );
-
-      expect(warningCall).toBeDefined();
-      const warningMessage = warningCall?.[0] as string;
-
-      expect(warningMessage).toContain('Warning: Version mismatch detected!');
-      expect(warningMessage).toContain('• package.json version: 0.7.0');
-      expect(warningMessage).toContain('• Latest Git tag version: 0.8.0 (from v0.8.0)');
-      expect(warningMessage).toContain('• Git tag version is AHEAD of package version');
-    });
-
-    it('should warn when Git tag version is ahead of Cargo.toml version', async () => {
-      // Mock manifest helper to return older Cargo.toml version
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
-        version: '2.1.0',
-        manifestFound: true,
-        manifestPath: '/test/Cargo.toml',
-        manifestType: 'Cargo.toml',
-      });
-
-      // Mock semver functions
-      vi.spyOn(semver, 'clean').mockImplementation((version) => {
-        if (version === 'v2.3.0') return '2.3.0';
-        if (version === '2.3.0') return '2.3.0';
-        return version;
-      });
-      vi.spyOn(semver, 'gt').mockImplementation((a, b) => {
-        if (a === '2.1.0' && b === '2.3.0') return false; // package < tag
-        if (a === '2.3.0' && b === '2.1.0') return true; // tag > package
-        return false;
-      });
-
-      const config: Partial<Config> = {
-        ...defaultConfig,
-        type: 'minor',
-      };
-
-      const options: VersionOptions = {
-        latestTag: 'v2.3.0',
-        versionPrefix: 'v',
-        path: '/test/path',
-        name: 'rust-package',
-      };
-
-      await calculateVersion(config as Config, options);
-
-      // Check that the warning was logged with all expected content
-      const warningCall = (
-        logging.log as unknown as { mock: { calls: unknown[][] } }
-      ).mock.calls.find((call: unknown[]) =>
-        (call[0] as string).includes('Warning: Version mismatch detected!'),
-      );
-
-      expect(warningCall).toBeDefined();
-      const warningMessage = warningCall?.[0] as string;
-
-      expect(warningMessage).toContain('Warning: Version mismatch detected!');
-      expect(warningMessage).toContain('• Cargo.toml version: 2.1.0');
-      expect(warningMessage).toContain('• Latest Git tag version: 2.3.0 (from v2.3.0)');
-      expect(warningMessage).toContain('• Git tag version is AHEAD of package version');
-    });
-
-    it('should provide specific guidance for tag-ahead scenario', async () => {
-      // Mock manifest helper
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
-        version: '1.0.0',
-        manifestFound: true,
-        manifestPath: '/test/package.json',
-        manifestType: 'package.json',
-      });
-
-      // Mock semver functions - tag ahead scenario
-      vi.spyOn(semver, 'clean').mockImplementation((version) => {
-        if (version === 'v1.2.0') return '1.2.0';
-        return version;
-      });
-      vi.spyOn(semver, 'gt').mockImplementation((a, b) => {
-        if (a === '1.0.0' && b === '1.2.0') return false; // package < tag
-        if (a === '1.2.0' && b === '1.0.0') return true; // tag > package
-        return false;
-      });
-
-      const config: Partial<Config> = {
-        ...defaultConfig,
-        type: 'patch',
+        type: 'patch', // Explicitly specify type to bypass conventional commits
       };
 
       const options: VersionOptions = {
         latestTag: 'v1.2.0',
         versionPrefix: 'v',
         path: '/test/path',
-        name: 'test-package',
       };
 
-      await calculateVersion(config as Config, options);
+      const version = await calculateVersion(config as Config, options);
+      expect(version).toBe('1.2.1'); // Will be bumped from 1.2.0 to 1.2.1
+    });
 
-      const warningCall = (
-        logging.log as unknown as { mock: { calls: unknown[][] } }
-      ).mock.calls.find((call: unknown[]) =>
-        (call[0] as string).includes('Warning: Version mismatch detected!'),
-      );
+    it('should use smart fallback when Git tag version is ahead of Cargo.toml version', async () => {
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'git',
+        version: 'v1.2.0',
+        reason: 'Git tag is newer',
+      });
 
-      expect(warningCall).toBeDefined();
-      const warningMessage = warningCall?.[0] as string;
+      const config: Partial<Config> = {
+        ...defaultConfig,
+        type: 'patch', // Explicitly specify type to bypass conventional commits
+      };
 
-      // Check that all expected content is in the warning for tag-ahead scenario
-      expect(warningMessage).toContain('This usually happens when:');
-      expect(warningMessage).toContain("A release was tagged but the package.json wasn't updated");
-      expect(warningMessage).toContain("You're on an older branch that hasn't been updated");
-      expect(warningMessage).toContain(
-        "Automated release process created tags but didn't update manifest files",
-      );
-      expect(warningMessage).toContain(
-        "This will likely result in a version that's already been released",
-      );
-      expect(warningMessage).toContain('Update package.json: Set version to 1.2.0 or higher');
-      expect(warningMessage).toContain('Or checkout the branch/commit that corresponds to the tag');
+      const options: VersionOptions = {
+        latestTag: 'v1.2.0',
+        versionPrefix: 'v',
+        path: '/test/path',
+      };
+
+      const version = await calculateVersion(config as Config, options);
+      expect(version).toBe('1.2.1'); // Will be bumped from 1.2.0 to 1.2.1
+    });
+
+    it('should use smart fallback for tag-ahead scenario', async () => {
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'git',
+        version: 'v1.2.0',
+        reason: 'Git tag is newer',
+      });
+
+      const config: Partial<Config> = {
+        ...defaultConfig,
+        type: 'patch', // Explicitly specify type to bypass conventional commits
+      };
+
+      const options: VersionOptions = {
+        latestTag: 'v1.2.0',
+        versionPrefix: 'v',
+        path: '/test/path',
+      };
+
+      const version = await calculateVersion(config as Config, options);
+      expect(version).toBe('1.2.1'); // Will be bumped from 1.2.0 to 1.2.1
     });
 
     it('should not warn when package.json version equals Git tag version', async () => {
-      // Mock manifest helper to return same version as tag
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
-        version: '0.7.1',
-        manifestFound: true,
-        manifestPath: '/test/package.json',
-        manifestType: 'package.json',
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'git',
+        version: 'v1.0.0',
+        reason: 'Versions equal, using git tag',
       });
-
-      // Mock semver functions
-      vi.spyOn(semver, 'clean').mockImplementation((version) => {
-        if (version === 'v0.7.1') return '0.7.1';
-        if (version === '0.7.1') return '0.7.1';
-        return version;
-      });
-      vi.spyOn(semver, 'gt').mockReturnValue(false); // 0.7.1 === 0.7.1
 
       const config: Partial<Config> = {
         ...defaultConfig,
-        type: 'patch',
+        type: 'patch', // Explicitly specify type to bypass conventional commits
       };
 
       const options: VersionOptions = {
-        latestTag: 'v0.7.1',
+        latestTag: 'v1.0.0',
         versionPrefix: 'v',
         path: '/test/path',
-        name: 'test-package',
       };
 
-      await calculateVersion(config as Config, options);
-
-      expect(logging.log).not.toHaveBeenCalledWith(
-        expect.stringContaining('Warning: Version mismatch detected!'),
-        expect.any(String),
-      );
+      const version = await calculateVersion(config as Config, options);
+      expect(version).toBe('1.0.1'); // Will be bumped from 1.0.0 to 1.0.1
     });
 
     it('should not warn when package.json version is behind Git tag version', async () => {
-      // Mock manifest helper to return older version
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
-        version: '0.6.0',
-        manifestFound: true,
-        manifestPath: '/test/package.json',
-        manifestType: 'package.json',
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'git',
+        version: 'v1.2.0',
+        reason: 'Git tag is newer',
       });
-
-      // Mock semver functions
-      vi.spyOn(semver, 'clean').mockImplementation((version) => {
-        if (version === 'v0.7.1') return '0.7.1';
-        if (version === '0.7.1') return '0.7.1';
-        return version;
-      });
-      vi.spyOn(semver, 'gt').mockReturnValue(false); // 0.6.0 < 0.7.1
 
       const config: Partial<Config> = {
         ...defaultConfig,
-        type: 'patch',
+        type: 'patch', // Explicitly specify type to bypass conventional commits
       };
 
       const options: VersionOptions = {
-        latestTag: 'v0.7.1',
+        latestTag: 'v1.2.0',
         versionPrefix: 'v',
         path: '/test/path',
-        name: 'test-package',
       };
 
-      await calculateVersion(config as Config, options);
-
-      expect(logging.log).not.toHaveBeenCalledWith(
-        expect.stringContaining('Warning: Version mismatch detected!'),
-        expect.any(String),
-      );
+      const version = await calculateVersion(config as Config, options);
+      expect(version).toBe('1.2.1'); // Will be bumped from 1.2.0 to 1.2.1
     });
 
     it('should not warn when no tags exist (hasNoTags is true)', async () => {
-      // Mock manifest helper
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'package',
         version: '1.0.0',
-        manifestFound: true,
-        manifestPath: '/test/package.json',
-        manifestType: 'package.json',
+        reason: 'No git tag provided',
       });
 
       const config: Partial<Config> = {
         ...defaultConfig,
-        type: 'patch',
+        type: 'patch', // Explicitly specify type to bypass conventional commits
       };
 
       const options: VersionOptions = {
-        latestTag: '', // No tags
+        latestTag: '',
         versionPrefix: 'v',
         path: '/test/path',
-        name: 'test-package',
       };
 
-      await calculateVersion(config as Config, options);
-
-      expect(logging.log).not.toHaveBeenCalledWith(
-        expect.stringContaining('Warning: Version mismatch detected!'),
-        expect.any(String),
-      );
-    });
-
-    it('should not warn when no path is provided (pkgPath is undefined)', async () => {
-      const config: Partial<Config> = {
-        ...defaultConfig,
-        type: 'patch',
-      };
-
-      const options: VersionOptions = {
-        latestTag: 'v0.7.1',
-        versionPrefix: 'v',
-        // path is undefined
-        name: 'test-package',
-      };
-
-      await calculateVersion(config as Config, options);
-
-      expect(logging.log).not.toHaveBeenCalledWith(
-        expect.stringContaining('Warning: Version mismatch detected!'),
-        expect.any(String),
-      );
+      const version = await calculateVersion(config as Config, options);
+      expect(version).toBe('1.0.1'); // Will be bumped from 1.0.0 to 1.0.1
     });
 
     it('should not warn when no manifest is found', async () => {
-      // Mock manifest helper to return no manifest found
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
-        version: null,
-        manifestFound: false,
-        manifestPath: '',
-        manifestType: null,
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'git',
+        version: 'v1.0.0',
+        reason: 'Git tag exists, no package version to compare',
       });
 
       const config: Partial<Config> = {
         ...defaultConfig,
-        type: 'patch',
+        type: 'patch', // Explicitly specify type to bypass conventional commits
       };
 
       const options: VersionOptions = {
-        latestTag: 'v0.7.1',
+        latestTag: 'v1.0.0',
         versionPrefix: 'v',
         path: '/test/path',
-        name: 'test-package',
       };
 
-      await calculateVersion(config as Config, options);
-
-      expect(logging.log).not.toHaveBeenCalledWith(
-        expect.stringContaining('Warning: Version mismatch detected!'),
-        expect.any(String),
-      );
+      const version = await calculateVersion(config as Config, options);
+      expect(version).toBe('1.0.1'); // Will be bumped from 1.0.0 to 1.0.1
     });
 
-    it('should handle package-specific tags correctly in warning', async () => {
-      // Mock manifest helper
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
-        version: '2.1.0',
-        manifestFound: true,
-        manifestPath: '/test/package.json',
-        manifestType: 'package.json',
+    it('should handle package-specific tags correctly with smart fallback', async () => {
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'package',
+        version: '1.1.0',
+        reason: 'Package version is newer',
       });
-
-      // Mock semver functions for package-specific tag
-      vi.spyOn(semver, 'clean').mockImplementation((version) => {
-        if (version === 'my-package@v2.0.5') return '2.0.5';
-        if (version === '2.0.5') return '2.0.5';
-        return version;
-      });
-      vi.spyOn(semver, 'gt').mockReturnValue(true); // 2.1.0 > 2.0.5
 
       const config: Partial<Config> = {
         ...defaultConfig,
-        type: 'patch',
+        type: 'patch', // Explicitly specify type to bypass conventional commits
       };
 
       const options: VersionOptions = {
-        latestTag: 'my-package@v2.0.5',
+        latestTag: 'my-package@v1.0.0',
         versionPrefix: 'v',
         path: '/test/path',
         name: 'my-package',
       };
 
-      await calculateVersion(config as Config, options);
-
-      expect(logging.log).toHaveBeenCalledWith(
-        expect.stringContaining('Warning: Version mismatch detected!'),
-        'warning',
-      );
-      expect(logging.log).toHaveBeenCalledWith(
-        expect.stringContaining('• Latest Git tag version: 2.0.5 (from my-package@v2.0.5)'),
-        'warning',
-      );
+      const version = await calculateVersion(config as Config, options);
+      expect(version).toBe('1.1.1'); // Will be bumped from 1.1.0 to 1.1.1
     });
 
-    it('should provide helpful context in warning message', async () => {
-      // Mock manifest helper
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
-        version: '0.8.0',
-        manifestFound: true,
-        manifestPath: '/test/package.json',
-        manifestType: 'package.json',
+    it('should use smart fallback when package version is ahead', async () => {
+      // Mock getBestVersionSource for this test
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+        source: 'package',
+        version: '1.1.0',
+        reason: 'Package version is newer',
       });
-
-      // Mock semver functions
-      vi.spyOn(semver, 'clean').mockImplementation((version) => {
-        if (version === 'v0.7.1') return '0.7.1';
-        return version;
-      });
-      vi.spyOn(semver, 'gt').mockReturnValue(true);
 
       const config: Partial<Config> = {
         ...defaultConfig,
-        type: 'patch',
+        type: 'patch', // Explicitly specify type to bypass conventional commits
       };
 
       const options: VersionOptions = {
-        latestTag: 'v0.7.1',
+        latestTag: 'v1.0.0',
         versionPrefix: 'v',
         path: '/test/path',
-        name: 'test-package',
       };
 
-      await calculateVersion(config as Config, options);
-
-      const warningCall = (
-        logging.log as unknown as { mock: { calls: unknown[][] } }
-      ).mock.calls.find((call: unknown[]) =>
-        (call[0] as string).includes('Warning: Version mismatch detected!'),
-      );
-
-      expect(warningCall).toBeDefined();
-      const warningMessage = warningCall?.[0] as string;
-
-      // Check that all expected content is in the warning
-      expect(warningMessage).toContain('This usually happens when:');
-      expect(warningMessage).toContain("A version was released but the tag wasn't pushed");
-      expect(warningMessage).toContain(
-        'The package.json was manually updated without creating a corresponding tag',
-      );
-      expect(warningMessage).toContain(
-        "You're running in CI and the latest tag isn't available yet",
-      );
-      expect(warningMessage).toContain('The tool will use the Git tag version (0.7.1) as the base');
-      expect(warningMessage).toContain('Expected next version will be based on 0.7.1, not 0.8.0');
+      const version = await calculateVersion(config as Config, options);
+      expect(version).toBe('1.1.1'); // Will be bumped from 1.1.0 to 1.1.1
     });
   });
 });

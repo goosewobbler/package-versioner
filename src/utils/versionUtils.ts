@@ -3,11 +3,11 @@
  */
 
 import fs from 'node:fs';
-import path from 'node:path';
 import type { ReleaseType } from 'semver';
 import semver from 'semver';
 import * as TOML from 'smol-toml';
 
+import { verifyTag } from '../git/tagVerification.js';
 import type { CargoToml } from '../types.js';
 import { log } from './logging.js';
 
@@ -168,4 +168,87 @@ export function bumpVersion(
 
   // For non-prerelease versions or non-standard bump types
   return semver.inc(currentVersion, bumpType, prereleaseIdentifier) || '';
+}
+
+/**
+ * Get the best available version source (git tag vs package version)
+ * Smart fallback logic that chooses the most appropriate version source
+ */
+export async function getBestVersionSource(
+  tagName: string | undefined,
+  packageVersion: string | undefined,
+  cwd: string,
+): Promise<{
+  source: 'git' | 'package' | 'initial';
+  version: string;
+  reason: string;
+}> {
+  // No tag provided - use package version or fallback to initial
+  if (!tagName?.trim()) {
+    return packageVersion
+      ? { source: 'package', version: packageVersion, reason: 'No git tag provided' }
+      : { source: 'initial', version: '0.1.0', reason: 'No git tag or package version available' };
+  }
+
+  // Verify tag existence and reachability
+  const verification = verifyTag(tagName, cwd);
+
+  // Tag unreachable - use package version or fallback to initial
+  if (!verification.exists || !verification.reachable) {
+    if (packageVersion) {
+      log(
+        `Git tag '${tagName}' unreachable (${verification.error}), using package version: ${packageVersion}`,
+        'warning',
+      );
+      return { source: 'package', version: packageVersion, reason: 'Git tag unreachable' };
+    }
+
+    log(
+      `Git tag '${tagName}' unreachable and no package version available, using initial version`,
+      'warning',
+    );
+    return {
+      source: 'initial',
+      version: '0.1.0',
+      reason: 'Git tag unreachable, no package version',
+    };
+  }
+
+  // Tag exists and reachable - compare versions if package version available
+  if (!packageVersion) {
+    return {
+      source: 'git',
+      version: tagName,
+      reason: 'Git tag exists, no package version to compare',
+    };
+  }
+
+  try {
+    // Clean versions for comparison (remove prefixes like "v" or "package@v")
+    const cleanTagVersion = tagName.replace(/^.*?([0-9])/, '$1');
+    const cleanPackageVersion = packageVersion;
+
+    // Compare versions and use the newer one
+    if (semver.gt(cleanPackageVersion, cleanTagVersion)) {
+      log(
+        `Package version ${packageVersion} is newer than git tag ${tagName}, using package version`,
+        'info',
+      );
+      return { source: 'package', version: packageVersion, reason: 'Package version is newer' };
+    }
+
+    if (semver.gt(cleanTagVersion, cleanPackageVersion)) {
+      log(
+        `Git tag ${tagName} is newer than package version ${packageVersion}, using git tag`,
+        'info',
+      );
+      return { source: 'git', version: tagName, reason: 'Git tag is newer' };
+    }
+
+    // Versions equal - prefer git tag as source of truth
+    return { source: 'git', version: tagName, reason: 'Versions equal, using git tag' };
+  } catch (error) {
+    log(`Failed to compare versions, defaulting to git tag: ${error}`, 'warning');
+    return { source: 'git', version: tagName, reason: 'Version comparison failed' };
+  }
 }

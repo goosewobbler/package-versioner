@@ -1,4 +1,3 @@
-import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import path from 'node:path';
 import { exit } from 'node:process';
@@ -8,6 +7,7 @@ import { extractChangelogEntriesFromCommits } from '../changelog/commitParser.js
 import { calculateVersion } from '../core/versionCalculator.js';
 import { createGitTag, gitAdd, gitCommit } from '../git/commands.js';
 import { getLatestTagForPackage } from '../git/tagsAndBranches.js';
+import { verifyTag } from '../git/tagVerification.js';
 import type { Config, VersionConfigBase } from '../types.js';
 import { formatCommitMessage, formatTag, formatVersionPrefix } from '../utils/formatting.js';
 import { addTag, setCommitMessage } from '../utils/jsonOutput.js';
@@ -182,18 +182,18 @@ export class PackageProcessor {
           // If latestTag is empty or doesn't exist, we'll extract from HEAD
           let revisionRange: string;
 
-          // Check if the tag actually exists in the repository
+          // Check if the tag actually exists in the repository using the new verification utility
           if (latestTag) {
-            try {
-              execSync(`git rev-parse --verify "${latestTag}"`, {
-                cwd: pkgPath,
-                stdio: 'ignore',
-              });
-              // Tag exists, get commits since that tag
+            const verification = verifyTag(latestTag, pkgPath);
+            if (verification.exists && verification.reachable) {
+              // Tag exists and is reachable, get commits since that tag
               revisionRange = `${latestTag}..HEAD`;
-            } catch {
-              // Tag doesn't exist, get all commits
-              log(`Tag ${latestTag} doesn't exist, using all commits for changelog`, 'debug');
+            } else {
+              // Tag doesn't exist or is unreachable, get all commits
+              log(
+                `Tag ${latestTag} is unreachable (${verification.error}), using all commits for changelog`,
+                'debug',
+              );
               revisionRange = 'HEAD';
             }
           } else {

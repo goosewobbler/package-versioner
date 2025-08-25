@@ -109,21 +109,33 @@ export async function calculateVersion(config: Config, options: VersionOptions):
       const currentVersion = getCurrentVersionFromSource();
 
       // Handle prerelease versions with our helper
+      const isCurrentPrerelease = semver.prerelease(currentVersion);
+      const explicitlyRequestedPrerelease = config.isPrerelease;
+
       if (
         STANDARD_BUMP_TYPES.includes(specifiedType as 'major' | 'minor' | 'patch') &&
-        (semver.prerelease(currentVersion) || normalizedPrereleaseId)
+        (isCurrentPrerelease || explicitlyRequestedPrerelease)
       ) {
+        const prereleaseId =
+          explicitlyRequestedPrerelease || isCurrentPrerelease ? normalizedPrereleaseId : undefined;
+
         log(
-          normalizedPrereleaseId
-            ? `Creating prerelease version with identifier '${normalizedPrereleaseId}' using ${specifiedType}`
+          explicitlyRequestedPrerelease
+            ? `Creating prerelease version with identifier '${prereleaseId}' using ${specifiedType}`
             : `Cleaning prerelease identifier from ${currentVersion} for ${specifiedType} bump`,
           'debug',
         );
-        return bumpVersion(currentVersion, specifiedType, normalizedPrereleaseId);
+        return bumpVersion(currentVersion, specifiedType, prereleaseId);
       }
 
-      // Use prereleaseIdentifier for non-standard bump types or non-prerelease versions
-      return bumpVersion(currentVersion, specifiedType, normalizedPrereleaseId);
+      // For non-standard bump types (prerelease, premajor, preminor, prepatch), always use prereleaseIdentifier
+      // For standard bump types, only use if explicitly requested via --prerelease flag
+      const isPrereleaseBumpType = ['prerelease', 'premajor', 'preminor', 'prepatch'].includes(
+        specifiedType,
+      );
+      const prereleaseId =
+        config.isPrerelease || isPrereleaseBumpType ? normalizedPrereleaseId : undefined;
+      return bumpVersion(currentVersion, specifiedType, prereleaseId);
     }
 
     // 2. Handle branch pattern versioning (if configured)
@@ -157,7 +169,12 @@ export async function calculateVersion(config: Config, options: VersionOptions):
       if (branchVersionType) {
         const currentVersion = getCurrentVersionFromSource();
         log(`Applying ${branchVersionType} bump based on branch pattern`, 'debug');
-        return bumpVersion(currentVersion, branchVersionType, normalizedPrereleaseId);
+        const isPrereleaseBumpType = ['prerelease', 'premajor', 'preminor', 'prepatch'].includes(
+          branchVersionType,
+        );
+        const prereleaseId =
+          config.isPrerelease || isPrereleaseBumpType ? normalizedPrereleaseId : undefined;
+        return bumpVersion(currentVersion, branchVersionType, prereleaseId);
       }
     }
 
@@ -209,7 +226,12 @@ export async function calculateVersion(config: Config, options: VersionOptions):
         return ''; // No bump indicated by conventional commits
       }
 
-      return bumpVersion(currentVersion, releaseTypeFromCommits, normalizedPrereleaseId);
+      const isPrereleaseBumpType = ['prerelease', 'premajor', 'preminor', 'prepatch'].includes(
+        releaseTypeFromCommits,
+      );
+      const prereleaseId =
+        config.isPrerelease || isPrereleaseBumpType ? normalizedPrereleaseId : undefined;
+      return bumpVersion(currentVersion, releaseTypeFromCommits, prereleaseId);
     } catch (error) {
       // Handle errors during conventional bump calculation
       log(`Failed to calculate version for ${name || 'project'}`, 'error');

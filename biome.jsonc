@@ -37,6 +37,7 @@
       "!**/*coverage*",
       "!**/dist/**",
       "!**/node_modules/**",
+      // ignore invalid syntax fixture
       "!**/wdio-electron-service/fixtures/config-formats/invalid-syntax.ts"
     ]
   },

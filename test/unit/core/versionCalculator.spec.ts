@@ -402,11 +402,16 @@ describe('Version Calculator', () => {
 
     // Add test for --bump major --prerelease
     it('should create prerelease version when using major bump with prerelease flag', async () => {
+      const config = {
+        ...defaultConfig,
+        type: 'major',
+        isPrerelease: true, // Simulate CLI --prerelease flag
+        prereleaseIdentifier: 'next',
+      };
+
       const options: VersionOptions = {
         latestTag: 'v1.3.0',
-        type: 'major',
         versionPrefix: 'v',
-        prereleaseIdentifier: true as unknown as string, // Simulate CLI --prerelease flag
       };
 
       // Setup mocks for our specific test
@@ -414,7 +419,7 @@ describe('Version Calculator', () => {
       vi.spyOn(versionUtils, 'normalizePrereleaseIdentifier').mockReturnValue('next');
       vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('2.0.0-next.0');
 
-      const version = await calculateVersion(defaultConfig as Config, options);
+      const version = await calculateVersion(config as Config, options);
 
       expect(semver.clean).toHaveBeenCalledWith('v1.3.0');
       expect(versionUtils.bumpVersion).toHaveBeenCalledWith('1.3.0', 'major', 'next');
@@ -423,18 +428,23 @@ describe('Version Calculator', () => {
 
     // Add test for --bump minor --prerelease
     it('should create prerelease version when using minor bump with prerelease flag', async () => {
+      const config = {
+        ...defaultConfig,
+        type: 'minor',
+        isPrerelease: true,
+        prereleaseIdentifier: 'next',
+      };
+
       const options: VersionOptions = {
         latestTag: 'v1.3.0',
-        type: 'minor',
         versionPrefix: 'v',
-        prereleaseIdentifier: true as unknown as string,
       };
 
       vi.spyOn(semver, 'prerelease').mockReturnValue(null); // Not a prerelease version
       vi.spyOn(versionUtils, 'normalizePrereleaseIdentifier').mockReturnValue('next');
       vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.4.0-next.0');
 
-      const version = await calculateVersion(defaultConfig as Config, options);
+      const version = await calculateVersion(config as Config, options);
 
       expect(semver.clean).toHaveBeenCalledWith('v1.3.0');
       expect(versionUtils.bumpVersion).toHaveBeenCalledWith('1.3.0', 'minor', 'next');
@@ -443,18 +453,23 @@ describe('Version Calculator', () => {
 
     // Add test for --bump patch --prerelease
     it('should create prerelease version when using patch bump with prerelease flag', async () => {
+      const config = {
+        ...defaultConfig,
+        type: 'patch',
+        isPrerelease: true,
+        prereleaseIdentifier: 'next',
+      };
+
       const options: VersionOptions = {
         latestTag: 'v1.3.1',
-        type: 'patch',
         versionPrefix: 'v',
-        prereleaseIdentifier: true as unknown as string,
       };
 
       vi.spyOn(semver, 'prerelease').mockReturnValue(null); // Not a prerelease version
       vi.spyOn(versionUtils, 'normalizePrereleaseIdentifier').mockReturnValue('next');
       vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.3.2-next.0');
 
-      const version = await calculateVersion(defaultConfig as Config, options);
+      const version = await calculateVersion(config as Config, options);
 
       expect(semver.clean).toHaveBeenCalledWith('v1.3.1');
       expect(versionUtils.bumpVersion).toHaveBeenCalledWith('1.3.1', 'patch', 'next');
@@ -1176,6 +1191,140 @@ describe('Version Calculator', () => {
 
       const version = await calculateVersion(config as Config, options);
       expect(version).toBe('1.1.1'); // Will be bumped from 1.1.0 to 1.1.1
+    });
+  });
+
+  describe('Prerelease Logic Fix', () => {
+    describe('prereleaseIdentifier config vs isPrerelease flag', () => {
+      it('should NOT create prerelease when prereleaseIdentifier is in config but isPrerelease is not set', async () => {
+        const config: Partial<Config> = {
+          ...defaultConfig,
+          prereleaseIdentifier: 'next', // Set in config (like wdio-electron-service)
+          type: 'patch',
+          // isPrerelease: undefined/false - NOT explicitly requested
+        };
+
+        const options: VersionOptions = {
+          latestTag: 'v1.0.0',
+          versionPrefix: 'v',
+          path: '/test',
+        };
+
+        const result = await calculateVersion(config as Config, options);
+
+        // Should create stable version, NOT prerelease
+        expect(versionUtils.bumpVersion).toHaveBeenCalledWith('1.0.0', 'patch', undefined);
+        expect(result).toBe('1.0.1');
+      });
+
+      it('should create prerelease when prereleaseIdentifier is in config AND isPrerelease is true', async () => {
+        const config: Partial<Config> = {
+          ...defaultConfig,
+          prereleaseIdentifier: 'next',
+          type: 'patch',
+          isPrerelease: true, // Explicitly requested via --prerelease flag
+        };
+
+        const options: VersionOptions = {
+          latestTag: 'v1.0.0',
+          versionPrefix: 'v',
+          path: '/test',
+        };
+
+        // Override the mock to return prerelease version
+        vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.0.1-next.0');
+
+        const result = await calculateVersion(config as Config, options);
+
+        // Should create prerelease version
+        expect(versionUtils.bumpVersion).toHaveBeenCalledWith('1.0.0', 'patch', 'next');
+        expect(result).toBe('1.0.1-next.0');
+      });
+
+      it('should handle existing prerelease correctly (even without isPrerelease flag)', async () => {
+        const config: Partial<Config> = {
+          ...defaultConfig,
+          prereleaseIdentifier: 'next',
+          type: 'patch',
+          // isPrerelease: undefined - NOT explicitly requested
+        };
+
+        const options: VersionOptions = {
+          latestTag: 'v1.0.0-next.0',
+          versionPrefix: 'v',
+          path: '/test',
+        };
+
+        // Mock existing prerelease version
+        vi.spyOn(semver, 'prerelease').mockReturnValue(['next', 0]);
+        vi.spyOn(semver, 'clean').mockImplementation((version) => {
+          if (version === 'v1.0.0-next.0') return '1.0.0-next.0';
+          return version?.replace(/^[^\d]*/, '') || null;
+        });
+        vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.0.0'); // Clean to stable
+
+        const result = await calculateVersion(config as Config, options);
+
+        // Should clean to stable version (normal prerelease promotion behavior)  
+        expect(versionUtils.bumpVersion).toHaveBeenCalledWith('1.0.0-next.0', 'patch', undefined);
+        expect(result).toBe('1.0.0');
+      });
+    });
+
+    describe('branch pattern with prerelease logic', () => {
+      it('should NOT use prereleaseIdentifier for branch patterns unless isPrerelease is true', async () => {
+        const config: Partial<Config> = {
+          ...defaultConfig,
+          prereleaseIdentifier: 'next',
+          branchPattern: ['feature:minor'],
+          baseBranch: 'main',
+          // isPrerelease: undefined - NOT explicitly requested
+        };
+
+        const options: VersionOptions = {
+          latestTag: 'v1.0.0',
+          versionPrefix: 'v',
+          path: '/test',
+          branchPattern: config.branchPattern,
+          baseBranch: config.baseBranch,
+        };
+
+        // Mock branch matching
+        vi.spyOn(gitRepo, 'getCurrentBranch').mockReturnValue('feature/test-branch');
+
+        const result = await calculateVersion(config as Config, options);
+
+        // Should use stable version for branch pattern
+        expect(versionUtils.bumpVersion).toHaveBeenCalledWith('1.0.0', 'minor', undefined);
+      });
+
+      it('should use prereleaseIdentifier for branch patterns when isPrerelease is true', async () => {
+        const config: Partial<Config> = {
+          ...defaultConfig,
+          prereleaseIdentifier: 'next',
+          branchPattern: ['feature:minor'],
+          baseBranch: 'main',
+          isPrerelease: true, // Explicitly requested
+        };
+
+        const options: VersionOptions = {
+          latestTag: 'v1.0.0',
+          versionPrefix: 'v',
+          path: '/test',
+          branchPattern: config.branchPattern,
+          baseBranch: config.baseBranch,
+        };
+
+        // Mock branch matching
+        vi.spyOn(gitRepo, 'getCurrentBranch').mockReturnValue('feature/test-branch');
+        vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.1.0-next.0');
+
+        const result = await calculateVersion(config as Config, options);
+
+        // Should use prerelease version for branch pattern
+        expect(versionUtils.bumpVersion).toHaveBeenCalledWith('1.0.0', 'minor', 'next');
+        expect(result).toBe('1.1.0-next.0');
+      });
     });
   });
 });

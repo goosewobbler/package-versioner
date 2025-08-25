@@ -93,8 +93,10 @@ export async function run(): Promise<void> {
           if (options.dryRun) config.dryRun = true;
           if (options.synced) config.synced = true; // Allow forcing sync mode
           if (options.bump) config.type = options.bump;
-          if (options.prerelease)
+          if (options.prerelease) {
             config.prereleaseIdentifier = options.prerelease === true ? 'next' : options.prerelease;
+            config.isPrerelease = true; // Track that prerelease was explicitly requested
+          }
 
           // Parse targets
           const cliTargets: string[] = options.target

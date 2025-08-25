@@ -111,15 +111,14 @@ export async function calculateVersion(config: Config, options: VersionOptions):
       // Handle prerelease versions with our helper
       const isCurrentPrerelease = semver.prerelease(currentVersion);
       const explicitlyRequestedPrerelease = config.isPrerelease;
-      
+
       if (
         STANDARD_BUMP_TYPES.includes(specifiedType as 'major' | 'minor' | 'patch') &&
         (isCurrentPrerelease || explicitlyRequestedPrerelease)
       ) {
-        const prereleaseId = explicitlyRequestedPrerelease || isCurrentPrerelease 
-          ? normalizedPrereleaseId 
-          : undefined;
-        
+        const prereleaseId =
+          explicitlyRequestedPrerelease || isCurrentPrerelease ? normalizedPrereleaseId : undefined;
+
         log(
           explicitlyRequestedPrerelease
             ? `Creating prerelease version with identifier '${prereleaseId}' using ${specifiedType}`
@@ -129,8 +128,13 @@ export async function calculateVersion(config: Config, options: VersionOptions):
         return bumpVersion(currentVersion, specifiedType, prereleaseId);
       }
 
-      // For non-standard bump types, only use prereleaseIdentifier if explicitly requested
-      const prereleaseId = config.isPrerelease ? normalizedPrereleaseId : undefined;
+      // For non-standard bump types (prerelease, premajor, preminor, prepatch), always use prereleaseIdentifier
+      // For standard bump types, only use if explicitly requested via --prerelease flag
+      const isPrereleaseBumpType = ['prerelease', 'premajor', 'preminor', 'prepatch'].includes(
+        specifiedType,
+      );
+      const prereleaseId =
+        config.isPrerelease || isPrereleaseBumpType ? normalizedPrereleaseId : undefined;
       return bumpVersion(currentVersion, specifiedType, prereleaseId);
     }
 
@@ -165,7 +169,11 @@ export async function calculateVersion(config: Config, options: VersionOptions):
       if (branchVersionType) {
         const currentVersion = getCurrentVersionFromSource();
         log(`Applying ${branchVersionType} bump based on branch pattern`, 'debug');
-        const prereleaseId = config.isPrerelease ? normalizedPrereleaseId : undefined;
+        const isPrereleaseBumpType = ['prerelease', 'premajor', 'preminor', 'prepatch'].includes(
+          branchVersionType,
+        );
+        const prereleaseId =
+          config.isPrerelease || isPrereleaseBumpType ? normalizedPrereleaseId : undefined;
         return bumpVersion(currentVersion, branchVersionType, prereleaseId);
       }
     }
@@ -218,7 +226,11 @@ export async function calculateVersion(config: Config, options: VersionOptions):
         return ''; // No bump indicated by conventional commits
       }
 
-      const prereleaseId = config.isPrerelease ? normalizedPrereleaseId : undefined;
+      const isPrereleaseBumpType = ['prerelease', 'premajor', 'preminor', 'prepatch'].includes(
+        releaseTypeFromCommits,
+      );
+      const prereleaseId =
+        config.isPrerelease || isPrereleaseBumpType ? normalizedPrereleaseId : undefined;
       return bumpVersion(currentVersion, releaseTypeFromCommits, prereleaseId);
     } catch (error) {
       // Handle errors during conventional bump calculation

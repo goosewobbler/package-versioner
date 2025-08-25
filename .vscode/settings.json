@@ -1,8 +1,5 @@
 {
-  "git.ignoredRepositories": [
-    "test/fixtures/single-package",
-    "test/fixtures/monorepo"
-  ],
+  "git.ignoredRepositories": ["test/fixtures/single-package", "test/fixtures/monorepo"],
   "files.exclude": {
     "test/fixtures/**/.git": true
   }

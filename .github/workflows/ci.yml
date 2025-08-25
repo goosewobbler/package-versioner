@@ -36,6 +36,14 @@ jobs:
       - name: 🏗️ Build and verify packages
         uses: ./.github/workflows/actions/build-verify
 
+      - name: 📋 Run lint checks
+        run: pnpm lint
+        shell: bash
+
+      - name: 🎨 Check code formatting
+        run: pnpm format:check
+        shell: bash
+
       - name: 🧪 Run Tests
         run: pnpm test
         shell: bash

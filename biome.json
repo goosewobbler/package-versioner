@@ -32,7 +32,13 @@
     "indentStyle": "space",
     "indentWidth": 2,
     "lineWidth": 100,
-    "includes": ["**", "!**/*coverage*", "!**/dist/**", "!**/node_modules/**"]
+    "includes": [
+      "**",
+      "!**/*coverage*",
+      "!**/dist/**",
+      "!**/node_modules/**",
+      "!**/wdio-electron-service/fixtures/config-formats/invalid-syntax.ts"
+    ]
   },
   "javascript": {
     "formatter": {

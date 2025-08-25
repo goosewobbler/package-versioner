@@ -10,7 +10,7 @@ export function getGitConfig(key: string, cwd?: string): string | undefined {
 
 export function setGitConfig(key: string, value?: string, cwd?: string) {
   if (value) {
-    execSync(`git config --local ${key} "${value.replace(/"/g, '\"')}"`, { cwd });
+    execSync(`git config --local ${key} "${value.replace(/"/g, '"')}"`, { cwd });
   } else {
     // Unset if value is undefined
     execSync(`git config --local --unset ${key}`, { cwd });

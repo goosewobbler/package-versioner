@@ -28,8 +28,12 @@ export function filterPackagesByConfig(
     const nameMatches = filterByPackageNamePattern(packages, target);
 
     // Add all matches to the set (duplicates automatically handled)
-    dirMatches.forEach((pkg) => matchedPackages.add(pkg));
-    nameMatches.forEach((pkg) => matchedPackages.add(pkg));
+    for (const pkg of dirMatches) {
+      matchedPackages.add(pkg);
+    }
+    for (const pkg of nameMatches) {
+      matchedPackages.add(pkg);
+    }
   }
 
   return Array.from(matchedPackages);

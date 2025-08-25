@@ -1,6 +1,6 @@
-import { cpSync, existsSync, mkdtempSync, rmSync, symlinkSync } from 'fs';
-import { tmpdir } from 'os';
-import { dirname, join, resolve } from 'path';
+import { cpSync, existsSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 /**
  * Copy a fixture directory to a new temp directory. Returns the temp dir path.

@@ -1265,7 +1265,7 @@ describe('Version Calculator', () => {
 
         const result = await calculateVersion(config as Config, options);
 
-        // Should clean to stable version (normal prerelease promotion behavior)  
+        // Should clean to stable version (normal prerelease promotion behavior)
         expect(versionUtils.bumpVersion).toHaveBeenCalledWith('1.0.0-next.0', 'patch', undefined);
         expect(result).toBe('1.0.0');
       });
@@ -1292,7 +1292,7 @@ describe('Version Calculator', () => {
         // Mock branch matching
         vi.spyOn(gitRepo, 'getCurrentBranch').mockReturnValue('feature/test-branch');
 
-        const result = await calculateVersion(config as Config, options);
+        const _result = await calculateVersion(config as Config, options);
 
         // Should use stable version for branch pattern
         expect(versionUtils.bumpVersion).toHaveBeenCalledWith('1.0.0', 'minor', undefined);

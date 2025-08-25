@@ -1,12 +1,7 @@
 {
   "preset": "conventional-commits",
-  "packages": [
-    "packages/**/*"
-  ],
-  "skip": [
-    "@scope/*",
-    "standalone-pkg"
-  ],
+  "packages": ["packages/**/*"],
+  "skip": ["@scope/*", "standalone-pkg"],
   "versionPrefix": "v",
   "tagTemplate": "${prefix}${version}",
   "packageTagTemplate": "${packageName}@${prefix}${version}"

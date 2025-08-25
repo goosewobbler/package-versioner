@@ -24,12 +24,11 @@ export interface PackagesWithRoot extends Packages {
  */
 export class VersionEngine {
   private config: Config;
-  private jsonMode: boolean;
   private workspaceCache: PackagesWithRoot | null = null;
   private strategies: Record<StrategyType, StrategyFunction>;
   private currentStrategy: StrategyFunction;
 
-  constructor(config: Config, jsonMode = false) {
+  constructor(config: Config, _jsonMode = false) {
     // Validate required configuration
     if (!config) {
       throw createVersionError(VersionErrorCode.CONFIG_REQUIRED);
@@ -42,7 +41,6 @@ export class VersionEngine {
     }
 
     this.config = config;
-    this.jsonMode = jsonMode;
 
     // Create all strategy functions
     this.strategies = createStrategyMap(config);

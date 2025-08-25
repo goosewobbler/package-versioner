@@ -1,2 +1,5 @@
 # Prevent test fixtures from being treated as submodules
-test/fixtures/* -submodule 
+test/fixtures/* -submodule
+
+# Ensure consistent line endings across platforms
+* text=auto eol=lf 

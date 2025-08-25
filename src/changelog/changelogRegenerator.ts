@@ -45,7 +45,7 @@ function getAllVersionTags(since?: string, versionPrefix = 'v'): TagInfo[] {
     // If since is specified, filter out tags that come before or at the since tag
     let filteredTags = allTags;
     if (since) {
-      const sinceIndex = allTags.findIndex((tag) => tag === since);
+      const sinceIndex = allTags.indexOf(since);
       if (sinceIndex >= 0) {
         // Include the since tag and all tags that come after it
         filteredTags = allTags.slice(sinceIndex);
@@ -170,7 +170,7 @@ export async function regenerateChangelog(options: RegenerateOptions): Promise<s
           const allTagsCmd = `git tag --list "${versionPrefix}*" --sort=creatordate`;
           const allTagsOutput = execSync(allTagsCmd, { encoding: 'utf8' }).trim();
           const allTags = allTagsOutput.split('\n').filter((tag) => !!tag);
-          const sinceIndex = allTags.findIndex((tag) => tag === since);
+          const sinceIndex = allTags.indexOf(since);
           const actualPreviousTag = sinceIndex > 0 ? allTags[sinceIndex - 1] : null;
 
           if (actualPreviousTag) {

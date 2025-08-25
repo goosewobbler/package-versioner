@@ -1,12 +1,10 @@
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import fs, { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import fs from 'fs';
 import * as TOML from 'smol-toml';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { updatePackageVersion } from '../../src/package/packageManagement.js';
 import { executeCliCommand } from '../utils/cli.js';
-import { restoreFixtureState, saveFixtureState } from '../utils/file.js';
 import { createConventionalCommit, initGitRepo, safeGitCommit } from '../utils/git.js';
 import {
   createPackageJson,
@@ -76,7 +74,7 @@ const originalCwd = process.cwd();
 let tempDir: string;
 
 // Add debug logging to helpers and after CLI runs
-function debugLog(label: string, value: any) {
+function debugLog(label: string, value: unknown) {
   // eslint-disable-next-line no-console
   console.log(`[DEBUG] ${label}:`, value);
 }
@@ -163,7 +161,7 @@ describe('Monorepo Project', () => {
   it('should update all packages with synced versioning', () => {
     // Make a change in package-a
     const fileA = join(tempDir, 'packages/package-a/index.js');
-    require('fs').writeFileSync(fileA, 'console.log("Hello from A");');
+    require('node:fs').writeFileSync(fileA, 'console.log("Hello from A");');
     createConventionalCommitWithDebug(
       tempDir,
       'feat',

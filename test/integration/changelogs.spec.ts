@@ -13,7 +13,7 @@ let angularTempDir: string;
 let regenTempDir: string;
 
 // Add debug logging to helpers and after CLI runs
-function debugLog(label: string, value: any) {
+function debugLog(label: string, value: unknown) {
   // eslint-disable-next-line no-console
   console.log(`[DEBUG] ${label}:`, value);
 }

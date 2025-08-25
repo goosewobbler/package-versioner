@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.0.6/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.2.2/schema.json",
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
@@ -22,7 +22,14 @@
         "noUselessElse": "error"
       },
       "suspicious": {
-        "noConsole": { "level": "warn", "options": { "allow": ["log"] } }
+        "noConsole": {
+          "level": "warn",
+          "options": { "allow": ["log", "warn", "error"] }
+        },
+        // Disabled because this project uses template strings (e.g., "${version}", "${packageName}")
+        // as configuration values that are processed by the application's own templating system.
+        // These are NOT template literals and should not be converted.
+        "noTemplateCurlyInString": "off"
       }
     },
     "includes": ["**", "!**/*coverage*", "!**/dist/**", "!**/node_modules/**"]

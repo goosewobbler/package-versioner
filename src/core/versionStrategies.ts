@@ -6,7 +6,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import * as path from 'node:path';
 import type { Package } from '@manypkg/get-packages';
-import { updateChangelog } from '../changelog/changelogManager.js';
+import { type ChangelogEntry, updateChangelog } from '../changelog/changelogManager.js';
 import { extractChangelogEntriesFromCommits } from '../changelog/commitParser.js';
 import { GitError } from '../errors/gitError.js';
 import { createVersionError, VersionError, VersionErrorCode } from '../errors/versionError.js';
@@ -291,7 +291,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       // Generate changelog entries from conventional commits
       if (config.updateChangelog !== false) {
         // Extract changelog entries from commit messages
-        let changelogEntries: any[] = [];
+        let changelogEntries: ChangelogEntry[] = [];
 
         try {
           // Extract entries from commits between the latest tag and HEAD

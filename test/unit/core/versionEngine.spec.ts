@@ -1,5 +1,5 @@
 import { cwd as mockCwd } from 'node:process';
-import { getPackagesSync } from '@manypkg/get-packages';
+import { getPackagesSync, type Packages } from '@manypkg/get-packages';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VersionEngine } from '../../../src/core/versionEngine.js';
 import * as strategyModule from '../../../src/core/versionStrategies.js';
@@ -218,7 +218,7 @@ describe('Version Engine', () => {
             packageJson: { name: 'package-a', version: '1.0.0' },
           },
         ],
-      } as any;
+      } as Packages;
 
       vi.mocked(getPackagesSync, { partial: true }).mockReturnValue(mockPackagesWithoutRoot);
 

@@ -4,7 +4,6 @@ import {
   addTag,
   enableJsonOutput,
   getJsonData,
-  isJsonOutputMode,
   printJsonOutput,
   setCommitMessage,
 } from '../../../src/utils/jsonOutput.js';

@@ -1,5 +1,5 @@
-import { exec, execSync as nativeExecSync } from 'node:child_process';
 import type { ExecException, ExecOptions } from 'node:child_process';
+import { exec, execSync as nativeExecSync } from 'node:child_process';
 
 /**
  * Execute a command asynchronously with Promise wrapper

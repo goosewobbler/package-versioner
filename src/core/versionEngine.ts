@@ -147,7 +147,7 @@ export class VersionEngine {
 
   /**
    * Change the current strategy
-   * @param strategyType The strategy type to use: 'synced', 'single', or 'async'
+   * @param strategyType The strategy type to use: 'sync', 'single', or 'async'
    */
   public setStrategy(strategyType: StrategyType): void {
     this.currentStrategy = this.strategies[strategyType];

@@ -41,7 +41,7 @@
       "description": "The main branch for versioning",
       "default": "main"
     },
-    "synced": {
+    "sync": {
       "type": "boolean",
       "default": false,
       "description": "Whether packages should be versioned together"

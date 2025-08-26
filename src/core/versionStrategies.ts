@@ -24,7 +24,7 @@ import type { PackagesWithRoot } from './versionEngine.js';
 /**
  * Available strategy types
  */
-export type StrategyType = 'synced' | 'single' | 'async';
+export type StrategyType = 'sync' | 'single' | 'async';
 
 /**
  * Strategy function type
@@ -41,9 +41,9 @@ function shouldProcessPackage(pkg: Package, config: Config): boolean {
 }
 
 /**
- * Create a synced versioning strategy function
+ * Create a sync versioning strategy function
  */
-export function createSyncedStrategy(config: Config): StrategyFunction {
+export function createSyncStrategy(config: Config): StrategyFunction {
   return async (packages: PackagesWithRoot): Promise<void> => {
     try {
       const {
@@ -178,7 +178,7 @@ export function createSyncedStrategy(config: Config): StrategyFunction {
       }
 
       // Create tag using the template
-      // In synced mode with single package, respect packageSpecificTags setting
+      // In sync mode with single package, respect packageSpecificTags setting
       let tagPackageName: string | null = null;
       let commitPackageName: string | undefined;
 
@@ -485,8 +485,8 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
  * The CLI will override this based on resolved packages.
  */
 export function createStrategy(config: Config): StrategyFunction {
-  if (config.synced) {
-    return createSyncedStrategy(config);
+  if (config.sync) {
+    return createSyncStrategy(config);
   }
 
   // Default to async strategy - the CLI will determine the actual strategy
@@ -499,7 +499,7 @@ export function createStrategy(config: Config): StrategyFunction {
  */
 export function createStrategyMap(config: Config): Record<StrategyType, StrategyFunction> {
   return {
-    synced: createSyncedStrategy(config),
+    sync: createSyncStrategy(config),
     single: createSingleStrategy(config),
     async: createAsyncStrategy(config),
   };

@@ -19,7 +19,7 @@ vi.mock('node:process', () => ({
 
 describe('Version Engine', () => {
   // Mock strategies
-  const syncedStrategyMock = vi.fn().mockResolvedValue(undefined);
+  const syncStrategyMock = vi.fn().mockResolvedValue(undefined);
   const singleStrategyMock = vi.fn().mockResolvedValue(undefined);
   const asyncStrategyMock = vi.fn().mockResolvedValue(undefined);
 
@@ -41,7 +41,7 @@ describe('Version Engine', () => {
   // Default config for tests
   const defaultConfig: Partial<Config> = {
     preset: 'conventional-commits',
-    synced: true,
+    sync: true,
     versionPrefix: 'v',
     tagTemplate: '${packageName}@${prefix}${version}',
     baseBranch: 'main',
@@ -56,8 +56,8 @@ describe('Version Engine', () => {
     vi.mocked(mockCwd, { partial: true }).mockReturnValue('/test/workspace');
 
     // Setup strategy mocks
-    vi.mocked(strategyModule.createSyncedStrategy, { partial: true }).mockReturnValue(
-      syncedStrategyMock,
+    vi.mocked(strategyModule.createSyncStrategy, { partial: true }).mockReturnValue(
+      syncStrategyMock,
     );
     vi.mocked(strategyModule.createSingleStrategy, { partial: true }).mockReturnValue(
       singleStrategyMock,
@@ -65,9 +65,9 @@ describe('Version Engine', () => {
     vi.mocked(strategyModule.createAsyncStrategy, { partial: true }).mockReturnValue(
       asyncStrategyMock,
     );
-    vi.mocked(strategyModule.createStrategy, { partial: true }).mockReturnValue(syncedStrategyMock);
+    vi.mocked(strategyModule.createStrategy, { partial: true }).mockReturnValue(syncStrategyMock);
     vi.mocked(strategyModule.createStrategyMap, { partial: true }).mockReturnValue({
-      synced: syncedStrategyMock,
+      sync: syncStrategyMock,
       single: singleStrategyMock,
       async: asyncStrategyMock,
     });
@@ -89,7 +89,7 @@ describe('Version Engine', () => {
 
     it('should set default preset if not provided', () => {
       const config: Partial<Config> = {
-        synced: true,
+        sync: true,
         versionPrefix: 'v',
         tagTemplate: '${packageName}@${prefix}${version}',
         baseBranch: 'main',
@@ -296,19 +296,19 @@ describe('Version Engine', () => {
     it('should get workspace packages and execute the current strategy', async () => {
       const engine = new VersionEngine(defaultConfig as Config);
       await engine.run(mockPackages);
-      expect(syncedStrategyMock).toHaveBeenCalledWith(mockPackages, []);
+      expect(syncStrategyMock).toHaveBeenCalledWith(mockPackages, []);
     });
 
     it('should pass targets to the strategy function', async () => {
       const engine = new VersionEngine(defaultConfig as Config);
       const targets = ['package-a'];
       await engine.run(mockPackages, targets);
-      expect(syncedStrategyMock).toHaveBeenCalledWith(mockPackages, targets);
+      expect(syncStrategyMock).toHaveBeenCalledWith(mockPackages, targets);
     });
 
     it('should propagate errors thrown by the strategy', async () => {
       const error = new Error('Strategy failed');
-      syncedStrategyMock.mockRejectedValue(error);
+      syncStrategyMock.mockRejectedValue(error);
       const engine = new VersionEngine(defaultConfig as Config);
       await expect(engine.run(mockPackages)).rejects.toThrow('Strategy failed');
     });
@@ -340,7 +340,7 @@ describe('Version Engine', () => {
     it('should process all packages', async () => {
       const engine = new VersionEngine(defaultConfig as Config);
       await engine.run(mockPackages);
-      expect(syncedStrategyMock).toHaveBeenCalledWith(mockPackages, []);
+      expect(syncStrategyMock).toHaveBeenCalledWith(mockPackages, []);
     });
   });
 
@@ -348,17 +348,17 @@ describe('Version Engine', () => {
     it('should change the current strategy', async () => {
       const engine = new VersionEngine(defaultConfig as Config);
 
-      // Initially synced strategy should be used
+      // Initially sync strategy should be used
       await engine.run(mockPackages);
-      expect(syncedStrategyMock).toHaveBeenCalled();
+      expect(syncStrategyMock).toHaveBeenCalled();
 
       // Change to async strategy
       engine.setStrategy('async');
-      syncedStrategyMock.mockClear();
+      syncStrategyMock.mockClear();
 
       // Now async strategy should be used
       await engine.run(mockPackages);
-      expect(syncedStrategyMock).not.toHaveBeenCalled();
+      expect(syncStrategyMock).not.toHaveBeenCalled();
       expect(asyncStrategyMock).toHaveBeenCalled();
     });
   });

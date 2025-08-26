@@ -34,7 +34,7 @@ export interface Config extends VersionConfigBase {
   packageSpecificTags?: boolean; // Default: false - Set to true to enable package-specific tagging
 
   preset: string;
-  synced: boolean;
+  sync: boolean;
   packages: string[];
   mainPackage?: string; // The package to use for version determination
   updateInternalDependencies: 'major' | 'minor' | 'patch' | 'no-internal-update';
@@ -118,7 +118,7 @@ export interface TagFormat {
   tagTemplate?: string;
   prefix?: string;
   name?: string;
-  synced: boolean;
+  sync: boolean;
 }
 
 /**

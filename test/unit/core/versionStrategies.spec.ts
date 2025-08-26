@@ -146,19 +146,19 @@ describe('Version Strategies', () => {
     });
   });
 
-  describe('createSyncedStrategy', () => {
+  describe('createSyncStrategy', () => {
     it('should update all packages to the same version', async () => {
       // Setup
       const config: Partial<Config> = {
         ...defaultConfig,
-        synced: true,
+        sync: true,
         commitMessage: 'chore(release): v${version}',
       };
 
-      const syncedStrategy = strategies.createSyncedStrategy(config as Config);
+      const syncStrategy = strategies.createSyncStrategy(config as Config);
 
       // Execute
-      await syncedStrategy(mockPackages);
+      await syncStrategy(mockPackages);
 
       // Verify
       expect(git.getLatestTag).toHaveBeenCalled();
@@ -191,14 +191,14 @@ describe('Version Strategies', () => {
       // Setup with mainPackage
       const config: Partial<Config> = {
         ...defaultConfig,
-        synced: true,
+        sync: true,
         mainPackage: 'package-b',
       };
 
-      const syncedStrategy = strategies.createSyncedStrategy(config as Config);
+      const syncStrategy = strategies.createSyncStrategy(config as Config);
 
       // Execute
-      await syncedStrategy(mockPackages);
+      await syncStrategy(mockPackages);
 
       // Verify that version calculation used package-b
       expect(calculator.calculateVersion).toHaveBeenCalledWith(
@@ -219,14 +219,14 @@ describe('Version Strategies', () => {
       // Setup with non-existent mainPackage
       const config: Partial<Config> = {
         ...defaultConfig,
-        synced: true,
+        sync: true,
         mainPackage: 'package-z',
       };
 
-      const syncedStrategy = strategies.createSyncedStrategy(config as Config);
+      const syncStrategy = strategies.createSyncStrategy(config as Config);
 
       // Execute
-      await syncedStrategy(mockPackages);
+      await syncStrategy(mockPackages);
 
       // Verify that version calculation used root package
       expect(calculator.calculateVersion).toHaveBeenCalledWith(
@@ -248,17 +248,17 @@ describe('Version Strategies', () => {
       // Setup
       const config: Partial<Config> = {
         ...defaultConfig,
-        synced: true,
+        sync: true,
         commitMessage: 'chore: release ${packageName}@${version} [skip-ci]',
       };
 
-      const syncedStrategy = strategies.createSyncedStrategy(config as Config);
+      const syncStrategy = strategies.createSyncStrategy(config as Config);
 
       // Execute
-      await syncedStrategy(mockPackages);
+      await syncStrategy(mockPackages);
 
       // Verify that formatCommitMessage was called with the right template and parameters
-      // The synced strategy no longer suppresses warnings by default
+      // The sync strategy no longer suppresses warnings by default
       expect(formatting.formatCommitMessage).toHaveBeenCalledWith(
         'chore: release ${packageName}@${version} [skip-ci]',
         '1.1.0',
@@ -273,13 +273,13 @@ describe('Version Strategies', () => {
 
       const config: Partial<Config> = {
         ...defaultConfig,
-        synced: true,
+        sync: true,
       };
 
-      const syncedStrategy = strategies.createSyncedStrategy(config as Config);
+      const syncStrategy = strategies.createSyncStrategy(config as Config);
 
       // Execute
-      await syncedStrategy(mockPackages);
+      await syncStrategy(mockPackages);
 
       // Verify no updates were made
       expect(packageManagement.updatePackageVersion).not.toHaveBeenCalled();
@@ -290,14 +290,14 @@ describe('Version Strategies', () => {
     it('should respect skip configuration', async () => {
       const config: Partial<Config> = {
         ...defaultConfig,
-        synced: true,
+        sync: true,
         skip: ['package-b'],
       };
 
-      const syncedStrategy = strategies.createSyncedStrategy(config as Config);
+      const syncStrategy = strategies.createSyncStrategy(config as Config);
 
       // Execute
-      await syncedStrategy(mockPackages);
+      await syncStrategy(mockPackages);
 
       // Verify package-b was skipped
       expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(rootPackagePath, '1.1.0');
@@ -544,15 +544,15 @@ describe('Version Strategies', () => {
   });
 
   describe('createStrategy', () => {
-    it('should return synced strategy when synced is true', () => {
+    it('should return sync strategy when sync is true', () => {
       const config: Partial<Config> = {
         ...defaultConfig,
-        synced: true,
+        sync: true,
       };
 
       // Since we've already tested the individual strategies, just verify the strategy map exists
       const strategyMap = strategies.createStrategyMap(config as Config);
-      expect(strategyMap).toHaveProperty('synced');
+      expect(strategyMap).toHaveProperty('sync');
     });
 
     it('should return async strategy when packages has one item (CLI will handle strategy selection)', () => {
@@ -605,7 +605,7 @@ describe('Version Strategies', () => {
       const strategyMap = strategies.createStrategyMap(config as Config);
 
       // Instead of checking function calls, check the structure of the returned map
-      expect(strategyMap).toHaveProperty('synced');
+      expect(strategyMap).toHaveProperty('sync');
       expect(strategyMap).toHaveProperty('single');
       expect(strategyMap).toHaveProperty('async');
     });

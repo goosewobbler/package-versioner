@@ -61,7 +61,7 @@ export async function run(): Promise<void> {
       .option('-d, --dry-run', 'Dry run (no changes made)', false)
       .option('-b, --bump <type>', 'Specify bump type (patch|minor|major)')
       .option('-p, --prerelease [identifier]', 'Create prerelease version')
-      .option('-s, --synced', 'Use synchronized versioning across all packages')
+      .option('-s, --sync', 'Use synchronized versioning across all packages')
       .option('-j, --json', 'Output results as JSON', false)
       .option('-t, --target <packages>', 'Comma-delimited list of package names to target')
       .option('--project-dir <path>', 'Project directory to run commands in', process.cwd())
@@ -91,7 +91,7 @@ export async function run(): Promise<void> {
 
           // Override config with CLI options
           if (options.dryRun) config.dryRun = true;
-          if (options.synced) config.synced = true; // Allow forcing sync mode
+          if (options.sync) config.sync = true; // Allow forcing sync mode
           if (options.bump) config.type = options.bump;
           if (options.prerelease) {
             config.prereleaseIdentifier = options.prerelease === true ? 'next' : options.prerelease;
@@ -112,12 +112,12 @@ export async function run(): Promise<void> {
 
           log(`Resolved ${resolvedCount} packages from workspace`, 'debug');
           log(`Config packages: ${JSON.stringify(config.packages)}`, 'debug');
-          log(`Config synced: ${config.synced}`, 'debug');
+          log(`Config sync: ${config.sync}`, 'debug');
 
           // Determine strategy based on resolved package count
-          if (config.synced) {
-            log('Using synced versioning strategy.', 'info');
-            engine.setStrategy('synced');
+          if (config.sync) {
+            log('Using sync versioning strategy.', 'info');
+            engine.setStrategy('sync');
             await engine.run(pkgsResult);
           } else if (resolvedCount === 1) {
             // Check if the resolved package is a real package (not a glob pattern)

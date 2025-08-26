@@ -59,7 +59,7 @@ describe('CLI Interface', () => {
   let mockProcess: Partial<NodeJS.Process>;
   const originalProcess: NodeJS.Process = process;
   const mockConfig: Partial<Config> = {
-    synced: false,
+    sync: false,
     packages: ['package-a'],
     dryRun: false,
   };

@@ -110,7 +110,7 @@ describe('Package Processor', () => {
 
   // Mock config
   const mockConfig: Config = {
-    synced: false,
+    sync: false,
     updateInternalDependencies: 'patch',
     preset: 'conventional',
     versionPrefix: 'v',

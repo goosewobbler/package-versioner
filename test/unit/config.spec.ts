@@ -28,7 +28,7 @@ describe('Config', () => {
       packageTagTemplate: '${packageName}@${prefix}${version}',
       versionStrategy: 'branchPattern' as const,
       baseBranch: 'main',
-      synced: true,
+      sync: true,
       branchPattern: [],
       skip: [],
       updateInternalDependencies: 'no-internal-update' as const,

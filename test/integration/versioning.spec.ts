@@ -146,7 +146,7 @@ describe('Monorepo Project', () => {
     createVersionConfig(tempDir, {
       preset: 'conventional-commits',
       packages: ['packages/*'],
-      synced: true,
+      sync: true,
       versionPrefix: 'v',
       tagTemplate: '${prefix}${version}',
       packageTagTemplate: '${packageName}@${prefix}${version}',
@@ -158,7 +158,7 @@ describe('Monorepo Project', () => {
     cleanupTempDir(tempDir);
   });
 
-  it('should update all packages with synced versioning', () => {
+  it('should update all packages with sync versioning', () => {
     // Make a change in package-a
     const fileA = join(tempDir, 'packages/package-a/index.js');
     require('node:fs').writeFileSync(fileA, 'console.log("Hello from A");');
@@ -644,7 +644,7 @@ describe('Packages Filtering Tests', () => {
     createVersionConfig(tempDir, {
       preset: 'conventional-commits',
       packages: ['packages/*'],
-      synced: false,
+      sync: false,
       versionPrefix: 'v',
       tagTemplate: '${prefix}${version}',
       packageTagTemplate: '${packageName}@${prefix}${version}',
@@ -682,7 +682,7 @@ describe('Packages Filtering Tests', () => {
     createVersionConfig(tempDir, {
       preset: 'conventional-commits',
       packages: [], // Empty array should process all packages
-      synced: false,
+      sync: false,
       versionPrefix: 'v',
       tagTemplate: '${prefix}${version}',
       packageTagTemplate: '${packageName}@${prefix}${version}',
@@ -721,7 +721,7 @@ describe('Packages Filtering Tests', () => {
     createVersionConfig(tempDir, {
       preset: 'conventional-commits',
       // packages property not specified
-      synced: false,
+      sync: false,
       versionPrefix: 'v',
       tagTemplate: '${prefix}${version}',
       packageTagTemplate: '${packageName}@${prefix}${version}',
@@ -760,7 +760,7 @@ describe('Packages Filtering Tests', () => {
     createVersionConfig(tempDir, {
       preset: 'conventional-commits',
       packages: ['@test/package-a', 'standalone-package'],
-      synced: false,
+      sync: false,
       versionPrefix: 'v',
       tagTemplate: '${prefix}${version}',
       packageTagTemplate: '${packageName}@${prefix}${version}',
@@ -799,7 +799,7 @@ describe('Packages Filtering Tests', () => {
     createVersionConfig(tempDir, {
       preset: 'conventional-commits',
       packages: ['@test/*'],
-      synced: false,
+      sync: false,
       versionPrefix: 'v',
       tagTemplate: '${prefix}${version}',
       packageTagTemplate: '${packageName}@${prefix}${version}',

@@ -69,7 +69,7 @@ describe('formatting', () => {
         'Warning: Your tagTemplate contains ${packageName} but no package name is available.\n' +
           'This will result in an empty package name in the tag (e.g., "@v1.0.0" instead of "my-package@v1.0.0").\n\n' +
           'To fix this:\n' +
-          '• If using synced mode: Set "packageSpecificTags": true in your config to enable package names in tags\n' +
+          '• If using sync mode: Set "packageSpecificTags": true in your config to enable package names in tags\n' +
           '• If you want global tags: Remove ${packageName} from your tagTemplate (e.g., use "${prefix}${version}")\n' +
           '• If using single/async mode: Ensure your package.json has a valid "name" field',
         'warning',
@@ -186,7 +186,7 @@ describe('formatting', () => {
         'Warning: Your commitMessage template contains ${packageName} but no package name is available.\n' +
           'This will result in an empty package name in the commit message (e.g., "Release @v1.0.0").\n\n' +
           'To fix this:\n' +
-          '• If using synced mode: Set "packageSpecificTags": true to enable package names in commits\n' +
+          '• If using sync mode: Set "packageSpecificTags": true to enable package names in commits\n' +
           '• If you want generic commit messages: Remove ${packageName} from your commitMessage template\n' +
           '• If using single/async mode: Ensure your package.json has a valid "name" field',
         'warning',

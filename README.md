@@ -130,7 +130,7 @@ Customize behaviour by creating a `version.config.json` file in your project roo
   "updateChangelog": true,
   "changelogFormat": "keep-a-changelog",
   "strictReachable": false,
-  "synced": true,
+  "sync": true,
   "skip": [
     "docs",
     "e2e"
@@ -160,7 +160,7 @@ Customize behaviour by creating a `version.config.json` file in your project roo
   - `paths`: Directories to search for Cargo.toml files (optional)
 
 #### Monorepo-Specific Options
-- `synced`: Whether all packages should be versioned together (default: true)
+- `sync`: Whether all packages should be versioned together (default: true)
 - `skip`: Array of package names or patterns to exclude from versioning. Supports exact names, scope wildcards, path patterns, and global wildcards (e.g., ["@scope/package-a", "@scope/*", "packages/**/*"])
 - `packages`: Array of package names or patterns to target for versioning. Supports exact names, scope wildcards, path patterns and global wildcards (e.g., ["@scope/package-a", "@scope/*", "*"])
 - `mainPackage`: Package name whose commit history should drive version determination
@@ -234,7 +234,7 @@ This option works in conjunction with `tagTemplate` to control tag formatting. T
 
 **Examples:**
 
-For single-package repositories or synced monorepos:
+For single-package repositories or sync monorepos:
 ```json
 {
   "packageSpecificTags": true,
@@ -253,8 +253,8 @@ For global versioning:
 Creates tags like `v1.2.3`
 
 **Important Notes:**
-- In **synced mode** with a single package, `packageSpecificTags: true` will use the package name even though all packages are versioned together
-- In **synced mode** with multiple packages, package names are not used regardless of the setting
+- In **sync mode** with a single package, `packageSpecificTags: true` will use the package name even though all packages are versioned together
+- In **sync mode** with multiple packages, package names are not used regardless of the setting
 - In **async mode**, each package gets its own tag when `packageSpecificTags` is enabled
 
 With package-specific tagging enabled, the tool will:
@@ -269,7 +269,7 @@ With package-specific tagging enabled, the tool will:
 1.  **Conventional Commits:** Analyzes commit messages (like `feat:`, `fix:`, `BREAKING CHANGE:`) since the last tag.
 2.  **Branch Pattern:** Determines the bump based on the current or recently merged branch name matching predefined patterns.
 
-For a detailed explanation of these concepts and monorepo modes (Synced vs. Async), see [Versioning Strategies and Concepts](./docs/versioning.md).
+For a detailed explanation of these concepts and monorepo modes (Sync vs. Async), see [Versioning Strategies and Concepts](./docs/versioning.md).
 
 ## Documentation
 

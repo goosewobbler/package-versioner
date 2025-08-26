@@ -334,7 +334,7 @@ Warning: Your tagTemplate contains ${packageName} but no package name is availab
 This will result in an empty package name in the tag (e.g., "@v1.0.0" instead of "my-package@v1.0.0").
 
 To fix this:
-• If using synced mode: Set "packageSpecificTags": true in your config to enable package names in tags
+• If using sync mode: Set "packageSpecificTags": true in your config to enable package names in tags
 • If you want global tags: Remove ${packageName} from your tagTemplate (e.g., use "${prefix}${version}")
 • If using single/async mode: Ensure your package.json has a valid "name" field
 ```
@@ -344,7 +344,7 @@ To fix this:
 1. **For Synced Mode with Package Names**: Enable package-specific tags
    ```json
    {
-     "synced": true,
+     "sync": true,
      "packageSpecificTags": true,
      "tagTemplate": "${packageName}@${prefix}${version}"
    }
@@ -397,11 +397,11 @@ For global commit messages, use templates without `${packageName}`:
 
 ## Monorepo Versioning Modes
 
-While primarily used for single packages now, `package-versioner` retains options for monorepo workflows, controlled mainly by the `synced` flag in `version.config.json`.
+While primarily used for single packages now, `package-versioner` retains options for monorepo workflows, controlled mainly by the `sync` flag in `version.config.json`.
 
-### Synced Mode (`synced: true`)
+### Sync Mode (`sync: true`)
 
-This is the default if the `synced` flag is present and true.
+This is the default if the `sync` flag is present and true.
 
 -   **Behaviour:** The tool calculates **one** version bump based on the overall history (or branch pattern). This single new version is applied to **all** packages within the repository (or just the root `package.json` if not a structured monorepo). A single Git tag is created.
 -   **Tag Behaviour:** 
@@ -409,7 +409,7 @@ This is the default if the `synced` flag is present and true.
     - In **single-package repositories**: Respects the `packageSpecificTags` setting - can create either `v1.2.3` or `package-name@v1.2.3`
 -   **Use Case:** Suitable for monorepos where all packages are tightly coupled and released together with the same version number. Also the effective mode for single-package repositories.
 
-### Async Mode (`synced: false`)
+### Async Mode (`sync: false`)
 
 *(Note: This mode relies heavily on monorepo tooling and structure, like `pnpm workspaces` and correctly configured package dependencies.)*
 

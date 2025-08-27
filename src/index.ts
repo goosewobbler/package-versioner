@@ -103,6 +103,12 @@ export async function run(): Promise<void> {
             ? options.target.split(',').map((t: string) => t.trim())
             : [];
 
+          // Override config packages with CLI targets for isolation
+          if (cliTargets.length > 0) {
+            config.packages = cliTargets;
+            log(`CLI targets specified: ${cliTargets.join(', ')}`, 'info');
+          }
+
           // Initialize engine with JSON mode setting
           const engine = new VersionEngine(config, !!options.json);
 

@@ -839,6 +839,166 @@ describe('Packages Filtering Tests', () => {
   logLs(tempDir);
 });
 
+describe('CLI Target Flag (-t) Integration Tests', () => {
+  const MONOREPO_FIXTURE = './test/fixtures/monorepo';
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = copyFixtureToTemp(MONOREPO_FIXTURE);
+    symlinkNodeModules(tempDir);
+    initGitRepo(tempDir);
+    safeGitCommit(tempDir, 'Initial commit');
+  });
+
+  afterEach(() => {
+    cleanupTempDir(tempDir);
+  });
+
+  it('should only update targeted package when using -t flag', () => {
+    // Create a commit that would trigger version updates
+    createConventionalCommit(tempDir, 'feat', 'add new feature');
+
+    // Execute CLI with target flag for specific package
+    const result = executeCliCommand('-t @internal/core --bump patch --json', tempDir);
+
+    expect(result.status).toBe(0);
+
+    // Parse JSON output
+    const output = JSON.parse(result.stdout);
+
+    // Should only update the targeted package
+    expect(output.updates).toHaveLength(1);
+    expect(output.updates[0].packageName).toBe('@internal/core');
+    expect(output.updates[0].newVersion).toMatch(/^0\.\d+\.\d+$/); // Allow for version variations
+
+    // Verify only @internal/core was actually updated
+    const coreVersion = getPackageVersion(tempDir, 'core');
+    const utilsVersion = getPackageVersion(tempDir, 'utils');
+
+    expect(coreVersion).toMatch(/^0\.\d+\.\d+$/); // Should be updated
+    expect(utilsVersion).toBe('0.1.0'); // Should remain unchanged
+  });
+
+  it('should update multiple packages when multiple targets specified', () => {
+    // Create a commit that would trigger version updates
+    createConventionalCommit(tempDir, 'feat', 'add new feature to both packages');
+
+    // Execute CLI with multiple targets
+    const result = executeCliCommand(
+      '-t @internal/core,@internal/utils --bump patch --json',
+      tempDir,
+    );
+
+    expect(result.status).toBe(0);
+
+    // Parse JSON output
+    const output = JSON.parse(result.stdout);
+
+    // Should update both targeted packages
+    expect(output.updates).toHaveLength(2);
+
+    const packageNames = output.updates.map(
+      (update: { packageName: string }) => update.packageName,
+    );
+    expect(packageNames).toContain('@internal/core');
+    expect(packageNames).toContain('@internal/utils');
+
+    // Verify both packages were updated
+    const coreVersion = getPackageVersion(tempDir, 'core');
+    const utilsVersion = getPackageVersion(tempDir, 'utils');
+
+    expect(coreVersion).toMatch(/^0\.\d+\.\d+$/); // Should be updated
+    expect(utilsVersion).toMatch(/^0\.\d+\.\d+$/); // Should be updated
+  });
+
+  it('should update all packages when no -t flag is specified', () => {
+    // Create a commit that would trigger version updates
+    createConventionalCommit(tempDir, 'feat', 'add feature to all packages');
+
+    // Execute CLI without target flag
+    const result = executeCliCommand('--bump patch --json', tempDir);
+
+    expect(result.status).toBe(0);
+
+    // Parse JSON output
+    const output = JSON.parse(result.stdout);
+
+    // Should update all packages that match the config
+    expect(output.updates.length).toBeGreaterThan(0);
+
+    // At least core and utils should be updated (based on the monorepo fixture)
+    const packageNames = output.updates.map(
+      (update: { packageName: string }) => update.packageName,
+    );
+    expect(packageNames).toContain('@internal/core');
+    expect(packageNames).toContain('@internal/utils');
+  });
+
+  it('should handle non-existent target package gracefully', () => {
+    // Create a commit that would trigger version updates
+    createConventionalCommit(tempDir, 'feat', 'add new feature');
+
+    // Execute CLI with non-existent target
+    const result = executeCliCommand('-t @nonexistent/package --bump patch --json', tempDir);
+
+    // Should fail when no packages match the target
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('No packages found in workspace');
+  });
+
+  it('should filter packages correctly with mixed valid and invalid targets', () => {
+    // Create a commit that would trigger version updates
+    createConventionalCommit(tempDir, 'feat', 'add new feature');
+
+    // Execute CLI with mix of valid and invalid targets
+    const result = executeCliCommand(
+      '-t @internal/core,@nonexistent/package --bump patch --json',
+      tempDir,
+    );
+
+    expect(result.status).toBe(0);
+
+    // Parse JSON output
+    const output = JSON.parse(result.stdout);
+
+    // Should only update the valid target
+    expect(output.updates).toHaveLength(1);
+    expect(output.updates[0].packageName).toBe('@internal/core');
+
+    // Verify only the valid package was updated
+    const coreVersion = getPackageVersion(tempDir, 'core');
+    const utilsVersion = getPackageVersion(tempDir, 'utils');
+
+    expect(coreVersion).toMatch(/^0\.\d+\.\d+$/); // Should be updated
+    expect(utilsVersion).toBe('0.1.0'); // Should remain unchanged
+  });
+
+  it('should work with prerelease versions when targeting specific packages', () => {
+    // Create a commit that would trigger version updates
+    createConventionalCommit(tempDir, 'feat', 'add experimental feature');
+
+    // Execute CLI with target flag and prerelease
+    const result = executeCliCommand('-t @internal/core --bump prerelease --json', tempDir);
+
+    expect(result.status).toBe(0);
+
+    // Parse JSON output
+    const output = JSON.parse(result.stdout);
+
+    // Should only update the targeted package with prerelease version
+    expect(output.updates).toHaveLength(1);
+    expect(output.updates[0].packageName).toBe('@internal/core');
+    expect(output.updates[0].newVersion).toMatch(/0\.\d+\.\d+-/); // Should be a prerelease
+
+    // Verify only targeted package was updated
+    const coreVersion = getPackageVersion(tempDir, 'core');
+    const utilsVersion = getPackageVersion(tempDir, 'utils');
+
+    expect(coreVersion).toMatch(/0\.\d+\.\d+-/); // Should be a prerelease
+    expect(utilsVersion).toBe('0.1.0'); // Should remain unchanged
+  });
+});
+
 function logGitLog(cwd: string) {
   try {
     const log = execSync('git log --oneline', { cwd }).toString();

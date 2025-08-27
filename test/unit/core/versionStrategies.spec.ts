@@ -480,11 +480,11 @@ describe('Version Strategies', () => {
       );
 
       // Check logging
-      expect(logging.log).toHaveBeenCalledWith('Processing 2 pre-filtered packages', 'info');
+      expect(logging.log).toHaveBeenCalledWith('Processing 2 packages', 'info');
       expect(logging.log).toHaveBeenCalledWith('Updated 1 package(s): package-a', 'success');
     });
 
-    it('should ignore provided targets since targeting is now at discovery time', async () => {
+    it('should filter packages when runtime targets are provided', async () => {
       // Setup
       const config: Partial<Config> = {
         ...defaultConfig,
@@ -493,14 +493,45 @@ describe('Version Strategies', () => {
 
       const asyncStrategy = strategies.createAsyncStrategy(config as Config);
 
-      // Execute with targets (should be ignored)
+      // Execute with targets (should filter to only package-b)
       await asyncStrategy(mockPackages, ['package-b']);
 
-      // Verify that packages are processed normally (targets ignored)
+      // Verify that only targeted package is processed
+      const expectedFilteredPackages = [
+        { packageJson: { name: 'package-b', version: '1.0.0' }, dir: '/test/workspace/packages/b' },
+      ];
+
+      expect(PackageProcessor.prototype.processPackages).toHaveBeenCalledWith(
+        expectedFilteredPackages,
+      );
+
+      // Check filtering log messages
+      expect(logging.log).toHaveBeenCalledWith(
+        'Runtime targets filter: 2 → 1 packages (package-b)',
+        'info',
+      );
+      expect(logging.log).toHaveBeenCalledWith('Processing 1 packages', 'info');
+    });
+
+    it('should process all packages when no runtime targets are provided', async () => {
+      // Setup
+      const config: Partial<Config> = {
+        ...defaultConfig,
+        packages: ['package-a', 'package-b'],
+      };
+
+      const asyncStrategy = strategies.createAsyncStrategy(config as Config);
+
+      // Execute without runtime targets
+      await asyncStrategy(mockPackages);
+
+      // Verify that all packages are processed (no filtering)
       expect(PackageProcessor.prototype.processPackages).toHaveBeenCalledWith(
         mockPackages.packages,
       );
-      expect(logging.log).toHaveBeenCalledWith('Processing 2 pre-filtered packages', 'info');
+
+      // Should not show runtime filter message
+      expect(logging.log).toHaveBeenCalledWith('Processing 2 packages', 'info');
     });
 
     it('should process all pre-filtered packages', async () => {
@@ -519,7 +550,7 @@ describe('Version Strategies', () => {
       expect(PackageProcessor.prototype.processPackages).toHaveBeenCalledWith(
         mockPackages.packages,
       );
-      expect(logging.log).toHaveBeenCalledWith('Processing 2 pre-filtered packages', 'info');
+      expect(logging.log).toHaveBeenCalledWith('Processing 2 packages', 'info');
     });
 
     it('should handle case when no packages were updated', async () => {

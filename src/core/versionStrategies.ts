@@ -444,13 +444,25 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
 
   const packageProcessor = new PackageProcessor(processorOptions);
 
-  return async (packages: PackagesWithRoot, _targets: string[] = []): Promise<void> => {
+  return async (packages: PackagesWithRoot, targets: string[] = []): Promise<void> => {
     try {
-      // Packages are already filtered at discovery time, so just process all passed packages
-      log(`Processing ${packages.packages.length} pre-filtered packages`, 'info');
+      // Apply additional filtering if targets are specified at runtime
+      let packagesToProcess = packages.packages;
+      if (targets.length > 0) {
+        const beforeCount = packagesToProcess.length;
+        packagesToProcess = packagesToProcess.filter((pkg) =>
+          targets.includes(pkg.packageJson.name),
+        );
+        log(
+          `Runtime targets filter: ${beforeCount} → ${packagesToProcess.length} packages (${targets.join(', ')})`,
+          'info',
+        );
+      }
+
+      log(`Processing ${packagesToProcess.length} packages`, 'info');
 
       // 2. Process packages with PackageProcessor
-      const result = await packageProcessor.processPackages(packages.packages);
+      const result = await packageProcessor.processPackages(packagesToProcess);
 
       // 3. Report results
       if (result.updatedPackages.length === 0) {

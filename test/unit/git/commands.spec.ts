@@ -84,6 +84,32 @@ describe('Git Commands', () => {
         'git tag -a -m "Version 1.0.0" v1.0.0 ',
       );
     });
+
+    it('throws TAG_ALREADY_EXISTS error when tag already exists', async () => {
+      const options: GitTagOptions = {
+        tag: 'v1.0.0',
+        message: 'Version 1.0.0',
+      };
+
+      const mockError = new Error("fatal: tag 'v1.0.0' already exists");
+      vi.mocked(commandExecutor.execAsync, { partial: true }).mockRejectedValue(mockError);
+
+      const { GitError, GitErrorCode } = await import('../../../src/errors/gitError.js');
+
+      await expect(commands.createGitTag(options)).rejects.toThrow(GitError);
+
+      try {
+        await commands.createGitTag(options);
+      } catch (error) {
+        expect(error).toBeInstanceOf(GitError);
+        const gitError = error as GitError;
+        expect(gitError.code).toBe(GitErrorCode.TAG_ALREADY_EXISTS);
+        expect(gitError.message).toContain("Tag 'v1.0.0' already exists in the repository");
+        expect(gitError.message).toContain(
+          'Please use a different version or delete the existing tag first',
+        );
+      }
+    });
   });
 
   describe('gitProcess', () => {

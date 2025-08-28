@@ -8,8 +8,8 @@ import * as path from 'node:path';
 import type { Package } from '@manypkg/get-packages';
 import { type ChangelogEntry, updateChangelog } from '../changelog/changelogManager.js';
 import { extractChangelogEntriesFromCommits } from '../changelog/commitParser.js';
-import { GitError } from '../errors/gitError.js';
-import { createVersionError, VersionError, VersionErrorCode } from '../errors/versionError.js';
+import { BasePackageVersionerError } from '../errors/baseError.js';
+import { createVersionError, VersionErrorCode } from '../errors/versionError.js';
 import { createGitCommitAndTag } from '../git/commands.js';
 import { getLatestTag, getLatestTagForPackage } from '../git/tagsAndBranches.js';
 import { updatePackageVersion } from '../package/packageManagement.js';
@@ -205,8 +205,8 @@ export function createSyncStrategy(config: Config): StrategyFunction {
       // Use the Git service functions
       await createGitCommitAndTag(files, nextTag, formattedCommitMessage, skipHooks, dryRun);
     } catch (error) {
-      if (error instanceof VersionError || error instanceof GitError) {
-        log(`Synced Strategy failed: ${error.message} (${error.code || 'UNKNOWN'})`, 'error');
+      if (BasePackageVersionerError.isPackageVersionerError(error)) {
+        log(`Synced Strategy failed: ${error.message} (${error.code})`, 'error');
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);
         log(`Synced Strategy failed: ${errorMessage}`, 'error');
@@ -403,8 +403,8 @@ export function createSingleStrategy(config: Config): StrategyFunction {
         log(`Would create tag: ${tagName}`, 'info');
       }
     } catch (error) {
-      if (error instanceof VersionError || error instanceof GitError) {
-        log(`Single Strategy failed: ${error.message} (${error.code || 'UNKNOWN'})`, 'error');
+      if (BasePackageVersionerError.isPackageVersionerError(error)) {
+        log(`Single Strategy failed: ${error.message} (${error.code})`, 'error');
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);
         log(`Single Strategy failed: ${errorMessage}`, 'error');
@@ -480,8 +480,8 @@ export function createAsyncStrategy(config: Config): StrategyFunction {
         }
       }
     } catch (error) {
-      if (error instanceof VersionError || error instanceof GitError) {
-        log(`Async Strategy failed: ${error.message} (${error.code || 'UNKNOWN'})`, 'error');
+      if (BasePackageVersionerError.isPackageVersionerError(error)) {
+        log(`Async Strategy failed: ${error.message} (${error.code})`, 'error');
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);
         log(`Async Strategy failed: ${errorMessage}`, 'error');

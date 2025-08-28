@@ -1,15 +1,9 @@
+import { BasePackageVersionerError } from './baseError.js';
+
 /**
  * Custom error class for versioning operations
  */
-export class VersionError extends Error {
-  constructor(
-    message: string,
-    public readonly code?: string,
-  ) {
-    super(message);
-    this.name = 'VersionError';
-  }
-}
+export class VersionError extends BasePackageVersionerError {}
 
 /**
  * Error codes for versioning operations
@@ -39,8 +33,41 @@ export function createVersionError(code: VersionErrorCode, details?: string): Ve
     [VersionErrorCode.VERSION_CALCULATION_ERROR]: 'Failed to calculate version',
   };
 
+  // Provide helpful suggestions for specific error types
+  const suggestions: Record<VersionErrorCode, string[] | undefined> = {
+    [VersionErrorCode.CONFIG_REQUIRED]: [
+      'Create a version.config.json file in your project root',
+      'Check the documentation for configuration examples',
+    ],
+    [VersionErrorCode.PACKAGES_NOT_FOUND]: [
+      'Ensure package.json or Cargo.toml files exist in your project',
+      'Check workspace configuration (pnpm-workspace.yaml, etc.)',
+      'Verify file permissions and paths',
+    ],
+    [VersionErrorCode.WORKSPACE_ERROR]: [
+      'Verify workspace configuration files are valid',
+      'Check that workspace packages are accessible',
+      'Ensure proper monorepo structure',
+    ],
+    [VersionErrorCode.INVALID_CONFIG]: [
+      'Validate version.config.json syntax',
+      'Check configuration against schema',
+      'Review documentation for valid configuration options',
+    ],
+    [VersionErrorCode.PACKAGE_NOT_FOUND]: [
+      'Verify package name spelling and case',
+      'Check if package exists in workspace',
+      'Review packages configuration in version.config.json',
+    ],
+    [VersionErrorCode.VERSION_CALCULATION_ERROR]: [
+      'Ensure git repository has commits',
+      'Check conventional commit message format',
+      'Verify git tags are properly formatted',
+    ],
+  };
+
   const baseMessage = messages[code];
   const fullMessage = details ? `${baseMessage}: ${details}` : baseMessage;
 
-  return new VersionError(fullMessage, code);
+  return new VersionError(fullMessage, code, suggestions[code]);
 }

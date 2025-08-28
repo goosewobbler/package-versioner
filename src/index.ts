@@ -149,19 +149,28 @@ export async function run(): Promise<void> {
           // Print JSON output if enabled (this will be the only output in JSON mode)
           printJsonOutput();
         } catch (error) {
-          log(error instanceof Error ? error.message : String(error), 'error');
+          // Import base error class for streamlined handling
+          const { BasePackageVersionerError } = await import('./errors/baseError.js');
 
-          // Add more detailed error logging for better debugging in CI
-          if (error instanceof Error) {
-            // Log the full stack trace
-            console.error('Error details:');
-            console.error(error.stack || error.message);
+          // Use streamlined error handling for package-versioner errors
+          if (BasePackageVersionerError.isPackageVersionerError(error)) {
+            error.logError(); // Centralized error logging with suggestions
+          } else {
+            // Handle unexpected errors
+            log(error instanceof Error ? error.message : String(error), 'error');
 
-            // If it's a GitError, try to extract and log the underlying command output
-            if (error.message.includes('Command failed:')) {
-              const cmdOutput = error.message.split('Command failed:')[1];
-              if (cmdOutput) {
-                console.error('Command output:', cmdOutput.trim());
+            // Add more detailed error logging for better debugging in CI
+            if (error instanceof Error) {
+              // Log the full stack trace
+              console.error('Error details:');
+              console.error(error.stack || error.message);
+
+              // If it's a command error, try to extract and log the underlying command output
+              if (error.message.includes('Command failed:')) {
+                const cmdOutput = error.message.split('Command failed:')[1];
+                if (cmdOutput) {
+                  console.error('Command output:', cmdOutput.trim());
+                }
               }
             }
           }

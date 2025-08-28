@@ -20,6 +20,7 @@ export enum GitErrorCode {
   NO_FILES = 'NO_FILES',
   NO_COMMIT_MESSAGE = 'NO_COMMIT_MESSAGE',
   GIT_ERROR = 'GIT_ERROR',
+  TAG_ALREADY_EXISTS = 'TAG_ALREADY_EXISTS',
 }
 
 /**
@@ -35,6 +36,7 @@ export function createGitError(code: GitErrorCode, details?: string): GitError {
     [GitErrorCode.NO_FILES]: 'No files specified for commit',
     [GitErrorCode.NO_COMMIT_MESSAGE]: 'Commit message is required',
     [GitErrorCode.GIT_ERROR]: 'Git operation failed',
+    [GitErrorCode.TAG_ALREADY_EXISTS]: 'Git tag already exists',
   };
 
   const baseMessage = messages[code];

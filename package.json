@@ -1,7 +1,7 @@
 {
   "name": "package-versioner",
   "description": "A lightweight yet powerful CLI tool for automated semantic versioning based on Git history and conventional commits.",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

@@ -1,15 +1,9 @@
+import { BasePackageVersionerError } from './baseError.js';
+
 /**
  * Custom error class for Git operations
  */
-export class GitError extends Error {
-  constructor(
-    message: string,
-    public readonly code?: string,
-  ) {
-    super(message);
-    this.name = 'GitError';
-  }
-}
+export class GitError extends BasePackageVersionerError {}
 
 /**
  * Error codes for Git operations
@@ -20,6 +14,7 @@ export enum GitErrorCode {
   NO_FILES = 'NO_FILES',
   NO_COMMIT_MESSAGE = 'NO_COMMIT_MESSAGE',
   GIT_ERROR = 'GIT_ERROR',
+  TAG_ALREADY_EXISTS = 'TAG_ALREADY_EXISTS',
 }
 
 /**
@@ -35,10 +30,28 @@ export function createGitError(code: GitErrorCode, details?: string): GitError {
     [GitErrorCode.NO_FILES]: 'No files specified for commit',
     [GitErrorCode.NO_COMMIT_MESSAGE]: 'Commit message is required',
     [GitErrorCode.GIT_ERROR]: 'Git operation failed',
+    [GitErrorCode.TAG_ALREADY_EXISTS]: 'Git tag already exists',
+  };
+
+  // Provide helpful suggestions for specific error types
+  const suggestions: Record<GitErrorCode, string[] | undefined> = {
+    [GitErrorCode.NOT_GIT_REPO]: [
+      'Initialize git repository with: git init',
+      'Ensure you are in the correct directory',
+    ],
+    [GitErrorCode.TAG_ALREADY_EXISTS]: [
+      'Delete the existing tag: git tag -d <tag-name>',
+      'Use a different version by incrementing manually',
+      'Check if this version was already released',
+    ],
+    [GitErrorCode.GIT_PROCESS_ERROR]: undefined,
+    [GitErrorCode.NO_FILES]: undefined,
+    [GitErrorCode.NO_COMMIT_MESSAGE]: undefined,
+    [GitErrorCode.GIT_ERROR]: undefined,
   };
 
   const baseMessage = messages[code];
   const fullMessage = details ? `${baseMessage}: ${details}` : baseMessage;
 
-  return new GitError(fullMessage, code);
+  return new GitError(fullMessage, code, suggestions[code]);
 }

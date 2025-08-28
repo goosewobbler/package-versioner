@@ -80,7 +80,22 @@ export async function createGitTag(options: GitTagOptions) {
   const { tag, message = '', args = '' } = options;
   const command = `git tag -a -m "${message}" ${tag} ${args}`;
 
-  return execAsync(command);
+  try {
+    return await execAsync(command);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check if the error is due to tag already existing
+    if (errorMessage.includes('already exists')) {
+      throw createGitError(
+        GitErrorCode.TAG_ALREADY_EXISTS,
+        `Tag '${tag}' already exists in the repository. Please use a different version or delete the existing tag first.`,
+      );
+    }
+
+    // Re-throw other errors as generic git errors
+    throw createGitError(GitErrorCode.GIT_ERROR, errorMessage);
+  }
 }
 
 /**
@@ -122,6 +137,15 @@ export async function gitProcess(options: GitProcessOptions) {
     }
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
+
+    // Check if this is a tag already exists error
+    if (errorMessage.includes('already exists') && nextTag) {
+      log(`Tag '${nextTag}' already exists in the repository.`, 'error');
+      throw createGitError(
+        GitErrorCode.TAG_ALREADY_EXISTS,
+        `Tag '${nextTag}' already exists in the repository. Please use a different version or delete the existing tag first.`,
+      );
+    }
 
     // Log detailed error information
     log(`Git process error: ${errorMessage}`, 'error');
@@ -178,6 +202,11 @@ export async function createGitCommitAndTag(
       log(`Created tag: ${nextTag}`, 'success');
     }
   } catch (error) {
+    // If it's already a GitError, re-throw it to preserve the specific error type
+    if (error instanceof GitError) {
+      throw error;
+    }
+
     const errorMessage = error instanceof Error ? error.message : String(error);
     log(`Failed to create git commit and tag: ${errorMessage}`, 'error');
 

@@ -62,7 +62,7 @@ export function getVersionFromCargoToml(
 
     // Check if package section and version field exist
     if (!cargo.package?.version) {
-      log(`No version found in Cargo.toml. Using initial version ${initialVersion}`, 'info');
+      log(`No version found in Cargo.toml. Using initial version ${initialVersion}`, 'debug');
       return { version: initialVersion, success: false };
     }
 

@@ -379,9 +379,33 @@ export function createSingleStrategy(config: Config): StrategyFunction {
         );
       }
 
-      // Update package version
+      // Update package.json
       const packageJsonPath = path.join(pkgPath, 'package.json');
       updatePackageVersion(packageJsonPath, nextVersion);
+
+      // Check if Cargo.toml handling is enabled (default to true if not specified)
+      const cargoEnabled = config.cargo?.enabled !== false;
+
+      if (cargoEnabled) {
+        // Check for cargo paths configuration
+        const cargoPaths = config.cargo?.paths;
+
+        if (cargoPaths && cargoPaths.length > 0) {
+          // If paths are specified, only include those Cargo.toml files
+          for (const cargoPath of cargoPaths) {
+            const resolvedCargoPath = path.resolve(pkgPath, cargoPath, 'Cargo.toml');
+            if (fs.existsSync(resolvedCargoPath)) {
+              updatePackageVersion(resolvedCargoPath, nextVersion);
+            }
+          }
+        } else {
+          // Default behaviour: check for Cargo.toml in the root package directory
+          const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
+          if (fs.existsSync(cargoTomlPath)) {
+            updatePackageVersion(cargoTomlPath, nextVersion);
+          }
+        }
+      }
 
       log(`Updated package ${packageName} to version ${nextVersion}`, 'success');
 

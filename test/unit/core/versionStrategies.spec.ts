@@ -459,6 +459,192 @@ describe('Version Strategies', () => {
       expect(git.createGitCommitAndTag).not.toHaveBeenCalled();
       expect(logging.log).toHaveBeenCalledWith('No version change needed for package-a', 'info');
     });
+
+    describe('Cargo.toml Support', () => {
+      const hybridPackages: PackagesWithRoot = {
+        root: '/test/workspace',
+        packages: [
+          {
+            dir: '/test/workspace/hybrid-pkg',
+            packageJson: { name: 'hybrid-package', version: '0.1.0' },
+          },
+        ],
+      };
+
+      it('should update Cargo.toml in package root when cargo.enabled is true (default)', async () => {
+        // Setup
+        const config: Partial<Config> = {
+          ...defaultConfig,
+          mainPackage: 'hybrid-package',
+          cargo: {
+            enabled: true,
+          },
+        };
+
+        const singleStrategy = strategies.createSingleStrategy(config as Config);
+
+        // Execute
+        await singleStrategy(hybridPackages);
+
+        // Verify package.json was updated
+        expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(
+          '/test/workspace/hybrid-pkg/package.json',
+          '1.1.0',
+        );
+
+        // Verify Cargo.toml was also updated
+        expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(
+          '/test/workspace/hybrid-pkg/Cargo.toml',
+          '1.1.0',
+        );
+      });
+
+      it('should default to cargo.enabled: true when cargo config not specified', async () => {
+        // Setup - no cargo config at all
+        const config: Partial<Config> = {
+          ...defaultConfig,
+          mainPackage: 'hybrid-package',
+          // No cargo property
+        };
+
+        const singleStrategy = strategies.createSingleStrategy(config as Config);
+
+        // Execute
+        await singleStrategy(hybridPackages);
+
+        // Verify both files were updated (default behavior)
+        expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(
+          '/test/workspace/hybrid-pkg/package.json',
+          '1.1.0',
+        );
+        expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(
+          '/test/workspace/hybrid-pkg/Cargo.toml',
+          '1.1.0',
+        );
+      });
+
+      it('should not update Cargo.toml when cargo.enabled is false', async () => {
+        // Setup
+        const config: Partial<Config> = {
+          ...defaultConfig,
+          mainPackage: 'hybrid-package',
+          cargo: {
+            enabled: false,
+          },
+        };
+
+        const singleStrategy = strategies.createSingleStrategy(config as Config);
+
+        // Execute
+        await singleStrategy(hybridPackages);
+
+        // Verify only package.json was updated
+        expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(
+          '/test/workspace/hybrid-pkg/package.json',
+          '1.1.0',
+        );
+
+        // Verify Cargo.toml was NOT updated
+        expect(packageManagement.updatePackageVersion).not.toHaveBeenCalledWith(
+          '/test/workspace/hybrid-pkg/Cargo.toml',
+          expect.anything(),
+        );
+      });
+
+      // Note: cargo.paths with multiple files is tested in integration tests
+      // Unit testing path resolution is complex due to mocking requirements
+      // The integration tests verify this works end-to-end with real file system
+
+      it('should handle missing Cargo.toml gracefully when cargo is enabled', async () => {
+        // Setup - mock fs.existsSync to return false for Cargo.toml
+        vi.mocked(fs.existsSync, { partial: true }).mockImplementation((filePath) => {
+          // Only package.json exists, Cargo.toml doesn't
+          return !String(filePath).endsWith('Cargo.toml');
+        });
+
+        const config: Partial<Config> = {
+          ...defaultConfig,
+          mainPackage: 'hybrid-package',
+          cargo: {
+            enabled: true,
+          },
+        };
+
+        const singleStrategy = strategies.createSingleStrategy(config as Config);
+
+        // Execute - should not throw
+        await singleStrategy(hybridPackages);
+
+        // Verify package.json was updated
+        expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(
+          '/test/workspace/hybrid-pkg/package.json',
+          '1.1.0',
+        );
+
+        // Verify Cargo.toml update was not attempted (file doesn't exist)
+        expect(packageManagement.updatePackageVersion).not.toHaveBeenCalledWith(
+          '/test/workspace/hybrid-pkg/Cargo.toml',
+          expect.anything(),
+        );
+      });
+
+      it('should apply the same version to both package.json and Cargo.toml', async () => {
+        // Setup - test with a prerelease version
+        vi.mocked(calculator.calculateVersion, { partial: true }).mockResolvedValue('1.2.0-next.0');
+
+        const config: Partial<Config> = {
+          ...defaultConfig,
+          mainPackage: 'hybrid-package',
+          cargo: {
+            enabled: true,
+          },
+        };
+
+        const singleStrategy = strategies.createSingleStrategy(config as Config);
+
+        // Execute
+        await singleStrategy(hybridPackages);
+
+        // Verify both files get the same version
+        expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(
+          '/test/workspace/hybrid-pkg/package.json',
+          '1.2.0-next.0',
+        );
+        expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(
+          '/test/workspace/hybrid-pkg/Cargo.toml',
+          '1.2.0-next.0',
+        );
+      });
+
+      it('should ignore cargo.paths when cargo.enabled is false', async () => {
+        // Setup
+        const config: Partial<Config> = {
+          ...defaultConfig,
+          mainPackage: 'hybrid-package',
+          cargo: {
+            enabled: false,
+            paths: ['src', 'crates/core'], // Should be ignored
+          },
+        };
+
+        const singleStrategy = strategies.createSingleStrategy(config as Config);
+
+        // Execute
+        await singleStrategy(hybridPackages);
+
+        // Verify only package.json was updated
+        expect(packageManagement.updatePackageVersion).toHaveBeenCalledWith(
+          '/test/workspace/hybrid-pkg/package.json',
+          '1.1.0',
+        );
+
+        // Verify NO Cargo.toml files were updated (even though paths were specified)
+        expect(packageManagement.updatePackageVersion).not.toHaveBeenCalledWith(
+          expect.stringContaining('Cargo.toml'),
+          expect.anything(),
+        );
+      });
+    });
   });
 
   describe('createAsyncStrategy', () => {

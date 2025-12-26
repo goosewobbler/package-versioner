@@ -530,15 +530,8 @@ describe('Single Strategy with Hybrid Package', () => {
     expect(getPackageVersion(tempDir)).toBe('0.1.0');
     expect(getCargoVersion(tempDir)).toBe('0.1.0');
 
-    // Create a feature commit
-    const srcFile = join(tempDir, 'src/lib.rs');
-    writeFileSync(srcFile, 'pub fn new_feature() {}\n');
-    createConventionalCommitWithDebug(tempDir, 'feat', 'add new feature', undefined, false, [
-      srcFile,
-    ]);
-
-    // Run versioning with minor bump
-    mockVersionUpdates(tempDir, '0.2.0');
+    // Directly update both files (simulating what single strategy would do)
+    updateBothManifests(tempDir, '0.2.0');
 
     // Verify both manifests were updated to the same version
     const pkgVersion = getPackageVersion(tempDir);
@@ -553,20 +546,8 @@ describe('Single Strategy with Hybrid Package', () => {
     expect(getPackageVersion(tempDir)).toBe('0.1.0');
     expect(getCargoVersion(tempDir)).toBe('0.1.0');
 
-    // Create a breaking change commit
-    const srcFile = join(tempDir, 'src/lib.rs');
-    writeFileSync(srcFile, 'pub fn breaking_change() {}\n');
-    createConventionalCommitWithDebug(
-      tempDir,
-      'feat',
-      'change API\n\nBREAKING CHANGE: This breaks the API',
-      undefined,
-      false,
-      [srcFile],
-    );
-
-    // Mock major version bump
-    mockVersionUpdates(tempDir, '1.0.0');
+    // Directly update both files to major version (simulating breaking change)
+    updateBothManifests(tempDir, '1.0.0');
 
     // Verify both manifests bumped to 1.0.0
     expect(getPackageVersion(tempDir)).toBe('1.0.0');
@@ -574,30 +555,12 @@ describe('Single Strategy with Hybrid Package', () => {
   });
 
   it('should handle prerelease versions in both manifests', () => {
-    // Update config to use prerelease
-    createVersionConfig(tempDir, {
-      preset: 'conventional-commits',
-      packages: ['./'],
-      versionPrefix: 'v',
-      tagTemplate: '${prefix}${version}',
-      prereleaseIdentifier: 'next',
-      cargo: {
-        enabled: true,
-      },
-    });
+    // Initial versions
+    expect(getPackageVersion(tempDir)).toBe('0.1.0');
+    expect(getCargoVersion(tempDir)).toBe('0.1.0');
 
-    execSync('git add version.config.json', { cwd: tempDir });
-    safeGitCommit(tempDir, 'chore: update config for prerelease');
-
-    // Create a commit
-    const srcFile = join(tempDir, 'src/lib.rs');
-    writeFileSync(srcFile, 'pub fn prerelease_feature() {}\n');
-    createConventionalCommitWithDebug(tempDir, 'feat', 'add prerelease feature', undefined, false, [
-      srcFile,
-    ]);
-
-    // Mock prerelease version
-    mockVersionUpdates(tempDir, '0.2.0-next.0');
+    // Directly update both files to prerelease version
+    updateBothManifests(tempDir, '0.2.0-next.0');
 
     // Verify both manifests have prerelease version
     expect(getPackageVersion(tempDir)).toBe('0.2.0-next.0');

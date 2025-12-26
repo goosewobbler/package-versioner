@@ -525,6 +525,24 @@ describe('Single Strategy with Hybrid Package', () => {
     cleanupTempDir(tempDir);
   });
 
+  /**
+   * Helper to get the list of files in the most recent commit
+   */
+  function getLastCommitFiles(): string[] {
+    try {
+      const output = execSync('git diff-tree --no-commit-id --name-only -r HEAD', {
+        cwd: tempDir,
+        encoding: 'utf8',
+      });
+      return output
+        .trim()
+        .split('\n')
+        .filter((line) => line.length > 0);
+    } catch {
+      return [];
+    }
+  }
+
   it('should update both package.json and Cargo.toml with minor bump', () => {
     // Check initial versions
     expect(getPackageVersion(tempDir)).toBe('0.1.0');
@@ -657,6 +675,62 @@ edition = "2021"
     const coreCargoContent = readFileSync(join(coreDir, 'Cargo.toml'), 'utf8');
     const coreCargo = TOML.parse(coreCargoContent) as { package: { version: string } };
     expect(coreCargo.package.version).toBe('0.2.0');
+  });
+
+  it('should commit both package.json and Cargo.toml to git', () => {
+    // Create a feature commit to trigger versioning
+    const srcFile = join(tempDir, 'src/lib.rs');
+    writeFileSync(srcFile, 'pub fn test_commit() {}\n');
+    createConventionalCommitWithDebug(tempDir, 'feat', 'trigger version bump', undefined, false, [
+      srcFile,
+    ]);
+
+    // Run the versioning CLI
+    executeCliCommandWithDebug('version', tempDir);
+
+    // Get the files in the most recent commit (the version bump commit)
+    const committedFiles = getLastCommitFiles();
+
+    // Verify both package.json and Cargo.toml are in the commit
+    expect(committedFiles).toContain('package.json');
+    expect(committedFiles).toContain('Cargo.toml');
+
+    // Verify the commit message indicates a version change
+    const lastCommitMsg = execSync('git log -1 --pretty=%B', { cwd: tempDir, encoding: 'utf8' });
+    expect(lastCommitMsg).toMatch(/chore.*0\.2\.0/i);
+  });
+
+  it('should commit only package.json when cargo.enabled is false', () => {
+    // Update config to disable cargo
+    createVersionConfig(tempDir, {
+      preset: 'conventional-commits',
+      packages: ['./'],
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      cargo: {
+        enabled: false,
+      },
+    });
+
+    execSync('git add version.config.json', { cwd: tempDir });
+    safeGitCommit(tempDir, 'chore: disable cargo');
+
+    // Create a feature commit to trigger versioning
+    const srcFile = join(tempDir, 'src/lib.rs');
+    writeFileSync(srcFile, 'pub fn test_no_cargo() {}\n');
+    createConventionalCommitWithDebug(tempDir, 'feat', 'trigger version bump', undefined, false, [
+      srcFile,
+    ]);
+
+    // Run the versioning CLI
+    executeCliCommandWithDebug('version', tempDir);
+
+    // Get the files in the most recent commit
+    const committedFiles = getLastCommitFiles();
+
+    // Verify only package.json is committed, not Cargo.toml
+    expect(committedFiles).toContain('package.json');
+    expect(committedFiles).not.toContain('Cargo.toml');
   });
 });
 

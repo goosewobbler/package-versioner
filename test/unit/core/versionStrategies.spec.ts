@@ -342,9 +342,9 @@ describe('Version Strategies', () => {
         expect.anything(),
       );
 
-      // Check commit and tag
+      // Check commit and tag (includes both package.json and Cargo.toml since cargo is enabled by default)
       expect(git.createGitCommitAndTag).toHaveBeenCalledWith(
-        [packageAPath],
+        [packageAPath, '/test/workspace/packages/a/Cargo.toml'],
         'v1.1.0',
         'chore(release): v1.1.0',
         undefined,

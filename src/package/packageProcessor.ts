@@ -99,6 +99,7 @@ export class PackageProcessor {
     for (const pkg of pkgsToConsider) {
       const name = pkg.packageJson.name;
       const pkgPath = pkg.dir;
+      log(`Processing package ${name} at path: ${pkgPath}`, 'info');
       const formattedPrefix = formatVersionPrefix(this.versionPrefix);
       // For package-specific tags, we may need to request package-specific version history
       // Try to get the latest tag specific to this package first
@@ -278,26 +279,41 @@ export class PackageProcessor {
 
       // Check if Cargo.toml handling is enabled (default to true if not specified)
       const cargoEnabled = this.fullConfig.cargo?.enabled !== false;
+      log(
+        `Cargo enabled for ${name}: ${cargoEnabled}, config: ${JSON.stringify(this.fullConfig.cargo)}`,
+        'debug',
+      );
 
       if (cargoEnabled) {
         // Check for cargo paths configuration
         const cargoPaths = this.fullConfig.cargo?.paths;
+        log(`Cargo paths config for ${name}: ${JSON.stringify(cargoPaths)}`, 'debug');
 
         if (cargoPaths && cargoPaths.length > 0) {
           // If paths are specified, only include those Cargo.toml files
           for (const cargoPath of cargoPaths) {
             const resolvedCargoPath = path.resolve(pkgPath, cargoPath, 'Cargo.toml');
+            log(`Checking cargo path for ${name}: ${resolvedCargoPath}`, 'debug');
             if (fs.existsSync(resolvedCargoPath)) {
+              log(`Found Cargo.toml for ${name} at ${resolvedCargoPath}, updating...`, 'debug');
               updatePackageVersion(resolvedCargoPath, nextVersion);
+            } else {
+              log(`Cargo.toml not found at ${resolvedCargoPath}`, 'debug');
             }
           }
         } else {
           // Default behaviour: check for Cargo.toml in the root package directory
           const cargoTomlPath = path.join(pkgPath, 'Cargo.toml');
+          log(`Checking default cargo path for ${name}: ${cargoTomlPath}`, 'debug');
           if (fs.existsSync(cargoTomlPath)) {
+            log(`Found Cargo.toml for ${name} at ${cargoTomlPath}, updating...`, 'debug');
             updatePackageVersion(cargoTomlPath, nextVersion);
+          } else {
+            log(`Cargo.toml not found for ${name} at ${cargoTomlPath}`, 'debug');
           }
         }
+      } else {
+        log(`Cargo disabled for ${name}`, 'debug');
       }
 
       // Create package-specific tag (using the updated formatTag function with package name)

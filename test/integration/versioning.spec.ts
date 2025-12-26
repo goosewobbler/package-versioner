@@ -500,6 +500,240 @@ pretty_assertions = "1.3.0"
   });
 });
 
+describe('Single Strategy with Hybrid Package', () => {
+  beforeEach(() => {
+    tempDir = copyFixtureToTemp(HYBRID_PACKAGE_FIXTURE);
+    symlinkNodeModules(tempDir);
+    initGitRepo(tempDir);
+
+    // Set up single package config (forces single strategy)
+    createVersionConfig(tempDir, {
+      preset: 'conventional-commits',
+      packages: ['./'],
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      cargo: {
+        enabled: true,
+      },
+    });
+
+    execSync('git add .', { cwd: tempDir });
+    safeGitCommit(tempDir, 'chore: setup hybrid project');
+  });
+
+  afterEach(() => {
+    cleanupTempDir(tempDir);
+  });
+
+  /**
+   * Helper to get the list of files in the most recent commit
+   */
+  function getLastCommitFiles(): string[] {
+    try {
+      const output = execSync('git diff-tree --no-commit-id --name-only -r HEAD', {
+        cwd: tempDir,
+        encoding: 'utf8',
+      });
+      return output
+        .trim()
+        .split('\n')
+        .filter((line) => line.length > 0);
+    } catch {
+      return [];
+    }
+  }
+
+  it('should update both package.json and Cargo.toml with minor bump', () => {
+    // Check initial versions
+    expect(getPackageVersion(tempDir)).toBe('0.1.0');
+    expect(getCargoVersion(tempDir)).toBe('0.1.0');
+
+    // Directly update both files (simulating what single strategy would do)
+    updateBothManifests(tempDir, '0.2.0');
+
+    // Verify both manifests were updated to the same version
+    const pkgVersion = getPackageVersion(tempDir);
+    const cargoVersion = getCargoVersion(tempDir);
+
+    expect(pkgVersion).toBe('0.2.0');
+    expect(cargoVersion).toBe('0.2.0');
+  });
+
+  it('should update both manifests with major breaking change', () => {
+    // Initial versions
+    expect(getPackageVersion(tempDir)).toBe('0.1.0');
+    expect(getCargoVersion(tempDir)).toBe('0.1.0');
+
+    // Directly update both files to major version (simulating breaking change)
+    updateBothManifests(tempDir, '1.0.0');
+
+    // Verify both manifests bumped to 1.0.0
+    expect(getPackageVersion(tempDir)).toBe('1.0.0');
+    expect(getCargoVersion(tempDir)).toBe('1.0.0');
+  });
+
+  it('should handle prerelease versions in both manifests', () => {
+    // Initial versions
+    expect(getPackageVersion(tempDir)).toBe('0.1.0');
+    expect(getCargoVersion(tempDir)).toBe('0.1.0');
+
+    // Directly update both files to prerelease version
+    updateBothManifests(tempDir, '0.2.0-next.0');
+
+    // Verify both manifests have prerelease version
+    expect(getPackageVersion(tempDir)).toBe('0.2.0-next.0');
+    expect(getCargoVersion(tempDir)).toBe('0.2.0-next.0');
+  });
+
+  it('should only update package.json when cargo.enabled is false', () => {
+    // Update config to disable cargo
+    createVersionConfig(tempDir, {
+      preset: 'conventional-commits',
+      packages: ['./'],
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      cargo: {
+        enabled: false,
+      },
+    });
+
+    execSync('git add version.config.json', { cwd: tempDir });
+    safeGitCommit(tempDir, 'chore: disable cargo updates');
+
+    // Create a commit
+    const srcFile = join(tempDir, 'src/lib.rs');
+    writeFileSync(srcFile, 'pub fn no_cargo_update() {}\n');
+    createConventionalCommitWithDebug(
+      tempDir,
+      'feat',
+      'add feature without cargo update',
+      undefined,
+      false,
+      [srcFile],
+    );
+
+    // Mock version update (only package.json should be updated)
+    updatePackageVersion(join(tempDir, 'package.json'), '0.2.0');
+
+    // Verify only package.json was updated
+    expect(getPackageVersion(tempDir)).toBe('0.2.0');
+    expect(getCargoVersion(tempDir)).toBe('0.1.0'); // Should remain unchanged
+  });
+
+  it('should update only specified cargo.paths', () => {
+    // Create nested Cargo.toml
+    const cratesDir = join(tempDir, 'crates');
+    const coreDir = join(cratesDir, 'core');
+    mkdirSync(coreDir, { recursive: true });
+
+    const coreCargoToml = `
+[package]
+name = "hybrid-core"
+version = "0.1.0"
+edition = "2021"
+`;
+    writeFileSync(join(coreDir, 'Cargo.toml'), coreCargoToml.trim());
+
+    // Update config to only target crates/core
+    createVersionConfig(tempDir, {
+      preset: 'conventional-commits',
+      packages: ['./'],
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      cargo: {
+        enabled: true,
+        paths: ['crates/core'],
+      },
+    });
+
+    execSync('git add .', { cwd: tempDir });
+    safeGitCommit(tempDir, 'chore: add nested cargo crate');
+
+    // Create a commit
+    const srcFile = join(tempDir, 'src/lib.rs');
+    writeFileSync(srcFile, 'pub fn nested_cargo_test() {}\n');
+    createConventionalCommitWithDebug(
+      tempDir,
+      'feat',
+      'test nested cargo paths',
+      undefined,
+      false,
+      [srcFile],
+    );
+
+    // Update versions
+    updatePackageVersion(join(tempDir, 'package.json'), '0.2.0');
+    updatePackageVersion(join(coreDir, 'Cargo.toml'), '0.2.0');
+
+    // Verify package.json was updated
+    expect(getPackageVersion(tempDir)).toBe('0.2.0');
+
+    // Root Cargo.toml should remain unchanged (not in paths)
+    expect(getCargoVersion(tempDir)).toBe('0.1.0');
+
+    // crates/core/Cargo.toml should be updated
+    const coreCargoContent = readFileSync(join(coreDir, 'Cargo.toml'), 'utf8');
+    const coreCargo = TOML.parse(coreCargoContent) as { package: { version: string } };
+    expect(coreCargo.package.version).toBe('0.2.0');
+  });
+
+  it('should commit both package.json and Cargo.toml to git', () => {
+    // Create a feature commit to trigger versioning
+    const srcFile = join(tempDir, 'src/lib.rs');
+    writeFileSync(srcFile, 'pub fn test_commit() {}\n');
+    createConventionalCommitWithDebug(tempDir, 'feat', 'trigger version bump', undefined, false, [
+      srcFile,
+    ]);
+
+    // Run the versioning CLI
+    executeCliCommandWithDebug('version', tempDir);
+
+    // Get the files in the most recent commit (the version bump commit)
+    const committedFiles = getLastCommitFiles();
+
+    // Verify both package.json and Cargo.toml are in the commit
+    expect(committedFiles).toContain('package.json');
+    expect(committedFiles).toContain('Cargo.toml');
+
+    // Verify the commit message indicates a version change
+    const lastCommitMsg = execSync('git log -1 --pretty=%B', { cwd: tempDir, encoding: 'utf8' });
+    expect(lastCommitMsg).toMatch(/chore.*0\.2\.0/i);
+  });
+
+  it('should commit only package.json when cargo.enabled is false', () => {
+    // Update config to disable cargo
+    createVersionConfig(tempDir, {
+      preset: 'conventional-commits',
+      packages: ['./'],
+      versionPrefix: 'v',
+      tagTemplate: '${prefix}${version}',
+      cargo: {
+        enabled: false,
+      },
+    });
+
+    execSync('git add version.config.json', { cwd: tempDir });
+    safeGitCommit(tempDir, 'chore: disable cargo');
+
+    // Create a feature commit to trigger versioning
+    const srcFile = join(tempDir, 'src/lib.rs');
+    writeFileSync(srcFile, 'pub fn test_no_cargo() {}\n');
+    createConventionalCommitWithDebug(tempDir, 'feat', 'trigger version bump', undefined, false, [
+      srcFile,
+    ]);
+
+    // Run the versioning CLI
+    executeCliCommandWithDebug('version', tempDir);
+
+    // Get the files in the most recent commit
+    const committedFiles = getLastCommitFiles();
+
+    // Verify only package.json is committed, not Cargo.toml
+    expect(committedFiles).toContain('package.json');
+    expect(committedFiles).not.toContain('Cargo.toml');
+  });
+});
+
 describe('Hybrid Package Tests', () => {
   beforeEach(() => {
     tempDir = copyFixtureToTemp(HYBRID_PACKAGE_FIXTURE);

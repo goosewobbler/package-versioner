@@ -127,7 +127,7 @@ describe('Version Utils', () => {
       expect(result).toEqual({ version: initialVersion, success: false });
       expect(logging.log).toHaveBeenCalledWith(
         expect.stringContaining('No version found in Cargo.toml'),
-        'info',
+        'debug',
       );
     });
 

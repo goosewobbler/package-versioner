@@ -41,6 +41,50 @@ function shouldProcessPackage(pkg: Package, config: Config): boolean {
 }
 
 /**
+ * Update Cargo.toml files for a package and return the list of updated file paths
+ * @param packageDir - The directory containing the package
+ * @param version - The version to update to
+ * @param cargoConfig - The cargo configuration from config
+ * @returns Array of Cargo.toml file paths that were updated
+ */
+function updateCargoFiles(
+  packageDir: string,
+  version: string,
+  cargoConfig: Config['cargo'],
+): string[] {
+  const updatedFiles: string[] = [];
+
+  // Check if Cargo.toml handling is enabled (default to true if not specified)
+  const cargoEnabled = cargoConfig?.enabled !== false;
+
+  if (!cargoEnabled) {
+    return updatedFiles;
+  }
+
+  const cargoPaths = cargoConfig?.paths;
+
+  if (cargoPaths && cargoPaths.length > 0) {
+    // If paths are specified, only include those Cargo.toml files
+    for (const cargoPath of cargoPaths) {
+      const resolvedCargoPath = path.resolve(packageDir, cargoPath, 'Cargo.toml');
+      if (fs.existsSync(resolvedCargoPath)) {
+        updatePackageVersion(resolvedCargoPath, version);
+        updatedFiles.push(resolvedCargoPath);
+      }
+    }
+  } else {
+    // Default behaviour: check for Cargo.toml in the root package directory
+    const cargoTomlPath = path.join(packageDir, 'Cargo.toml');
+    if (fs.existsSync(cargoTomlPath)) {
+      updatePackageVersion(cargoTomlPath, version);
+      updatedFiles.push(cargoTomlPath);
+    }
+  }
+
+  return updatedFiles;
+}
+
+/**
  * Create a sync versioning strategy function
  */
 export function createSyncStrategy(config: Config): StrategyFunction {
@@ -141,6 +185,10 @@ export function createSyncStrategy(config: Config): StrategyFunction {
             files.push(rootPkgPath);
             updatedPackages.push('root');
             processedPaths.add(rootPkgPath);
+
+            // Handle Cargo.toml files in root
+            const rootCargoFiles = updateCargoFiles(packages.root, nextVersion, config.cargo);
+            files.push(...rootCargoFiles);
           }
         } else {
           log('Root package path is undefined, skipping root package.json update', 'warning');
@@ -167,6 +215,10 @@ export function createSyncStrategy(config: Config): StrategyFunction {
         files.push(packageJsonPath);
         updatedPackages.push(pkg.packageJson.name);
         processedPaths.add(packageJsonPath);
+
+        // Handle Cargo.toml files for this package
+        const pkgCargoFiles = updateCargoFiles(pkg.dir, nextVersion, config.cargo);
+        files.push(...pkgCargoFiles);
       }
 
       // Log updated packages
@@ -379,9 +431,16 @@ export function createSingleStrategy(config: Config): StrategyFunction {
         );
       }
 
-      // Update package version
+      // Update package.json
       const packageJsonPath = path.join(pkgPath, 'package.json');
       updatePackageVersion(packageJsonPath, nextVersion);
+
+      // Track all files that need to be committed
+      const filesToCommit: string[] = [packageJsonPath];
+
+      // Handle Cargo.toml files for this package
+      const cargoFiles = updateCargoFiles(pkgPath, nextVersion, config.cargo);
+      filesToCommit.push(...cargoFiles);
 
       log(`Updated package ${packageName} to version ${nextVersion}`, 'success');
 
@@ -397,7 +456,7 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       const commitMsg = formatCommitMessage(commitMessage, nextVersion, packageName);
 
       if (!dryRun) {
-        await createGitCommitAndTag([packageJsonPath], tagName, commitMsg, skipHooks, dryRun);
+        await createGitCommitAndTag(filesToCommit, tagName, commitMsg, skipHooks, dryRun);
         log(`Created tag: ${tagName}`, 'success');
       } else {
         log(`Would create tag: ${tagName}`, 'info');

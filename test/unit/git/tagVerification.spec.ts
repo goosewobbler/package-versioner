@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { execSync } from '../../../src/git/commandExecutor.js';
 import { verifyTag } from '../../../src/git/tagVerification.js';
 import { log } from '../../../src/utils/logging.js';
-import { getBestVersionSource } from '../../../src/utils/versionUtils.js';
+import { getBestVersionSource, VersionMismatchError } from '../../../src/utils/versionUtils.js';
 
 // Mock dependencies
 vi.mock('../../../src/git/commandExecutor.js');
@@ -145,11 +145,12 @@ describe('Tag Verification', () => {
 
       const result = await getBestVersionSource('v1.2.0', '1.0.0', '/test/path');
 
-      expect(result).toEqual({
-        source: 'git',
-        version: 'v1.2.0',
-        reason: 'Git tag is newer',
-      });
+      expect(result.source).toBe('git');
+      expect(result.version).toBe('v1.2.0');
+      expect(result.reason).toBe('Git tag is newer');
+      expect(result.mismatch).toBeDefined();
+      expect(result.mismatch?.detected).toBe(true);
+      expect(result.mismatch?.severity).toBe('major');
       expect(mockLog).toHaveBeenCalledWith(
         'Git tag v1.2.0 is newer than package version 1.0.0, using git tag',
         'info',
@@ -287,6 +288,120 @@ describe('Tag Verification', () => {
         source: 'git',
         version: 'v1.0.0',
         reason: 'Git tag exists, no package version to compare',
+      });
+    });
+
+    describe('version mismatch detection', () => {
+      it('should detect mismatch when git tag is stable but package is prerelease (same major)', async () => {
+        // Mock execSync to succeed (tag exists)
+        mockExecSync.mockImplementation(() => Buffer.from('abc123'));
+
+        const result = await getBestVersionSource('v1.0.0', '1.0.0-beta.1', '/test/path');
+
+        expect(result.source).toBe('git');
+        expect(result.version).toBe('v1.0.0');
+        expect(result.mismatch?.detected).toBe(true);
+        expect(result.mismatch?.severity).toBe('major');
+        expect(result.mismatch?.message).toContain('reverted release');
+      });
+
+      it('should use prefer-package strategy to use package version on mismatch', async () => {
+        // Mock execSync to succeed (tag exists)
+        mockExecSync.mockImplementation(() => Buffer.from('abc123'));
+
+        const result = await getBestVersionSource(
+          'v1.0.0',
+          '1.0.0-beta.1',
+          '/test/path',
+          'prefer-package',
+        );
+
+        expect(result.source).toBe('package');
+        expect(result.version).toBe('1.0.0-beta.1');
+        expect(result.reason).toContain('package version');
+      });
+
+      it('should throw VersionMismatchError on mismatch with error strategy', async () => {
+        // Mock execSync to succeed (tag exists)
+        mockExecSync.mockImplementation(() => Buffer.from('abc123'));
+
+        await expect(
+          getBestVersionSource('v1.0.0', '1.0.0-beta.1', '/test/path', 'error'),
+        ).rejects.toThrow(VersionMismatchError);
+      });
+
+      it('should detect major version difference as significant mismatch', async () => {
+        // Mock execSync to succeed (tag exists)
+        mockExecSync.mockImplementation(() => Buffer.from('abc123'));
+
+        const result = await getBestVersionSource('v2.0.0', '1.0.0', '/test/path');
+
+        expect(result.source).toBe('git');
+        expect(result.mismatch?.detected).toBe(true);
+        expect(result.mismatch?.severity).toBe('major');
+      });
+
+      it('should detect minor version difference as significant mismatch', async () => {
+        // Mock execSync to succeed (tag exists)
+        mockExecSync.mockImplementation(() => Buffer.from('abc123'));
+
+        const result = await getBestVersionSource('v1.5.0', '1.0.0', '/test/path');
+
+        expect(result.source).toBe('git');
+        expect(result.mismatch?.detected).toBe(true);
+        expect(result.mismatch?.severity).toBe('major');
+      });
+
+      it('should not flag patch difference as major mismatch', async () => {
+        // Mock execSync to succeed (tag exists)
+        mockExecSync.mockImplementation(() => Buffer.from('abc123'));
+
+        const result = await getBestVersionSource('v1.0.5', '1.0.0', '/test/path');
+
+        expect(result.source).toBe('git');
+        expect(result.mismatch?.detected).toBeFalsy();
+      });
+
+      it('should use package version when it is newer than prerelease tag', async () => {
+        // Mock execSync to succeed (tag exists)
+        mockExecSync.mockImplementation(() => Buffer.from('abc123'));
+
+        // Package 1.0.0 is greater than tag 1.0.0-beta.1
+        const result = await getBestVersionSource('v1.0.0-beta.1', '1.0.0', '/test/path');
+
+        expect(result.source).toBe('package');
+        expect(result.version).toBe('1.0.0');
+        expect(result.reason).toBe('Package version is newer');
+      });
+
+      it('should support ignore strategy (silent)', async () => {
+        // Mock execSync to succeed (tag exists)
+        mockExecSync.mockImplementation(() => Buffer.from('abc123'));
+        mockLog.mockClear();
+
+        const result = await getBestVersionSource('v2.0.0', '1.0.0', '/test/path', 'ignore');
+
+        expect(result.source).toBe('git');
+        // Should not log warnings with ignore strategy
+        const warningCalls = mockLog.mock.calls.filter((call) => call[1] === 'warning');
+        expect(warningCalls.length).toBe(0);
+      });
+
+      it('should support prefer-git strategy explicitly', async () => {
+        // Mock execSync to succeed (tag exists)
+        mockExecSync.mockImplementation(() => Buffer.from('abc123'));
+
+        const result = await getBestVersionSource(
+          'v1.0.0',
+          '1.0.0-beta.1',
+          '/test/path',
+          'prefer-git',
+        );
+
+        expect(result.source).toBe('git');
+        expect(result.version).toBe('v1.0.0');
+        expect(result.reason).toContain('git tag per strategy');
+        expect(result.mismatch?.detected).toBe(true);
       });
     });
   });

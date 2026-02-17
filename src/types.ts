@@ -49,6 +49,8 @@ export interface Config extends VersionConfigBase {
   updateChangelog?: boolean; // Whether to automatically generate and update changelogs
   changelogFormat?: 'keep-a-changelog' | 'angular'; // Format to use for changelogs
   isPrerelease?: boolean; // Track whether prerelease was explicitly requested via --prerelease flag
+  /** How to handle version mismatches between git tags and package.json */
+  mismatchStrategy?: 'error' | 'warn' | 'ignore' | 'prefer-package' | 'prefer-git';
   // Cargo configuration options
   cargo?: {
     enabled?: boolean; // Default: true - Set to false to disable Cargo.toml version handling

@@ -16,6 +16,7 @@ import {
   getBestVersionSource,
   normalizePrereleaseIdentifier,
   STANDARD_BUMP_TYPES,
+  type VersionSourceResult,
 } from '../utils/versionUtils.js';
 
 /**
@@ -29,6 +30,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
     prereleaseIdentifier: configPrereleaseIdentifier,
     branchPattern,
     baseBranch,
+    mismatchStrategy,
   } = config;
   const {
     latestTag,
@@ -67,9 +69,7 @@ export async function calculateVersion(config: Config, options: VersionOptions):
     const escapedTagPattern = escapeRegExp(tagSearchPattern);
 
     // Get the best available version source using smart fallback
-    let versionSource:
-      | { source: 'git' | 'package' | 'initial'; version: string; reason: string }
-      | undefined;
+    let versionSource: VersionSourceResult | undefined;
 
     if (pkgPath) {
       const packageDir = pkgPath || cwd();
@@ -77,7 +77,12 @@ export async function calculateVersion(config: Config, options: VersionOptions):
       const packageVersion =
         manifestResult.manifestFound && manifestResult.version ? manifestResult.version : undefined;
 
-      versionSource = await getBestVersionSource(latestTag, packageVersion, packageDir);
+      versionSource = await getBestVersionSource(
+        latestTag,
+        packageVersion,
+        packageDir,
+        mismatchStrategy,
+      );
       log(`Using version source: ${versionSource.source} (${versionSource.reason})`, 'info');
     }
 

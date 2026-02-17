@@ -171,18 +171,107 @@ export function bumpVersion(
 }
 
 /**
+ * Detects significant version mismatches that could indicate problems
+ * Returns details about the mismatch if detected
+ */
+function detectVersionMismatch(
+  tagVersion: string,
+  packageVersion: string,
+): {
+  isMismatch: boolean;
+  severity: 'minor' | 'major';
+  message: string;
+} {
+  const tagIsPrerelease = semver.prerelease(tagVersion) !== null;
+  const packageIsPrerelease = semver.prerelease(packageVersion) !== null;
+  const tagParsed = semver.parse(tagVersion);
+  const packageParsed = semver.parse(packageVersion);
+
+  if (!tagParsed || !packageParsed) {
+    return { isMismatch: false, severity: 'minor', message: '' };
+  }
+
+  // Case 1: Tag is stable but package is prerelease (same major version)
+  // This can happen when a release was reverted but tag wasn't deleted
+  if (!tagIsPrerelease && packageIsPrerelease && tagParsed.major === packageParsed.major) {
+    return {
+      isMismatch: true,
+      severity: 'major',
+      message:
+        `Git tag ${tagVersion} (stable) is ahead of package ${packageVersion} (prerelease). ` +
+        `This may indicate a reverted release. Consider deleting tag ${tagVersion} or updating package.json.`,
+    };
+  }
+
+  // Case 2: Tag is ahead by more than one minor/patch version
+  const tagHigher = semver.gt(tagVersion, packageVersion);
+  if (tagHigher) {
+    const diff = semver.diff(packageVersion, tagVersion);
+    if (diff === 'major' || diff === 'minor') {
+      return {
+        isMismatch: true,
+        severity: 'major',
+        message:
+          `Git tag ${tagVersion} is significantly ahead (${diff}) of package ${packageVersion}. ` +
+          'This may cause unexpected version bumps.',
+      };
+    }
+  }
+
+  // Case 3: Package is stable but tag is prerelease (unusual)
+  if (tagIsPrerelease && !packageIsPrerelease) {
+    return {
+      isMismatch: true,
+      severity: 'minor',
+      message:
+        `Git tag ${tagVersion} is a prerelease but package ${packageVersion} is stable. ` +
+        'Consider aligning your versioning.',
+    };
+  }
+
+  return { isMismatch: false, severity: 'minor', message: '' };
+}
+
+export class VersionMismatchError extends Error {
+  constructor(
+    message: string,
+    public readonly severity: 'minor' | 'major',
+  ) {
+    super(message);
+    this.name = 'VersionMismatchError';
+  }
+}
+
+export type MismatchInfo = {
+  detected: boolean;
+  severity: 'minor' | 'major';
+  message: string;
+};
+
+export type VersionSourceResult = {
+  source: 'git' | 'package' | 'initial';
+  version: string;
+  reason: string;
+  mismatch?: MismatchInfo;
+};
+
+/**
  * Get the best available version source (git tag vs package version)
  * Smart fallback logic that chooses the most appropriate version source
+ *
+ * Mismatch strategies:
+ * - 'error': Throw error on significant mismatch
+ * - 'warn': Log warning but continue (default behavior)
+ * - 'ignore': Silent ignore
+ * - 'prefer-package': Always use package version when mismatch detected
+ * - 'prefer-git': Always use git tag when mismatch detected (old behavior)
  */
 export async function getBestVersionSource(
   tagName: string | undefined,
   packageVersion: string | undefined,
   cwd: string,
-): Promise<{
-  source: 'git' | 'package' | 'initial';
-  version: string;
-  reason: string;
-}> {
+  mismatchStrategy: 'error' | 'warn' | 'ignore' | 'prefer-package' | 'prefer-git' = 'warn',
+): Promise<VersionSourceResult> {
   // No tag provided - use package version or fallback to initial
   if (!tagName?.trim()) {
     return packageVersion
@@ -228,13 +317,72 @@ export async function getBestVersionSource(
     const cleanTagVersion = tagName.replace(/^.*?([0-9])/, '$1');
     const cleanPackageVersion = packageVersion;
 
+    // Check for significant mismatches
+    const mismatch = detectVersionMismatch(cleanTagVersion, cleanPackageVersion);
+    const mismatchInfo: MismatchInfo | undefined = mismatch.isMismatch
+      ? { detected: true, severity: mismatch.severity, message: mismatch.message }
+      : undefined;
+
+    // Handle mismatch based on strategy
+    if (mismatch.isMismatch) {
+      switch (mismatchStrategy) {
+        case 'error':
+          throw new VersionMismatchError(
+            `Version mismatch detected: ${mismatch.message}\n` +
+              `To resolve: delete the conflicting tag, update package.json, or change mismatchStrategy to 'warn' or 'ignore'`,
+            mismatch.severity,
+          );
+
+        case 'warn':
+          log(mismatch.message, 'warning');
+          log(
+            `Continuing with git tag ${tagName}. ` +
+              `To use package version instead, set mismatchStrategy to 'prefer-package'`,
+            'warning',
+          );
+          break;
+
+        case 'ignore':
+          // Silent - no logging
+          break;
+
+        case 'prefer-package':
+          log(mismatch.message, 'warning');
+          log(
+            `Using package version ${packageVersion} due to mismatchStrategy='prefer-package'`,
+            'info',
+          );
+          return {
+            source: 'package',
+            version: packageVersion,
+            reason: 'Mismatch detected, using package version per strategy',
+            mismatch: mismatchInfo,
+          };
+
+        case 'prefer-git':
+          log(mismatch.message, 'warning');
+          log(`Using git tag ${tagName} due to mismatchStrategy='prefer-git'`, 'info');
+          return {
+            source: 'git',
+            version: tagName,
+            reason: 'Mismatch detected, using git tag per strategy',
+            mismatch: mismatchInfo,
+          };
+      }
+    }
+
     // Compare versions and use the newer one
     if (semver.gt(cleanPackageVersion, cleanTagVersion)) {
       log(
         `Package version ${packageVersion} is newer than git tag ${tagName}, using package version`,
         'info',
       );
-      return { source: 'package', version: packageVersion, reason: 'Package version is newer' };
+      return {
+        source: 'package',
+        version: packageVersion,
+        reason: 'Package version is newer',
+        mismatch: mismatchInfo,
+      };
     }
 
     if (semver.gt(cleanTagVersion, cleanPackageVersion)) {
@@ -242,12 +390,25 @@ export async function getBestVersionSource(
         `Git tag ${tagName} is newer than package version ${packageVersion}, using git tag`,
         'info',
       );
-      return { source: 'git', version: tagName, reason: 'Git tag is newer' };
+      return {
+        source: 'git',
+        version: tagName,
+        reason: 'Git tag is newer',
+        mismatch: mismatchInfo,
+      };
     }
 
     // Versions equal - prefer git tag as source of truth
-    return { source: 'git', version: tagName, reason: 'Versions equal, using git tag' };
+    return {
+      source: 'git',
+      version: tagName,
+      reason: 'Versions equal, using git tag',
+      mismatch: mismatchInfo,
+    };
   } catch (error) {
+    if (error instanceof VersionMismatchError) {
+      throw error;
+    }
     log(`Failed to compare versions, defaulting to git tag: ${error}`, 'warning');
     return { source: 'git', version: tagName, reason: 'Version comparison failed' };
   }

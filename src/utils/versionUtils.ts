@@ -260,17 +260,17 @@ export type VersionSourceResult = {
  * Smart fallback logic that chooses the most appropriate version source
  *
  * Mismatch strategies:
- * - 'error': Throw error on significant mismatch
- * - 'warn': Log warning but continue (default behavior)
+ * - 'error': Throw error on significant mismatch (default)
+ * - 'warn': Log warning but continue with the higher version
  * - 'ignore': Silent ignore
  * - 'prefer-package': Always use package version when mismatch detected
- * - 'prefer-git': Always use git tag when mismatch detected (old behavior)
+ * - 'prefer-git': Always use git tag when mismatch detected
  */
 export async function getBestVersionSource(
   tagName: string | undefined,
   packageVersion: string | undefined,
   cwd: string,
-  mismatchStrategy: 'error' | 'warn' | 'ignore' | 'prefer-package' | 'prefer-git' = 'warn',
+  mismatchStrategy: 'error' | 'warn' | 'ignore' | 'prefer-package' | 'prefer-git' = 'error',
 ): Promise<VersionSourceResult> {
   // No tag provided - use package version or fallback to initial
   if (!tagName?.trim()) {

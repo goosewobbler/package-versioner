@@ -143,7 +143,7 @@ describe('Tag Verification', () => {
       // Mock execSync to succeed (tag exists)
       mockExecSync.mockImplementation(() => Buffer.from('abc123'));
 
-      const result = await getBestVersionSource('v1.2.0', '1.0.0', '/test/path');
+      const result = await getBestVersionSource('v1.2.0', '1.0.0', '/test/path', 'warn');
 
       expect(result.source).toBe('git');
       expect(result.version).toBe('v1.2.0');
@@ -296,7 +296,7 @@ describe('Tag Verification', () => {
         // Mock execSync to succeed (tag exists)
         mockExecSync.mockImplementation(() => Buffer.from('abc123'));
 
-        const result = await getBestVersionSource('v1.0.0', '1.0.0-beta.1', '/test/path');
+        const result = await getBestVersionSource('v1.0.0', '1.0.0-beta.1', '/test/path', 'warn');
 
         expect(result.source).toBe('git');
         expect(result.version).toBe('v1.0.0');
@@ -330,11 +330,20 @@ describe('Tag Verification', () => {
         ).rejects.toThrow(VersionMismatchError);
       });
 
+      it('should throw VersionMismatchError by default (error is the default strategy)', async () => {
+        // Mock execSync to succeed (tag exists)
+        mockExecSync.mockImplementation(() => Buffer.from('abc123'));
+
+        await expect(getBestVersionSource('v1.0.0', '1.0.0-beta.1', '/test/path')).rejects.toThrow(
+          VersionMismatchError,
+        );
+      });
+
       it('should detect major version difference as significant mismatch', async () => {
         // Mock execSync to succeed (tag exists)
         mockExecSync.mockImplementation(() => Buffer.from('abc123'));
 
-        const result = await getBestVersionSource('v2.0.0', '1.0.0', '/test/path');
+        const result = await getBestVersionSource('v2.0.0', '1.0.0', '/test/path', 'warn');
 
         expect(result.source).toBe('git');
         expect(result.mismatch?.detected).toBe(true);
@@ -345,7 +354,7 @@ describe('Tag Verification', () => {
         // Mock execSync to succeed (tag exists)
         mockExecSync.mockImplementation(() => Buffer.from('abc123'));
 
-        const result = await getBestVersionSource('v1.5.0', '1.0.0', '/test/path');
+        const result = await getBestVersionSource('v1.5.0', '1.0.0', '/test/path', 'warn');
 
         expect(result.source).toBe('git');
         expect(result.mismatch?.detected).toBe(true);
@@ -367,7 +376,7 @@ describe('Tag Verification', () => {
         mockExecSync.mockImplementation(() => Buffer.from('abc123'));
 
         // Package 1.0.0 is greater than tag 1.0.0-beta.1
-        const result = await getBestVersionSource('v1.0.0-beta.1', '1.0.0', '/test/path');
+        const result = await getBestVersionSource('v1.0.0-beta.1', '1.0.0', '/test/path', 'warn');
 
         expect(result.source).toBe('package');
         expect(result.version).toBe('1.0.0');

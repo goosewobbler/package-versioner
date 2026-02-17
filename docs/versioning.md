@@ -145,8 +145,8 @@ The `mismatchStrategy` option controls how these situations are handled:
 
 | Strategy | Behavior |
 |----------|----------|
-| `"warn"` (default) | Logs a warning describing the mismatch, then continues with the higher version |
-| `"error"` | Throws an error and stops execution, forcing the user to resolve the mismatch |
+| `"error"` (default) | Throws an error and stops execution, forcing the user to resolve the mismatch |
+| `"warn"` | Logs a warning describing the mismatch, then continues with the higher version |
 | `"prefer-package"` | Uses the package.json version as the base when a mismatch is detected |
 | `"prefer-git"` | Uses the git tag version as the base when a mismatch is detected |
 | `"ignore"` | Silently continues with the higher version (pre-v0.9.4 behavior) |

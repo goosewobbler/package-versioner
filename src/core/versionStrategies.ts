@@ -16,6 +16,7 @@ import { updatePackageVersion } from '../package/packageManagement.js';
 import { PackageProcessor } from '../package/packageProcessor.js';
 import type { Config } from '../types.js';
 import { formatCommitMessage, formatTag, formatVersionPrefix } from '../utils/formatting.js';
+import { addChangelogData } from '../utils/jsonOutput.js';
 import { log } from '../utils/logging.js';
 import { shouldProcessPackage as shouldProcessPackageUtil } from '../utils/packageMatching.js';
 import { calculateVersion } from './versionCalculator.js';
@@ -344,10 +345,10 @@ export function createSingleStrategy(config: Config): StrategyFunction {
       if (config.updateChangelog !== false) {
         // Extract changelog entries from commit messages
         let changelogEntries: ChangelogEntry[] = [];
+        let revisionRange = 'HEAD';
 
         try {
           // Extract entries from commits between the latest tag and HEAD
-          let revisionRange: string;
 
           // Check if the tag actually exists in the repository
           if (latestTag) {
@@ -419,6 +420,16 @@ export function createSingleStrategy(config: Config): StrategyFunction {
             'warning',
           );
         }
+
+        // Track changelog data for JSON output
+        addChangelogData({
+          packageName,
+          version: nextVersion,
+          previousVersion: latestTag || null,
+          revisionRange,
+          repoUrl: repoUrl || null,
+          entries: changelogEntries,
+        });
 
         // Update the changelog
         updateChangelog(

@@ -10,7 +10,7 @@ import { getLatestTagForPackage } from '../git/tagsAndBranches.js';
 import { verifyTag } from '../git/tagVerification.js';
 import type { Config, VersionConfigBase } from '../types.js';
 import { formatCommitMessage, formatTag, formatVersionPrefix } from '../utils/formatting.js';
-import { addTag, setCommitMessage } from '../utils/jsonOutput.js';
+import { addChangelogData, addTag, setCommitMessage } from '../utils/jsonOutput.js';
 import { log } from '../utils/logging.js';
 import { getVersionFromManifests } from '../utils/manifestHelpers.js';
 import { shouldProcessPackage } from '../utils/packageMatching.js';
@@ -177,11 +177,11 @@ export class PackageProcessor {
       if (this.fullConfig.updateChangelog !== false) {
         // Extract changelog entries from commit messages
         let changelogEntries: ChangelogEntry[] = [];
+        let revisionRange = 'HEAD';
 
         try {
           // Extract entries from commits between the latest tag and HEAD
           // If latestTag is empty or doesn't exist, we'll extract from HEAD
-          let revisionRange: string;
 
           // Check if the tag actually exists in the repository using the new verification utility
           if (latestTag) {
@@ -253,6 +253,16 @@ export class PackageProcessor {
             'warning',
           );
         }
+
+        // Track changelog data for JSON output
+        addChangelogData({
+          packageName: name,
+          version: nextVersion,
+          previousVersion: latestTag || null,
+          revisionRange,
+          repoUrl: repoUrl || null,
+          entries: changelogEntries,
+        });
 
         // Update the changelog
         updateChangelog(

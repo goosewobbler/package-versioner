@@ -179,11 +179,13 @@ jobs:
           fi
           
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-             echo "[DRY RUN] Checking NPM authentication..."
-             # Run npm whoami and output a warning on failure, but don't fail the step
-             npm whoami || echo "::warning::NPM auth check failed (npm whoami). Token might be invalid or missing."
-             echo "[DRY RUN] Would publish version $VERSION_TO_CHECK to NPM with tag \"$NPM_TAG\""
-          else
+              # Configure NPM auth for dry-run mode so npm whoami can verify token
+              echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
+              echo "[DRY RUN] Checking NPM authentication..."
+              # Run npm whoami and output a warning on failure, but don't fail the step
+              npm whoami || echo "::warning::NPM auth check failed (npm whoami). Token might be invalid or missing."
+              echo "[DRY RUN] Would publish version $VERSION_TO_CHECK to NPM with tag \"$NPM_TAG\""
+           else
              if [[ -z "$VERSION_TO_CHECK" ]]; then
                 echo "::error::Cannot publish to NPM because version is empty."
                 exit 1

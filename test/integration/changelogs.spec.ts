@@ -89,7 +89,7 @@ describe('Changelog Integration Tests', () => {
       preset: 'conventional-commits',
       packages: ['.'],
       versionPrefix: 'v',
-      updateChangelog: true,
+      writeChangelog: true,
       changelogFormat: 'keep-a-changelog',
     });
     execSync('git add .', { cwd: tempDir });
@@ -181,7 +181,7 @@ describe('Changelog Integration Tests', () => {
         preset: 'conventional-commits',
         packages: ['.'],
         versionPrefix: 'v',
-        updateChangelog: true,
+        writeChangelog: true,
         changelogFormat: 'angular',
       });
       execSync('git add .', { cwd: angularTempDir });
@@ -307,7 +307,7 @@ describe('Changelog Integration Tests', () => {
         preset: 'conventional-commits',
         packages: ['.'],
         versionPrefix: 'v',
-        updateChangelog: true,
+        writeChangelog: true,
         changelogFormat: 'keep-a-changelog',
       });
 
@@ -433,7 +433,7 @@ describe('Changelog Integration Tests', () => {
         preset: 'conventional-commits',
         packages: ['.'],
         versionPrefix: 'v',
-        updateChangelog: true,
+        writeChangelog: true,
         changelogFormat: 'angular',
       });
 

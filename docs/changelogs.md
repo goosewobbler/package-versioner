@@ -35,14 +35,14 @@ You can configure the preferred format in your `version.config.json`:
 
 ```json
 {
-  "updateChangelog": true,
+  "writeChangelog": true,
   "changelogFormat": "keep-a-changelog" // or "angular"
 }
 ```
 
 ## Customization Options
 
-- **Enable/Disable**: Set `updateChangelog: false` in your config to disable changelog generation
+- **Enable/Disable**: Set `writeChangelog: false` in your config to disable changelog file generation (changelog data is still available via `--json`)
 - **Format Selection**: Use `changelogFormat` to choose between "keep-a-changelog" or "angular"
 - **Repository URL**: Automatically detected from package.json, or can be configured explicitly
 - **Issue References**: Commit messages containing `fixes #123` or similar will link issues in the changelog

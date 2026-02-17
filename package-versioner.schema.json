@@ -106,10 +106,10 @@
       "default": false,
       "description": "Whether to skip Git hooks"
     },
-    "updateChangelog": {
+    "writeChangelog": {
       "type": "boolean",
       "default": true,
-      "description": "Whether to automatically generate and update changelogs"
+      "description": "Whether to write changelog files to disk"
     },
     "strictReachable": {
       "type": "boolean",

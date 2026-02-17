@@ -727,7 +727,7 @@ describe('Package Processor', () => {
           ...mockConfig,
           // Enable Cargo handling explicitly
           cargo: { enabled: true },
-          updateChangelog: false,
+          writeChangelog: false,
         },
       });
 
@@ -770,7 +770,7 @@ describe('Package Processor', () => {
           ...mockConfig,
           // Enable Cargo handling explicitly
           cargo: { enabled: true },
-          updateChangelog: false,
+          writeChangelog: false,
         },
       });
 
@@ -821,7 +821,7 @@ describe('Package Processor', () => {
           ...mockConfig,
           // Enable Cargo handling explicitly
           cargo: { enabled: true },
-          updateChangelog: false,
+          writeChangelog: false,
         },
       });
 
@@ -862,7 +862,7 @@ describe('Package Processor', () => {
         fullConfig: {
           ...mockConfig,
           versionPrefix: 'ver',
-          updateChangelog: false,
+          writeChangelog: false,
         },
       });
 
@@ -940,7 +940,7 @@ describe('Package Processor', () => {
         config: {},
         fullConfig: {
           ...mockConfig,
-          updateChangelog: false,
+          writeChangelog: false,
         },
       });
 
@@ -980,7 +980,7 @@ describe('Package Processor', () => {
         fullConfig: {
           ...mockConfig,
           // Disable changelog to simplify test
-          updateChangelog: false,
+          writeChangelog: false,
         },
       });
 
@@ -1017,7 +1017,7 @@ describe('Package Processor', () => {
         fullConfig: {
           ...mockConfig,
           // Disable changelog to simplify test
-          updateChangelog: false,
+          writeChangelog: false,
         },
       });
 
@@ -1058,7 +1058,7 @@ describe('Package Processor', () => {
         fullConfig: {
           ...mockConfig,
           // Disable changelog to simplify test
-          updateChangelog: false,
+          writeChangelog: false,
         },
       });
 
@@ -1243,7 +1243,7 @@ describe('Package Processor', () => {
         fullConfig: {
           ...mockConfig,
           versionPrefix: 'ver',
-          updateChangelog: false,
+          writeChangelog: false,
         },
       });
 

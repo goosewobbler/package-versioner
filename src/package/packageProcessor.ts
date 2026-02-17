@@ -174,52 +174,37 @@ export class PackageProcessor {
       }
 
       // Generate changelog entries from conventional commits
-      if (this.fullConfig.updateChangelog !== false) {
-        // Extract changelog entries from commit messages
-        let changelogEntries: ChangelogEntry[] = [];
-        let revisionRange = 'HEAD';
+      let changelogEntries: ChangelogEntry[] = [];
+      let revisionRange = 'HEAD';
 
-        try {
-          // Extract entries from commits between the latest tag and HEAD
-          // If latestTag is empty or doesn't exist, we'll extract from HEAD
+      try {
+        // Extract entries from commits between the latest tag and HEAD
+        // If latestTag is empty or doesn't exist, we'll extract from HEAD
 
-          // Check if the tag actually exists in the repository using the new verification utility
-          if (latestTag) {
-            const verification = verifyTag(latestTag, pkgPath);
-            if (verification.exists && verification.reachable) {
-              // Tag exists and is reachable, get commits since that tag
-              revisionRange = `${latestTag}..HEAD`;
-            } else {
-              // Tag doesn't exist or is unreachable, get all commits
-              log(
-                `Tag ${latestTag} is unreachable (${verification.error}), using all commits for changelog`,
-                'debug',
-              );
-              revisionRange = 'HEAD';
-            }
+        // Check if the tag actually exists in the repository using the new verification utility
+        if (latestTag) {
+          const verification = verifyTag(latestTag, pkgPath);
+          if (verification.exists && verification.reachable) {
+            // Tag exists and is reachable, get commits since that tag
+            revisionRange = `${latestTag}..HEAD`;
           } else {
-            // No tag provided, get all commits
+            // Tag doesn't exist or is unreachable, get all commits
+            log(
+              `Tag ${latestTag} is unreachable (${verification.error}), using all commits for changelog`,
+              'debug',
+            );
             revisionRange = 'HEAD';
           }
+        } else {
+          // No tag provided, get all commits
+          revisionRange = 'HEAD';
+        }
 
-          changelogEntries = extractChangelogEntriesFromCommits(pkgPath, revisionRange);
+        changelogEntries = extractChangelogEntriesFromCommits(pkgPath, revisionRange);
 
-          // If we have no entries but we're definitely changing versions,
-          // add a minimal entry about the version change
-          if (changelogEntries.length === 0) {
-            changelogEntries = [
-              {
-                type: 'changed',
-                description: `Update version to ${nextVersion}`,
-              },
-            ];
-          }
-        } catch (error) {
-          log(
-            `Error extracting changelog entries: ${error instanceof Error ? error.message : String(error)}`,
-            'warning',
-          );
-          // Fall back to minimal entry
+        // If we have no entries but we're definitely changing versions,
+        // add a minimal entry about the version change
+        if (changelogEntries.length === 0) {
           changelogEntries = [
             {
               type: 'changed',
@@ -227,44 +212,58 @@ export class PackageProcessor {
             },
           ];
         }
+      } catch (error) {
+        log(
+          `Error extracting changelog entries: ${error instanceof Error ? error.message : String(error)}`,
+          'warning',
+        );
+        // Fall back to minimal entry
+        changelogEntries = [
+          {
+            type: 'changed',
+            description: `Update version to ${nextVersion}`,
+          },
+        ];
+      }
 
-        // Determine repo URL from package.json or git config
-        let repoUrl: string | undefined;
-        try {
-          const packageJsonPath = path.join(pkgPath, 'package.json');
-          if (fs.existsSync(packageJsonPath)) {
-            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-            if (packageJson.repository) {
-              if (typeof packageJson.repository === 'string') {
-                repoUrl = packageJson.repository;
-              } else if (packageJson.repository.url) {
-                repoUrl = packageJson.repository.url;
-              }
+      // Determine repo URL from package.json or git config
+      let repoUrl: string | undefined;
+      try {
+        const packageJsonPath = path.join(pkgPath, 'package.json');
+        if (fs.existsSync(packageJsonPath)) {
+          const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+          if (packageJson.repository) {
+            if (typeof packageJson.repository === 'string') {
+              repoUrl = packageJson.repository;
+            } else if (packageJson.repository.url) {
+              repoUrl = packageJson.repository.url;
+            }
 
-              // Clean up GitHub URL format if needed
-              if (repoUrl?.startsWith('git+') && repoUrl?.endsWith('.git')) {
-                repoUrl = repoUrl.substring(4, repoUrl.length - 4);
-              }
+            // Clean up GitHub URL format if needed
+            if (repoUrl?.startsWith('git+') && repoUrl?.endsWith('.git')) {
+              repoUrl = repoUrl.substring(4, repoUrl.length - 4);
             }
           }
-        } catch (error) {
-          log(
-            `Could not determine repository URL for changelog links: ${error instanceof Error ? error.message : String(error)}`,
-            'warning',
-          );
         }
+      } catch (error) {
+        log(
+          `Could not determine repository URL for changelog links: ${error instanceof Error ? error.message : String(error)}`,
+          'warning',
+        );
+      }
 
-        // Track changelog data for JSON output
-        addChangelogData({
-          packageName: name,
-          version: nextVersion,
-          previousVersion: latestTag || null,
-          revisionRange,
-          repoUrl: repoUrl || null,
-          entries: changelogEntries,
-        });
+      // Track changelog data for JSON output (always, regardless of writeChangelog)
+      addChangelogData({
+        packageName: name,
+        version: nextVersion,
+        previousVersion: latestTag || null,
+        revisionRange,
+        repoUrl: repoUrl || null,
+        entries: changelogEntries,
+      });
 
-        // Update the changelog
+      // Write changelog file if enabled
+      if (this.fullConfig.writeChangelog !== false) {
         updateChangelog(
           pkgPath,
           name,

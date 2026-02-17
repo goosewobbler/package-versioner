@@ -4,7 +4,7 @@
   "preset": "angular",
   "updateInternalDependencies": "patch",
   "commitMessage": "chore: release ${version} [skip-ci]",
-  "updateChangelog": true,
+  "writeChangelog": true,
   "tagTemplate": "${prefix}${version}",
   "packageSpecificTags": false,
   "cargo": {

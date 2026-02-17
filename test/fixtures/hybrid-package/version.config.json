@@ -2,5 +2,5 @@
   "preset": "conventional-commits",
   "versionPrefix": "v",
   "packages": ["."],
-  "updateChangelog": false
+  "writeChangelog": false
 }

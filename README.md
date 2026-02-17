@@ -140,7 +140,7 @@ Customize behaviour by creating a `version.config.json` file in your project roo
   "tagTemplate": "${packageName}@${prefix}${version}",
   "packageSpecificTags": true,
   "commitMessage": "chore: release ${packageName}@${version} [skip ci]",
-  "updateChangelog": true,
+  "writeChangelog": true,
   "changelogFormat": "keep-a-changelog",
   "strictReachable": false,
   "sync": true,
@@ -164,7 +164,7 @@ Customize behaviour by creating a `version.config.json` file in your project roo
 - `versionPrefix`: Prefix for version numbers in tags (default: "v")
 - `tagTemplate`: Template for Git tags (default: "${prefix}${version}")
 - `commitMessage`: Template for commit messages (default: "chore(release): ${version}")
-- `updateChangelog`: Whether to automatically update changelogs (default: true)
+- `writeChangelog`: Whether to write changelog files to disk (default: true). Changelog data is always available via `--json` regardless of this setting
 - `changelogFormat`: Format for changelogs - "keep-a-changelog" or "angular" (default: "keep-a-changelog")
 - `strictReachable`: Only use reachable tags, no fallback to unreachable tags (default: false)
 - `prereleaseIdentifier`: Identifier for prerelease versions (e.g., "alpha", "beta", "next") used in versions like "1.2.0-alpha.3"

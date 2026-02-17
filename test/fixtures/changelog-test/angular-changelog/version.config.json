@@ -2,6 +2,6 @@
   "preset": "conventional-commits",
   "packages": ["."],
   "versionPrefix": "v",
-  "updateChangelog": true,
+  "writeChangelog": true,
   "changelogFormat": "angular"
 }

@@ -813,11 +813,17 @@ describe('Version Calculator', () => {
     });
 
     it('should use package.json version when no latestTag exists with explicit bump', async () => {
-      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValueOnce({
+      // Mock both functions properly
+      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
         version: '1.0.0-beta.1',
         manifestFound: true,
         manifestPath: 'path/to/package.json',
         manifestType: 'package.json',
+      });
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValue({
+        source: 'package',
+        version: '1.0.0-beta.1',
+        reason: 'No git tag provided',
       });
       vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.0.0');
 
@@ -839,12 +845,19 @@ describe('Version Calculator', () => {
     });
 
     it('should correctly handle major bump on 1.0.0-next.0 to become 1.0.0', async () => {
-      // Mock getBestVersionSource for this test
-      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+      // Mock both dependencies properly
+      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
+        version: '1.0.0-next.0',
+        manifestFound: true,
+        manifestPath: 'path/to/package.json',
+        manifestType: 'package.json',
+      });
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValue({
         source: 'package',
         version: '1.0.0-next.0',
         reason: 'No git tag provided',
       });
+      vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.0.0');
 
       const config: Partial<Config> = {
         ...defaultConfig,
@@ -862,12 +875,19 @@ describe('Version Calculator', () => {
     });
 
     it('should attempt to use package.json version with conventional commits when no latestTag exists', async () => {
-      // Mock getBestVersionSource for this test
-      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValueOnce({
+      // Mock both dependencies properly
+      vi.spyOn(manifestHelpers, 'getVersionFromManifests').mockReturnValue({
+        version: '1.0.0',
+        manifestFound: true,
+        manifestPath: 'path/to/package.json',
+        manifestType: 'package.json',
+      });
+      vi.spyOn(versionUtils, 'getBestVersionSource').mockResolvedValue({
         source: 'package',
         version: '1.0.0',
         reason: 'No git tag provided',
       });
+      vi.spyOn(versionUtils, 'bumpVersion').mockReturnValue('1.0.1');
 
       const config: Partial<Config> = {
         ...defaultConfig,

@@ -107,6 +107,19 @@ When using the `--json` flag, normal console output is suppressed and the tool o
       "filePath": "/path/to/package.json"
     }
   ],
+  "changelogs": [
+    {
+      "packageName": "@scope/package-a",
+      "version": "1.2.3",
+      "previousVersion": "v1.2.2",
+      "revisionRange": "v1.2.2..HEAD",
+      "repoUrl": "https://github.com/org/repo",
+      "entries": [
+        { "type": "added", "description": "New feature", "scope": "core" },
+        { "type": "fixed", "description": "Bug fix" }
+      ]
+    }
+  ],
   "commitMessage": "chore(release): v1.2.3",
   "tags": [
     "v@scope/package-a@1.2.3"

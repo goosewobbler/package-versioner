@@ -22,8 +22,21 @@ This will suppress all normal console output and instead output a single JSON ob
   "updates": [                                // Array of packages that were updated
     {
       "packageName": "@scope/package-a",     // Package name
-      "newVersion": "1.2.3",                 // New version number 
+      "newVersion": "1.2.3",                 // New version number
       "filePath": "/path/to/package.json"    // Path to the updated package.json
+    }
+  ],
+  "changelogs": [                            // Structured changelog data per package
+    {
+      "packageName": "@scope/package-a",     // Package name
+      "version": "1.2.3",                   // New version
+      "previousVersion": "v1.2.2",          // Previous tag (null if none)
+      "revisionRange": "v1.2.2..HEAD",      // Git revision range used
+      "repoUrl": "https://github.com/org/repo", // Repository URL (null if unknown)
+      "entries": [                           // Parsed changelog entries
+        { "type": "added", "description": "New feature", "scope": "core" },
+        { "type": "fixed", "description": "Bug fix" }
+      ]
     }
   ],
   "commitMessage": "chore(release): v1.2.3", // The commit message that was used

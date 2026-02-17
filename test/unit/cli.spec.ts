@@ -11,25 +11,28 @@ vi.mock('../../src/core/versionEngine.js');
 vi.mock('../../src/utils/logging.js');
 vi.mock('commander', async () => {
   const actual = (await vi.importActual('commander')) as { Command: typeof Command };
+
+  // Store commands at module level to persist across instances
+  const commands = new Map<string, { handler: unknown; isDefault?: boolean }>();
+
   return {
     ...actual,
-    Command: vi.fn().mockImplementation(() => {
+    Command: vi.fn().mockImplementation(function (this: unknown) {
+      // Use function constructor instead of arrow function
       const originalCommand = new actual.Command();
 
       // Add spies to track method calls
       originalCommand.parse = vi.fn().mockReturnThis();
 
-      // Keep track of commands and their actions
-      const commands = new Map<string, { handler: unknown; isDefault?: boolean }>();
-
       // Override command method to track commands
-      const originalCommandMethod = originalCommand.command;
-      originalCommand.command = vi.fn((name, opts) => {
-        const cmd = originalCommandMethod.call(originalCommand, name, opts);
-        cmd.action = vi.fn((handler) => {
+      const originalCommandMethod = originalCommand.command.bind(originalCommand);
+      originalCommand.command = vi.fn((name: string, opts?: { isDefault?: boolean }) => {
+        const cmd = originalCommandMethod(name, opts);
+        const originalAction = cmd.action.bind(cmd);
+        cmd.action = vi.fn((handler: unknown) => {
           // Store the command and handler
           commands.set(name, { handler, isDefault: opts?.isDefault });
-          return cmd;
+          return originalAction(handler);
         });
         return cmd;
       });
@@ -172,6 +175,22 @@ describe('CLI Interface', () => {
 
   describe('CLI Target Handling', () => {
     it('should override config.packages when -t flag is used', async () => {
+      // Create a spy to capture the config passed to VersionEngine
+      let capturedConfigFromEngine: Config | undefined;
+
+      // Set up the mock BEFORE calling run
+      vi.mocked(VersionEngine, { partial: true }).mockImplementation(function (
+        this: unknown,
+        config: Config,
+      ) {
+        capturedConfigFromEngine = config;
+        return {
+          getWorkspacePackages: mockGetWorkspacePackages,
+          run: mockRun,
+          setStrategy: mockSetStrategy,
+        } as unknown as VersionEngine;
+      });
+
       // Mock the version command handler to capture config changes
       const originalLoadConfig = vi.mocked(configModule.loadConfig, { partial: true });
 
@@ -199,19 +218,6 @@ describe('CLI Interface', () => {
         projectDir: process.cwd(),
       };
 
-      // Create a spy to capture the config passed to VersionEngine
-      const VersionEngineSpy = vi.mocked(VersionEngine, { partial: true });
-      let capturedConfigFromEngine: Config | undefined;
-
-      VersionEngineSpy.mockImplementation((config: Config) => {
-        capturedConfigFromEngine = config;
-        return {
-          getWorkspacePackages: mockGetWorkspacePackages,
-          run: mockRun,
-          setStrategy: mockSetStrategy,
-        } as unknown as VersionEngine;
-      });
-
       // Execute the version handler directly with mock options
       await (versionHandler as (options: VersionCommandOptions) => Promise<void>)(mockOptions);
 
@@ -221,10 +227,13 @@ describe('CLI Interface', () => {
     });
 
     it('should parse multiple targets from comma-separated string', async () => {
-      const VersionEngineSpy = vi.mocked(VersionEngine, { partial: true });
       let capturedConfigFromEngine: Config | undefined;
 
-      VersionEngineSpy.mockImplementation((config: Config) => {
+      // Set up the mock BEFORE calling run
+      vi.mocked(VersionEngine, { partial: true }).mockImplementation(function (
+        this: unknown,
+        config: Config,
+      ) {
         capturedConfigFromEngine = config;
         return {
           getWorkspacePackages: mockGetWorkspacePackages,
@@ -255,10 +264,13 @@ describe('CLI Interface', () => {
     });
 
     it('should not override config.packages when no -t flag is provided', async () => {
-      const VersionEngineSpy = vi.mocked(VersionEngine, { partial: true });
       let capturedConfigFromEngine: Config | undefined;
 
-      VersionEngineSpy.mockImplementation((config: Config) => {
+      // Set up the mock BEFORE calling run
+      vi.mocked(VersionEngine, { partial: true }).mockImplementation(function (
+        this: unknown,
+        config: Config,
+      ) {
         capturedConfigFromEngine = config;
         return {
           getWorkspacePackages: mockGetWorkspacePackages,
@@ -288,10 +300,13 @@ describe('CLI Interface', () => {
     });
 
     it('should handle empty target string gracefully', async () => {
-      const VersionEngineSpy = vi.mocked(VersionEngine, { partial: true });
       let capturedConfigFromEngine: Config | undefined;
 
-      VersionEngineSpy.mockImplementation((config: Config) => {
+      // Set up the mock BEFORE calling run
+      vi.mocked(VersionEngine, { partial: true }).mockImplementation(function (
+        this: unknown,
+        config: Config,
+      ) {
         capturedConfigFromEngine = config;
         return {
           getWorkspacePackages: mockGetWorkspacePackages,

@@ -3,40 +3,22 @@ name: Publish Release
 on:
   workflow_call:
     inputs:
-      target_branch:
-        description: 'Target branch to release from'
-        required: true
-        type: string
       release_version:
         description: 'Release type (patch, minor, major, prepatch, preminor, premajor, prerelease)'
         required: true
         type: string
       dry_run:
-        description: 'Do not touch or write anything. Show the commands.'
+        description: 'Dry run - no changes made'
         required: true
         default: false
         type: boolean
-      branch_type:
-        description: 'Branch type (main, feature)'
-        required: true
-        type: string
     secrets:
-      github_bot_token:
-        description: 'GitHub token for authentication'
-        required: true
       npm_token:
         description: 'NPM token for publishing packages'
         required: true
       deploy_key:
         description: 'SSH deploy key for pushing to the repository'
         required: true
-    outputs:
-      release_tag:
-        description: 'The created release tag'
-        value: ${{ jobs.publish.outputs.release_tag }}
-      new_version:
-        description: 'The new version number'
-        value: ${{ jobs.publish.outputs.new_version }}
 
 jobs:
   publish:
@@ -47,214 +29,128 @@ jobs:
       release_tag: ${{ steps.version.outputs.release_tag }}
       new_version: ${{ steps.version.outputs.new_version }}
     steps:
-      - name: ⚖️ Define target branch for tagging
-        id: define
-        env:
-          TARGET_BRANCH: ${{ inputs.target_branch }}
-          IS_MAJOR: ${{ contains(inputs.release_version, 'major') }}
-          IS_PRE_RELEASE: ${{ contains(inputs.release_version, 'pre') }}
+      - name: Verify official repository
+        if: github.repository != 'goosewobbler/package-versioner'
         run: |
-          # Major releases (not pre) tag on main, others on target_branch
-          if [ "${IS_MAJOR}" == 'true' -a "${IS_PRE_RELEASE}" == 'false' ]; then
-            echo "tagging_branch=main"
-            echo "tagging_branch=main" >>"${GITHUB_OUTPUT}"
-          else
-            echo "tagging_branch=${TARGET_BRANCH}"
-            echo "tagging_branch=${TARGET_BRANCH}" >>"${GITHUB_OUTPUT}"
-          fi
+          echo "::error::This workflow can only be run in the official repository (goosewobbler/package-versioner)"
+          exit 1
 
-      - name: 👷 Checkout branch for tagging
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
           ssh-key: ${{ secrets.deploy_key }}
-          ref: ${{ steps.define.outputs.tagging_branch }}
-          fetch-depth: 0 # Full history needed for versioning
+          ref: main
+          fetch-depth: 0
 
-      - name: 🛠️ Setup workspace
+      - name: Setup workspace
         uses: ./.github/workflows/actions/setup-workspace
         with:
           node-version: '20'
 
-      - name: Build and verify package
+      - name: Build and verify
         uses: ./.github/workflows/actions/build-verify
 
-      - name: 🔖 Run package-versioner
+      - name: Run package-versioner
         id: version
         shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          # Determine package-versioner arguments
-          BUMP_ARG=""
-          PRE_ARG=""
-          if [[ "${{ inputs.release_version }}" == "prepatch" || "${{ inputs.release_version }}" == "preminor" || "${{ inputs.release_version }}" == "premajor" || "${{ inputs.release_version }}" == "prerelease" ]]; then
-            PRE_ARG="--prerelease $(echo "${{ inputs.release_version }}" | sed 's/^pre//')" # Extract identifier like patch, minor, etc.
-            # Need a default bump for prerelease if not specified
-            if [[ "${{ inputs.release_version }}" == "prerelease" ]]; then
-              BUMP_ARG="--bump patch" # Default to patch bump for simple prerelease
+          # Build package-versioner arguments
+          ARGS=""
+          if [[ "$RELEASE_VERSION" == pre* ]]; then
+            # Pre-release: extract the base type for --prerelease flag
+            if [[ "$RELEASE_VERSION" == "prerelease" ]]; then
+              ARGS="--bump patch --prerelease"
+            else
+              BASE_TYPE="${RELEASE_VERSION#pre}"
+              ARGS="--bump $BASE_TYPE --prerelease"
             fi
           else
-            BUMP_ARG="--bump ${{ inputs.release_version }}"
+            ARGS="--bump $RELEASE_VERSION"
           fi
 
-          DRY_RUN_ARG=""
-          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            DRY_RUN_ARG="--dry-run"
+          if [[ "$DRY_RUN" == "true" ]]; then
+            ARGS="$ARGS --dry-run"
           fi
 
-          # Execute package-versioner (ESM output is index.js due to type: module)
-          COMMAND="node ./dist/index.js $BUMP_ARG $PRE_ARG $DRY_RUN_ARG" 
-          
-          # Debug information 
-          echo "Current directory: $(pwd)"
-          echo "Files in current directory: $(ls -la)"
-          echo "Contents of package.json:"
-          cat package.json
-          echo "Version from package.json: $(jq -r '.version' package.json)"
-          
-          echo "Running: $COMMAND"
-          OUTPUT=$( $COMMAND 2>&1 )
+          echo "Running: node ./dist/index.js $ARGS"
+          OUTPUT=$(node ./dist/index.js $ARGS 2>&1)
           CMD_STATUS=$?
-          echo "Command Output:"
           echo "$OUTPUT"
-          
-          # Capture versioning status in output variable
-          echo "versioning_success=$CMD_STATUS" >> "$GITHUB_OUTPUT"
-          
+
           if [ $CMD_STATUS -ne 0 ]; then
-            echo "::error::Versioning command failed with exit code $CMD_STATUS"
-            echo "new_version=FAILED" >> "$GITHUB_OUTPUT"
-            echo "release_tag=FAILED" >> "$GITHUB_OUTPUT"
+            echo "::error::Versioning failed with exit code $CMD_STATUS"
             exit 1
           fi
 
-          # Determine new version and tag
-          # In dry run, parse output. Otherwise, read package.json and construct tag.
-          NEW_VERSION=""
-          RELEASE_TAG=""
-
-          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            # Parse version from the dry run update log (take first match if multiple)
-            # Handle both "Updated" (actual output) and "Would update" (expected dry run format)
-            NEW_VERSION=$(echo "$OUTPUT" | grep -o 'to version [0-9][0-9.]*' | head -n 1 | cut -d' ' -f3)
-            # Parse tag from the dry run tag log
+          # Determine version and tag
+          if [[ "$DRY_RUN" == "true" ]]; then
+            NEW_VERSION=$(echo "$OUTPUT" | grep -o 'to version [0-9][0-9.a-z-]*' | head -n 1 | cut -d' ' -f3)
             RELEASE_TAG=$(echo "$OUTPUT" | grep -o 'Would create tag: [^[:space:]]*' | head -n 1 | cut -d' ' -f4)
-            echo "Dry run - Parsed Version: $NEW_VERSION"
-            echo "Dry run - Parsed Tag: $RELEASE_TAG"
           else
-            # Read version from package.json after real run
-            if [[ -f package.json ]]; then
-              NEW_VERSION=$(jq -r '.version' package.json)
-              # Construct tag based on version and prefix (assuming 'v' prefix)
-              RELEASE_TAG="v${NEW_VERSION}"
-              echo "Actual run - Read Version: $NEW_VERSION"
-              echo "Actual run - Constructed Tag: $RELEASE_TAG"
-            else
-              echo "::error::package.json not found after running package-versioner."
-              exit 1
-            fi
+            NEW_VERSION=$(jq -r '.version' package.json)
+            RELEASE_TAG="v${NEW_VERSION}"
           fi
 
           if [[ -z "$NEW_VERSION" ]]; then
-            echo "::error::Could not determine new version."
+            echo "::error::Could not determine new version"
             exit 1
-          fi
-          if [[ -z "$RELEASE_TAG" ]]; then
-             echo "::error::Could not determine release tag."
-             exit 1
           fi
 
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${RELEASE_TAG:-v$NEW_VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: 📢 Publish to NPM
+      - name: Publish to NPM
+        if: inputs.dry_run == false
         shell: bash
-        if: ${{ steps.version.outputs.new_version != 'FAILED' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
         run: |
           NPM_TAG="latest"
-          # Determine NPM tag based on version (handle potential missing version in dry run)
-          VERSION_TO_CHECK="${{ steps.version.outputs.new_version }}"
-          if [[ -z "$VERSION_TO_CHECK" ]]; then
-             echo "::warning::Cannot determine NPM tag because version is empty."
-          elif [[ "$VERSION_TO_CHECK" =~ (beta|alpha|rc|pre) ]]; then
-             NPM_TAG="next"
+          VERSION="${{ steps.version.outputs.new_version }}"
+          if [[ "$VERSION" =~ (beta|alpha|rc|pre|next) ]]; then
+            NPM_TAG="next"
           fi
-          
-          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-              # Configure NPM auth for dry-run mode so npm whoami can verify token
-              echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
-              echo "[DRY RUN] Checking NPM authentication..."
-              # Run npm whoami and output a warning on failure, but don't fail the step
-              npm whoami || echo "::warning::NPM auth check failed (npm whoami). Token might be invalid or missing."
-              echo "[DRY RUN] Would publish version $VERSION_TO_CHECK to NPM with tag \"$NPM_TAG\""
-           else
-             if [[ -z "$VERSION_TO_CHECK" ]]; then
-                echo "::error::Cannot publish to NPM because version is empty."
-                exit 1
-             fi
-             echo "Publishing version $VERSION_TO_CHECK to NPM with tag $NPM_TAG..."
-             # Ensure NODE_AUTH_TOKEN is set before publishing
-             if [[ -z "${NODE_AUTH_TOKEN}" ]]; then
-                 echo "::error::NODE_AUTH_TOKEN is not set. Cannot publish to NPM."
-                 exit 1
-             fi
 
-             # Explicitly configure .npmrc
-             echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
-             # echo "registry=https://registry.npmjs.org/" >> .npmrc # Optional: Ensure registry URL
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
+          echo "Publishing $VERSION to NPM with tag $NPM_TAG..."
+          pnpm publish --tag $NPM_TAG --no-git-checks
 
-             # Now publish
-             pnpm publish --tag $NPM_TAG --no-git-checks
-             PUBLISH_STATUS=$?
-
-             # Check if failure was due to version already existing
-             if [ $PUBLISH_STATUS -ne 0 ]; then
-                 # Check if error is due to version already existing
-                 if npm view package-versioner version | grep -q "^${VERSION_TO_CHECK}$"; then
-                     echo "Warning: Version ${VERSION_TO_CHECK} already exists in the registry."
-                     echo "This is likely because the package was already published with this version."
-                     # Don't fail the workflow, this is a recoverable situation
-                     echo "Continuing with the workflow..."
-                 else
-                     echo "::error::Failed to publish to NPM. Not related to existing version."
-                     exit 1
-                 fi
-             fi
-
-             # Optional: Remove .npmrc after publish for cleanup
-             # rm -f .npmrc
-          fi
+      - name: Publish to NPM (dry run)
+        if: inputs.dry_run == true
+        shell: bash
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.npm_token }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
+          npm whoami || echo "::warning::NPM auth check failed"
+          echo "[DRY RUN] Would publish ${{ steps.version.outputs.new_version }} to NPM"
 
-      - name: 🚀 Push Tags and Commits
-        id: push_tags # Renamed from push_tags to avoid conflict?
+      - name: Push tags and commits
         if: inputs.dry_run == false
         shell: bash
         run: |
           RELEASE_TAG="${{ steps.version.outputs.release_tag }}"
-          TARGET_BRANCH="${{ steps.define.outputs.tagging_branch }}"
-          echo "Pushing tag $RELEASE_TAG and branch $TARGET_BRANCH..."
+          echo "Pushing tag $RELEASE_TAG and commits to main..."
 
-          # Make sure git knows who is making the tag
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          
-          # Create the tag explicitly before pushing
-          git tag -a $RELEASE_TAG -m "Release $RELEASE_TAG" || echo "Tag already exists, continuing..."
-          
-          # Now push the tag and branch
+          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG" || echo "Tag already exists"
           git push origin "$RELEASE_TAG" --no-verify
-          # Push the branch where the version commit was made
-          git push origin "HEAD:$TARGET_BRANCH" --no-verify
+          git push origin HEAD:main --no-verify
 
-          echo "✅ Pushed tag and branch."
-          # Output the tag again for the release step (redundant but safe)
-          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
-
-      - name: 📝 Create GitHub Release
+      - name: Create GitHub release
         if: inputs.dry_run == false
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.release_tag }}
           name: Release ${{ steps.version.outputs.release_tag }}
-          # generate_release_notes: true # Consider enabling if you want auto-generated notes
           prerelease: ${{ contains(inputs.release_version, 'pre') }}
+
+      - name: Dry run summary
+        if: inputs.dry_run == true
+        run: |
+          echo "## Dry Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: ${{ steps.version.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tag: ${{ steps.version.outputs.release_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Release type: ${{ inputs.release_version }}" >> $GITHUB_STEP_SUMMARY

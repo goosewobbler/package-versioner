@@ -116,6 +116,12 @@
       "default": false,
       "description": "Only use reachable tags (no fallback to unreachable tags)"
     },
+    "mismatchStrategy": {
+      "type": "string",
+      "enum": ["error", "warn", "ignore", "prefer-package", "prefer-git"],
+      "default": "warn",
+      "description": "How to handle version mismatches between git tags and package.json. 'warn' logs a warning, 'error' throws, 'prefer-package' uses package.json version, 'prefer-git' uses git tag, 'ignore' silently continues."
+    },
     "cargo": {
       "type": "object",
       "properties": {

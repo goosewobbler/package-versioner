@@ -130,6 +130,39 @@ Result: Uses 2.0.0 as base in normal mode (unreachable tag is newer)
         Uses 1.0.0 as base in strict mode (unreachable tag ignored)
 ```
 
+### Version Mismatch Detection
+
+When Git tags and manifest versions diverge significantly, it can lead to unexpected version bumps. A common scenario is when a release is reverted but its Git tag is not deleted — the tool sees the tag as the latest version and bumps from there.
+
+For example:
+```
+- Git tag: v1.0.0 (from a reverted release)
+- package.json: 1.0.0-beta.3
+- Without mismatch detection: Uses v1.0.0 as base, next release bumps to v2.0.0
+```
+
+The `mismatchStrategy` option controls how these situations are handled:
+
+| Strategy | Behavior |
+|----------|----------|
+| `"warn"` (default) | Logs a warning describing the mismatch, then continues with the higher version |
+| `"error"` | Throws an error and stops execution, forcing the user to resolve the mismatch |
+| `"prefer-package"` | Uses the package.json version as the base when a mismatch is detected |
+| `"prefer-git"` | Uses the git tag version as the base when a mismatch is detected |
+| `"ignore"` | Silently continues with the higher version (pre-v0.9.4 behavior) |
+
+Mismatches are detected in the following cases:
+- Git tag is a stable release but package.json is a prerelease of the same major version (e.g., tag `1.0.0` vs package `1.0.0-beta.3`)
+- Git tag is ahead by a major or minor version (e.g., tag `2.0.0` vs package `1.0.0`)
+- Git tag is a prerelease but package.json is a stable release (e.g., tag `1.0.0-beta.1` vs package `1.0.0`)
+
+Configure it in `version.config.json`:
+```json
+{
+  "mismatchStrategy": "prefer-package"
+}
+```
+
 ## Package Targeting in Monorepos
 
 When working with monorepos, you can control which packages are processed for versioning using the `packages` configuration option. This provides flexible targeting with support for various pattern types.

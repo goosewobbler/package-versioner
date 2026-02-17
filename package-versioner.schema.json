@@ -119,8 +119,8 @@
     "mismatchStrategy": {
       "type": "string",
       "enum": ["error", "warn", "ignore", "prefer-package", "prefer-git"],
-      "default": "warn",
-      "description": "How to handle version mismatches between git tags and package.json. 'warn' logs a warning, 'error' throws, 'prefer-package' uses package.json version, 'prefer-git' uses git tag, 'ignore' silently continues."
+      "default": "error",
+      "description": "How to handle version mismatches between git tags and package.json. 'error' throws and stops execution (default), 'warn' logs a warning but continues, 'prefer-package' uses package.json version, 'prefer-git' uses git tag, 'ignore' silently continues."
     },
     "cargo": {
       "type": "object",

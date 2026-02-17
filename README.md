@@ -168,9 +168,9 @@ Customize behaviour by creating a `version.config.json` file in your project roo
 - `changelogFormat`: Format for changelogs - "keep-a-changelog" or "angular" (default: "keep-a-changelog")
 - `strictReachable`: Only use reachable tags, no fallback to unreachable tags (default: false)
 - `prereleaseIdentifier`: Identifier for prerelease versions (e.g., "alpha", "beta", "next") used in versions like "1.2.0-alpha.3"
-- `mismatchStrategy`: How to handle version mismatches between git tags and package.json (default: "warn"). Options:
+- `mismatchStrategy`: How to handle version mismatches between git tags and package.json (default: "error"). Options:
+  - `"error"`: Throw an error and stop execution, forcing the mismatch to be resolved
   - `"warn"`: Log a warning but continue with the higher version
-  - `"error"`: Throw an error and stop execution
   - `"prefer-package"`: Use the package.json version when a mismatch is detected
   - `"prefer-git"`: Use the git tag version when a mismatch is detected
   - `"ignore"`: Silently continue with the higher version
